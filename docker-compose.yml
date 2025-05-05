@@ -1,0 +1,21 @@
+services:
+  ollama:
+    build: ollama-mcp/
+    ports:
+      - "11435:11434"
+    container_name: ollama
+    volumes:
+      - ollama_data:/root/.ollama
+    deploy:
+       resources:
+         reservations:
+           devices:
+             - driver: nvidia
+               count: 1
+               capabilities: [gpu]
+    environment:
+       - NVIDIA_VISIBLE_DEVICES=all
+
+
+volumes:
+  ollama_data:
