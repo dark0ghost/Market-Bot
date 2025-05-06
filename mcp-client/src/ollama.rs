@@ -1,6 +1,5 @@
-use mistralrs::ChatCompletionResponse;
 use ollama_rs::Ollama;
-use crate::llm::llm_provider::LLMProvider;
+use crate::llm_provider::LLMProvider;
 
 struct OllamaProvider {
     ollama: Ollama
@@ -24,7 +23,7 @@ impl Default for OllamaProvider {
 }
 
 impl LLMProvider for OllamaProvider {
-    async fn send_message(&self, text: String) -> anyhow::Result<ChatCompletionResponse> {
-
+    async fn send_message(&self, text: String) -> anyhow::Result<()> {
+             Ok(())
     }
 }
