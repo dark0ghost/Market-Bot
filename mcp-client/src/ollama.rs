@@ -5,6 +5,11 @@ use ollama_rs::models::LocalModel;
 use ollama_rs::Ollama;
 use crate::llm_provider::LLMProvider;
 
+
+pub type LlmError = OllamaError;
+pub type LlmMessage = ChatMessageResponse;
+
+
 pub struct OllamaProvider {
     ollama: Ollama,
     model: String,
@@ -33,7 +38,7 @@ impl Default for OllamaProvider {
     }
 }
 
-impl LLMProvider<ChatMessageResponse, OllamaError> for OllamaProvider {
+impl LLMProvider<LlmMessage, LlmError> for OllamaProvider {
     async fn send_message(self, text: String) -> Result<ChatMessageResponse, OllamaError> {
         let user_message = ChatMessage::user(text.to_owned());
         self.ollama.send_chat_messages(ChatMessageRequest::new(self.model, vec![user_message])).await
