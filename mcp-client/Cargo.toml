@@ -1,7 +1,8 @@
 [package]
 name = "mcp-client"
-version = "0.1.0"
 edition = "2024"
+license-file = "../LICENSE"
+version.workspace = true
 
 [dependencies]
 # https://github.com/pepperoni21/ollama-rs?tab=readme-ov-file#create-a-custom-tool

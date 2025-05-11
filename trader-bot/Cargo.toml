@@ -1,10 +1,12 @@
 [package]
 name = "trader-bot"
-version = "0.1.0"
-edition = "2021"
+edition = "2024"
+license-file = "../LICENSE"
+version.workspace = true
 
 [dependencies]
 t-invest-sdk = { git = "https://github.com/artemevsevev/t-invest-sdk.git", version = "0.6.0"}
+mcp-client = { workspace = true, optional = true }
 tokio = { version = "1.42.0", features = ["full"] }
 flume = "0.11.1"
 anyhow = "1.0.95"

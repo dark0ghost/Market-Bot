@@ -1,0 +1,9 @@
+[workspace]
+resolver = "2"
+members = ["mcp-client", "trader-bot"]
+
+[workspace.dependencies]
+mcp-client = { path = "mcp-client" }
+
+[workspace.package]
+version = "0.1.0"
