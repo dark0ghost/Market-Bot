@@ -3,6 +3,7 @@ mod utils;
 mod strategy;
 mod client;
 mod mcp;
+mod instrument;
 
 use anyhow::anyhow;
 use std::env;
@@ -16,7 +17,7 @@ use t_invest_sdk::{Environment, TInvestSdk};
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let token = env::var("API_TOKEN")?;
-    let sdk = TInvestSdk::new(&token, Environment::Production).await?;
+    let sdk = TInvestSdk::new(&token, Environment::Sandbox).await?;
     let mut instruments_service_client = sdk.instruments();
     let mut market_data_stream_service_client = sdk.market_data_stream();
 

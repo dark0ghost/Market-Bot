@@ -1,6 +1,10 @@
+#![feature(cell_update)]
+use std::cell::{Cell, RefCell};
+use ollama_rs::coordinator::Coordinator;
 use ollama_rs::error::OllamaError;
 use ollama_rs::generation::chat::{ChatMessage, ChatMessageResponse};
 use ollama_rs::generation::chat::request::ChatMessageRequest;
+use ollama_rs::generation::tools::Tool;
 use ollama_rs::models::LocalModel;
 use ollama_rs::Ollama;
 use crate::llm_provider::LLMProvider;
@@ -13,15 +17,37 @@ pub type LlmMessage = ChatMessageResponse;
 pub struct OllamaProvider {
     ollama: Ollama,
     model: String,
+    coordinator: RefCell<Coordinator<Vec<ChatMessage>>>,
 }
 
 impl OllamaProvider {
     fn new(model: String, host: String, port: u16) -> Self {
         let ollama = Ollama::new(host, port);
+        let coordinator = RefCell::new(Coordinator::new(
+            ollama.clone(),
+            model.clone(),
+            vec![],
+        ));
+
         OllamaProvider {
             ollama,
             model,
+            coordinator,
         }
+    }
+
+    fn add_tool<T: Tool + 'static>(&mut self, tools: Vec<T>) {
+        let mut coordinator = Coordinator::new(
+            self.ollama.clone(),
+            self.model.clone(),
+            vec![],
+        );
+        for tool in tools {
+            coordinator = coordinator.add_tool(tool)
+        }
+
+        let mut cord = self.coordinator.get_mut();
+        *cord = coordinator
     }
 
     async fn get_local_model(self) -> Result<Vec<LocalModel>, OllamaError> {
@@ -31,9 +57,17 @@ impl OllamaProvider {
 
 impl Default for OllamaProvider {
     fn default() -> Self {
+        let ollama = Ollama::default();
+        let model = "qwen3:1.7b".to_string();
+        let coordinator = Coordinator::new(
+            ollama.clone(),
+            model.clone(),
+            vec![],
+        );
         OllamaProvider {
-            ollama: Ollama::default(),
-            model: "qwen3:1.7b".to_string(),
+            ollama,
+            model,
+            coordinator: RefCell::new(coordinator)
         }
     }
 }
