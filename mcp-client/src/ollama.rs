@@ -1,14 +1,13 @@
-#![feature(cell_update)]
-use std::cell::{Cell, RefCell};
+use std::cell::RefCell;
+
 use ollama_rs::coordinator::Coordinator;
 use ollama_rs::error::OllamaError;
 use ollama_rs::generation::chat::{ChatMessage, ChatMessageResponse};
-use ollama_rs::generation::chat::request::ChatMessageRequest;
 use ollama_rs::generation::tools::Tool;
 use ollama_rs::models::LocalModel;
 use ollama_rs::Ollama;
-use crate::llm_provider::LLMProvider;
 
+use crate::llm_provider::LLMProvider;
 
 pub type LlmError = OllamaError;
 pub type LlmMessage = ChatMessageResponse;
@@ -46,7 +45,7 @@ impl OllamaProvider {
             coordinator = coordinator.add_tool(tool)
         }
 
-        let mut cord = self.coordinator.get_mut();
+        let cord = self.coordinator.get_mut();
         *cord = coordinator
     }
 
@@ -67,7 +66,7 @@ impl Default for OllamaProvider {
         OllamaProvider {
             ollama,
             model,
-            coordinator: RefCell::new(coordinator)
+            coordinator: RefCell::new(coordinator),
         }
     }
 }
@@ -75,12 +74,20 @@ impl Default for OllamaProvider {
 impl LLMProvider<LlmMessage, LlmError> for OllamaProvider {
     async fn send_message(self, text: String) -> Result<ChatMessageResponse, OllamaError> {
         let user_message = ChatMessage::user(text.to_owned());
-        self.ollama.send_chat_messages(ChatMessageRequest::new(self.model, vec![user_message])).await
+        self
+            .coordinator
+            .borrow_mut()
+            .chat(vec![user_message])
+            .await
     }
 }
 
 mod test {
+    use std::fmt::format;
+    use crate::llm_provider::LLMProvider;
     use crate::ollama::OllamaProvider;
+
+    const CPU_TEMPERATURE: &str = "32";
 
     #[tokio::test]
     async fn test_default() {
@@ -88,5 +95,24 @@ mod test {
         let models = ollama.get_local_model().await.unwrap();
 
         assert_ne!(models.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_working_add_tool() {
+        let mut ollama = OllamaProvider::default();
+
+        ollama.add_tool(vec![get_cpu_temperature]);
+        let response = ollama
+            .send_message("What's the CPU temperature?".to_owned())
+            .await
+            .expect("Ollama not working");
+
+        assert!(response.message.content.contains(&CPU_TEMPERATURE.to_string()))
+    }
+
+    /// Get the CPU temperature in Celsius.
+    #[ollama_rs::function]
+    async fn get_cpu_temperature() -> Result<&str, Box<dyn std::error::Error + Send + Sync>> {
+        Ok(CPU_TEMPERATURE.to_string())
     }
 }
