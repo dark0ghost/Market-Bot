@@ -6,6 +6,8 @@
 
 [Perplexica](https://github.com/ItzCrazyKns/Perplexica) — это open-source AI-поисковик, который работает на вашем оборудовании и предоставляет точные ответы с цитированием источников.
 
+**Документация API получена через Context7 MCP сервер** — актуальная информация из репозитория GitHub.
+
 ## Требования
 
 - Запущенный экземпляр Perplexica (порт 3000 по умолчанию)
@@ -19,7 +21,40 @@
 docker run -d -p 3000:3000 -v perplexica-data:/home/perplexica/data --name perplexica itzcrazykns1337/perplexica:latest
 ```
 
-### 2. Использование в коде
+### 2. Получение списка провайдеров
+
+```bash
+curl http://localhost:3000/api/providers
+```
+
+Пример ответа:
+```json
+{
+  "providers": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "name": "OpenAI",
+      "chatModels": [
+        { "name": "GPT 4 Omni Mini", "key": "gpt-4o-mini" }
+      ],
+      "embeddingModels": [
+        { "name": "Text Embedding 3 Large", "key": "text-embedding-3-large" }
+      ]
+    },
+    {
+      "id": "660e8400-e29b-41d4-a716-446655440001",
+      "name": "Ollama",
+      "chatModels": [
+        { "name": "Llama 3.1", "key": "llama3.1:latest" },
+        { "name": "Qwen 3", "key": "qwen3:1.7b" }
+      ],
+      "embeddingModels": [
+        { "name": "Nomic Embed Text", "key": "nomic-embed-text" }
+      ]
+    }
+  ]
+}
+```
 
 ```rust
 use mcp_client::perplexica::{PerplexicaProvider, PerplexicaSearcher, ModelConfig};
@@ -168,17 +203,33 @@ pub struct SourceInfo {
 
 Источники поиска:
 
-- `SearchSource::Web` — веб-страницы
-- `SearchSource::Academic` — академические источники
-- `SearchSource::Discussions` — обсуждения и форумы
+| Источник | Описание |
+|----------|----------|
+| `SearchSource::Web` | Обычный веб-поиск |
+| `SearchSource::Academic` | Академические источники (arxiv, scholar, pubmed) |
+| `SearchSource::Discussions` | Форумы и обсуждения (reddit и др.) |
 
 ### OptimizationMode
 
 Режим оптимизации:
 
-- `OptimizationMode::Speed` — скорость
-- `OptimizationMode::Balanced` — баланс (по умолчанию)
-- `OptimizationMode::Quality` — качество
+| Режим | Описание |
+|-------|----------|
+| `OptimizationMode::Speed` | Самая быстрая выдача, меньшее качество (по умолчанию) |
+| `OptimizationMode::Balanced` | Баланс между скоростью и качеством |
+| `OptimizationMode::Quality` | Лучшее качество, медленнее |
+
+### FocusMode
+
+Режимы фокусировки (для `/api/chat`):
+
+| Режим | Описание |
+|-------|----------|
+| `FocusMode::WebSearch` | Веб-поиск |
+| `FocusMode::AcademicSearch` | Академический поиск |
+| `FocusMode::YoutubeSearch` | Поиск на YouTube |
+| `FocusMode::RedditSearch` | Поиск на Reddit |
+| `FocusMode::WritingAssistant` | Помощник в написании (без поиска) |
 
 ## Интеграция с LLM Tools
 
@@ -238,50 +289,92 @@ async fn monitor_portfolio(portfolio: &[(&str, &str)]) -> Result<()> {
 
 ## Конфигурация Perplexica
 
-### Получение списка провайдеров
+### API Endpoints
+
+#### GET /api/providers
+
+Получение списка всех провайдеров и моделей.
 
 ```bash
 curl http://localhost:3000/api/providers
 ```
 
-Ответ:
+**Ответ:**
 ```json
 {
   "providers": [
     {
-      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "id": "uuid",
       "name": "OpenAI",
-      "chatModels": [
-        { "name": "GPT 4 Omni Mini", "key": "gpt-4o-mini" }
-      ],
-      "embeddingModels": [
-        { "name": "Text Embedding 3 Large", "key": "text-embedding-3-large" }
-      ]
+      "chatModels": [{"name": "GPT 4", "key": "gpt-4"}],
+      "embeddingModels": [{"name": "Text Embedding", "key": "text-embedding"}]
     }
   ]
 }
 ```
 
-### Пример запроса к API
+#### POST /api/search
 
+Поисковый запрос с AI-ответом.
+
+**Request:**
 ```bash
 curl -X POST http://localhost:3000/api/search \
   -H "Content-Type: application/json" \
   -d '{
     "chatModel": {
-      "providerId": "550e8400-e29b-41d4-a716-446655440000",
+      "providerId": "uuid",
       "key": "gpt-4o-mini"
     },
     "embeddingModel": {
-      "providerId": "550e8400-e29b-41d4-a716-446655440000",
+      "providerId": "uuid",
       "key": "text-embedding-3-large"
     },
     "sources": ["web"],
-    "query": "Apple Inc. stock analysis",
     "optimizationMode": "balanced",
+    "query": "Apple Inc. stock analysis",
     "stream": false
   }'
 ```
+
+**Response (JSON):**
+```json
+{
+  "message": "AI ответ...",
+  "sources": [
+    {
+      "content": "сниппет",
+      "metadata": {
+        "title": "Заголовок",
+        "url": "https://..."
+      }
+    }
+  ]
+}
+```
+
+**Streaming (SSE):**
+```bash
+curl -N -X POST http://localhost:3000/api/search \
+  -H "Content-Type: application/json" \
+  -d '{"stream": true, ...}'
+```
+
+Формат потока:
+```
+{"type":"init","data":"Stream connected"}
+{"type":"sources","data":[...]}
+{"type":"response","data":"часть ответа"}
+{"type":"done"}
+```
+
+### Коды ошибок HTTP
+
+| Статус | Описание |
+|--------|----------|
+| `200 OK` | Успешный поиск |
+| `400 Bad Request` | Отсутствуют обязательные поля |
+| `500 Internal Server Error` | Ошибка сервера |
 
 ## Тесты
 
@@ -293,3 +386,5 @@ cargo test -p mcp-client
 
 - [GitHub репозиторий Perplexica](https://github.com/ItzCrazyKns/Perplexica)
 - [Документация API](https://github.com/ItzCrazyKns/Perplexica/tree/master/docs/API)
+- [Context7 MCP Server](https://github.com/upstash/context7) — для получения актуальной документации
+- [Perplexica Search API Spec](https://github.com/ItzCrazyKns/Perplexica/blob/main/docs/API/SEARCH.md)

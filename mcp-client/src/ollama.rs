@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+use std::sync::Arc;
 
 use ollama_rs::coordinator::Coordinator;
 use ollama_rs::error::OllamaError;
@@ -6,6 +6,7 @@ use ollama_rs::generation::chat::{ChatMessage, ChatMessageResponse};
 use ollama_rs::generation::tools::Tool;
 use ollama_rs::models::LocalModel;
 use ollama_rs::Ollama;
+use tokio::sync::Mutex;
 
 use crate::llm_provider::LLMProvider;
 
@@ -13,12 +14,13 @@ pub type LlmError = OllamaError;
 pub type LlmMessage = ChatMessageResponse;
 
 
+/// Провайдер для работы с Ollama API
 pub struct OllamaProvider {
     ollama: Ollama,
     model: String,
     host: String,
     port: u16,
-    coordinator: RefCell<Coordinator<Vec<ChatMessage>>>,
+    coordinator: Arc<Mutex<Coordinator<Vec<ChatMessage>>>>,
 }
 
 impl Clone for OllamaProvider {
@@ -27,11 +29,11 @@ impl Clone for OllamaProvider {
             self.host.clone(),
             self.port,
         );
-        let coordinator = RefCell::new(Coordinator::new(
+        let coordinator = Arc::new(Mutex::new(Coordinator::new(
             ollama.clone(),
             self.model.clone(),
             vec![],
-        ));
+        )));
 
         OllamaProvider {
             ollama,
@@ -46,11 +48,11 @@ impl Clone for OllamaProvider {
 impl OllamaProvider {
     pub fn new(model: String, host: String, port: u16) -> Self {
         let ollama = Ollama::new(host.clone(), port);
-        let coordinator = RefCell::new(Coordinator::new(
+        let coordinator = Arc::new(Mutex::new(Coordinator::new(
             ollama.clone(),
             model.clone(),
             vec![],
-        ));
+        )));
 
         OllamaProvider {
             ollama,
@@ -71,8 +73,11 @@ impl OllamaProvider {
             coordinator = coordinator.add_tool(tool)
         }
 
-        let cord = self.coordinator.get_mut();
-        *cord = coordinator
+        let cord = self.coordinator.clone();
+        tokio::spawn(async move {
+            let mut guard = cord.lock().await;
+            *guard = coordinator;
+        });
     }
 
     async fn get_local_model(self) -> Result<Vec<LocalModel>, OllamaError> {
@@ -86,17 +91,17 @@ impl Default for OllamaProvider {
         let model = "qwen3:1.7b".to_string();
         let host = "http://localhost".to_string();
         let port = 11434u16;
-        let coordinator = Coordinator::new(
+        let coordinator = Arc::new(Mutex::new(Coordinator::new(
             ollama.clone(),
             model.clone(),
             vec![],
-        );
+        )));
         OllamaProvider {
             ollama,
             model,
             host,
             port,
-            coordinator: RefCell::new(coordinator),
+            coordinator,
         }
     }
 }
@@ -104,9 +109,8 @@ impl Default for OllamaProvider {
 impl LLMProvider<LlmMessage, LlmError> for OllamaProvider {
     async fn send_message(&self, text: String) -> Result<ChatMessageResponse, OllamaError> {
         let user_message = ChatMessage::user(text.to_owned());
-        self
-            .coordinator
-            .borrow_mut()
+        let mut coordinator = self.coordinator.lock().await;
+        coordinator
             .chat(vec![user_message])
             .await
     }

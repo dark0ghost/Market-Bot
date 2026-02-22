@@ -229,25 +229,29 @@ impl TradingExecutor {
                 }
             }
             Action::Sell => {
-                if let Some(entry_price) = decision.entry_price {
+                if let Some(current_position) = decision.current_position {
                     // Для продажи используем текущую позицию
                     let quantity = self.calculate_sell_quantity(
-                        entry_price,
+                        current_position,
                         decision.position_size_pct,
                     );
 
                     if quantity > 0 {
+                        // Используем текущую цену для заявки
+                        let price = decision.current_price;
                         log::info!(
                             "Размещение SELL заявки: {} лотов по цене {:.2}",
                             quantity,
-                            entry_price
+                            price
                         );
 
                         let order_result = self.position_manager
-                            .place_limit_order(instrument_uid, OrderAction::Sell, quantity, entry_price)
+                            .place_limit_order(instrument_uid, OrderAction::Sell, quantity, price)
                             .await?;
                         results.push(order_result);
                     }
+                } else {
+                    log::warn!("Невозможно продать: текущая позиция не указана");
                 }
             }
             Action::Hold => {
@@ -273,14 +277,22 @@ impl TradingExecutor {
     }
 
     /// Расчет количества лотов для продажи
-    fn calculate_sell_quantity(&self, _price: f64, position_pct: f64) -> i32 {
-        // Для продажи пока возвращаем заглушку
-        // В реальности нужно получать текущую позицию из портфеля
-        if position_pct <= 0.0 {
+    /// 
+    /// # Arguments
+    /// * `current_position` - Текущая позиция в лотах
+    /// * `position_pct` - Процент позиции для продажи (0.0-1.0)
+    /// 
+    /// # Returns
+    /// Количество лотов для продажи
+    fn calculate_sell_quantity(&self, current_position: i32, position_pct: f64) -> i32 {
+        if position_pct <= 0.0 || current_position <= 0 {
             return 0;
         }
 
-        // Продаем всю позицию (100 лотов по умолчанию)
-        100
+        // Рассчитываем количество лотов для продажи на основе процента
+        let quantity = (current_position as f64 * position_pct) as i32;
+        
+        // Округляем до целого лота, минимум 1 если есть позиция
+        quantity.max(1).min(current_position)
     }
 }

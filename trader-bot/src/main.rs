@@ -39,10 +39,10 @@ async fn main() -> Result<()> {
     log::info!("Конфигурация загружена. Режим: {:?}", config.mode);
 
     // Получение токена API
-    let token = if config.creditional.token.is_empty() {
+    let token = if config.credential.token.is_empty() {
         env::var("API_TOKEN")?
     } else {
-        config.creditional.token.clone()
+        config.credential.token.clone()
     };
 
     // Инициализация SDK
@@ -91,8 +91,15 @@ async fn main() -> Result<()> {
             balance
         }
         Err(e) => {
-            log::warn!("Ошибка получения баланса: {}", e);
-            1_000_000.0 // Запасное значение
+            log::error!("Ошибка получения баланса: {}", e);
+            // Используем значение из переменной окружения или завершаем работу
+            std::env::var("DEFAULT_BALANCE")
+                .ok()
+                .and_then(|s| s.parse::<f64>().ok())
+                .unwrap_or_else(|| {
+                    log::error!("Переменная окружения DEFAULT_BALANCE не установлена или некорректна. Завершение работы.");
+                    std::process::exit(1);
+                })
         }
     };
 

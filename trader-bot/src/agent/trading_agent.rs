@@ -21,6 +21,8 @@ pub struct TradingDecision {
     pub rationale: String,
     pub risks: Vec<String>,
     pub time_horizon: TimeHorizon,
+    pub current_position: Option<i32>, // Текущая позиция в лотах (для Sell)
+    pub current_price: f64,            // Текущая цена инструмента
 }
 
 /// Тип действия
@@ -248,6 +250,9 @@ impl TradingAgent {
 
         let rationale = rationale_parts.join("; ");
 
+        // Получаем текущую позицию в лотах
+        let current_position = context.current_position.as_ref().map(|p| p.quantity);
+
         Ok(TradingDecision {
             ticker: context.ticker,
             action,
@@ -259,6 +264,8 @@ impl TradingAgent {
             rationale,
             risks,
             time_horizon,
+            current_position,
+            current_price: context.current_price,
         })
     }
 
@@ -476,19 +483,29 @@ impl TradingAgent {
     }
 
     /// Парсинг ответа LLM
+    /// 
+    /// # Errors
+    /// Возвращает ошибку, если JSON некорректен или отсутствуют обязательные поля
     fn parse_llm_response(
         &self,
         content: &str,
         context: &DecisionContext,
     ) -> Result<TradingDecision> {
         // Поиск JSON в ответе
-        let json_start = content.find('{').unwrap_or(0);
-        let json_end = content.rfind('}').unwrap_or(content.len());
+        let json_start = content.find('{')
+            .ok_or_else(|| anyhow::anyhow!("Не найден JSON в ответе LLM"))?;
+        let json_end = content.rfind('}')
+            .ok_or_else(|| anyhow::anyhow!("Не найден закрывающий символ JSON"))?;
+        
+        if json_start > json_end {
+            anyhow::bail!("Некорректный JSON: открывающая скобка после закрывающей");
+        }
+        
         let json_str = &content[json_start..=json_end];
 
-        // Парсинг JSON
+        // Парсинг JSON с обработкой ошибок
         let parsed: serde_json::Value = serde_json::from_str(json_str)
-            .unwrap_or_else(|_| serde_json::json!({}));
+            .map_err(|e| anyhow::anyhow!("Ошибка парсинга JSON: {}. JSON: {}", e, json_str))?;
 
         // Извлечение полей
         let action_str = parsed["action"].as_str().unwrap_or("HOLD");
@@ -517,6 +534,9 @@ impl TradingAgent {
             _ => TimeHorizon::Medium,
         };
 
+        // Получаем текущую позицию в лотах
+        let current_position = context.current_position.as_ref().map(|p| p.quantity);
+
         Ok(TradingDecision {
             ticker: context.ticker.clone(),
             action,
@@ -528,6 +548,8 @@ impl TradingAgent {
             rationale,
             risks,
             time_horizon,
+            current_position,
+            current_price: context.current_price,
         })
     }
 }

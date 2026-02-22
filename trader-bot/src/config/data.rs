@@ -7,7 +7,7 @@ use anyhow::Result;
 pub struct TradingConfig {
     #[serde(rename = "type")]
     pub config_type: String,
-    pub creditional: Credential,
+    pub credential: Credential,
     pub accounts: Vec<AccountConfig>,
     pub mode: WorkingMode,
     pub llm_config: Option<LlmConfig>,

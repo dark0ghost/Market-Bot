@@ -25,14 +25,17 @@ pub struct ModelConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum OptimizationMode {
+    /// Самая быстрая выдача, меньшее качество
     Speed,
+    /// Баланс между скоростью и качеством
     Balanced,
+    /// Лучшее качество, медленнее
     Quality,
 }
 
 impl Default for OptimizationMode {
     fn default() -> Self {
-        OptimizationMode::Balanced
+        OptimizationMode::Quality
     }
 }
 
@@ -40,9 +43,28 @@ impl Default for OptimizationMode {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum SearchSource {
+    /// Обычный веб-поиск
     Web,
+    /// Академические источники (arxiv, scholar, pubmed)
     Academic,
+    /// Форумы и обсуждения (reddit и др.)
     Discussions,
+}
+
+/// Режим фокусировки (для /api/chat)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum FocusMode {
+    /// Веб-поиск
+    WebSearch,
+    /// Академический поиск
+    AcademicSearch,
+    /// Поиск на YouTube
+    YoutubeSearch,
+    /// Поиск на Reddit
+    RedditSearch,
+    /// Помощник в написании (без поиска)
+    WritingAssistant,
 }
 
 /// Запрос к Perplexica API
@@ -50,9 +72,9 @@ pub enum SearchSource {
 pub struct SearchRequest {
     pub chat_model: ModelConfig,
     pub embedding_model: ModelConfig,
+    pub sources: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub optimization_mode: Option<String>,
-    pub sources: Vec<String>,
     pub query: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub history: Option<Vec<(String, String)>>,
@@ -303,10 +325,25 @@ mod tests {
 
     #[test]
     fn test_optimization_mode_default() {
+        // По умолчанию используется Speed (согласно документации Perplexica)
         assert!(matches!(
             OptimizationMode::default(),
-            OptimizationMode::Balanced
+            OptimizationMode::Quality
         ));
+    }
+
+    #[test]
+    fn test_optimization_mode_serialization() {
+        assert_eq!(serde_json::to_string(&OptimizationMode::Speed).unwrap(), "\"speed\"");
+        assert_eq!(serde_json::to_string(&OptimizationMode::Balanced).unwrap(), "\"balanced\"");
+        assert_eq!(serde_json::to_string(&OptimizationMode::Quality).unwrap(), "\"quality\"");
+    }
+
+    #[test]
+    fn test_focus_mode_serialization() {
+        assert_eq!(serde_json::to_string(&FocusMode::WebSearch).unwrap(), "\"webSearch\"");
+        assert_eq!(serde_json::to_string(&FocusMode::AcademicSearch).unwrap(), "\"academicSearch\"");
+        assert_eq!(serde_json::to_string(&FocusMode::RedditSearch).unwrap(), "\"redditSearch\"");
     }
 
     #[test]

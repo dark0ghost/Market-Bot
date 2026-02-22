@@ -6,6 +6,6 @@ pub trait ApiProvider {
 
 impl ApiProvider for TradingConfig {
     fn get_api_token(config: &TradingConfig) -> String {
-        config.creditional.token.clone()
+        config.credential.token.clone()
     }
 }
