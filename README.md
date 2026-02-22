@@ -39,6 +39,7 @@ AI-powered торговая система для торговли на Моск
 - **Tinkoff Invest API**: Торги на Московской бирже
 - **Ollama LLM**: Локальная языковая модель для анализа
 - **DuckDuckGo**: Поиск новостей
+- **Perplexica**: AI-поисковик для анализа компаний и новостей
 
 ## 🏗 Архитектура
 
@@ -224,6 +225,17 @@ RUST_LOG=info cargo run -p trader-bot
 - Принятие торговых решений
 - Порт: 11435
 
+### Perplexica
+
+AI-поисковая система для глубокого анализа компаний и рынка.
+
+- Поиск информации о компаниях
+- Анализ новостей и аналитики
+- Поиск рейтингов и целевых цен
+- Порт: 3000
+
+📖 **Документация**: [docs/PERPLEXICA.md](./docs/PERPLEXICA.md)
+
 ### Анализ новостей
 
 - Источники: Tinkoff, Investing.com, Bloomberg
@@ -378,6 +390,8 @@ MIT License — см. файл [LICENSE](./LICENSE)
 - [Tinkoff Invest API](https://developer.tbank.ru/invest/intro/intro)
 - [Документация Grid Bot](./GRID_BOT.md)
 - [Ollama Documentation](https://ollama.ai)
+- [Perplexica Documentation](./docs/PERPLEXICA.md)
+- [Perplexica GitHub](https://github.com/ItzCrazyKns/Perplexica)
 
 ## 🤝 Вклад в проект
 
