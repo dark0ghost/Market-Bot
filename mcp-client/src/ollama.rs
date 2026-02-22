@@ -16,12 +16,36 @@ pub type LlmMessage = ChatMessageResponse;
 pub struct OllamaProvider {
     ollama: Ollama,
     model: String,
+    host: String,
+    port: u16,
     coordinator: RefCell<Coordinator<Vec<ChatMessage>>>,
 }
 
+impl Clone for OllamaProvider {
+    fn clone(&self) -> Self {
+        let ollama = Ollama::new(
+            self.host.clone(),
+            self.port,
+        );
+        let coordinator = RefCell::new(Coordinator::new(
+            ollama.clone(),
+            self.model.clone(),
+            vec![],
+        ));
+
+        OllamaProvider {
+            ollama,
+            model: self.model.clone(),
+            host: self.host.clone(),
+            port: self.port,
+            coordinator,
+        }
+    }
+}
+
 impl OllamaProvider {
-    fn new(model: String, host: String, port: u16) -> Self {
-        let ollama = Ollama::new(host, port);
+    pub fn new(model: String, host: String, port: u16) -> Self {
+        let ollama = Ollama::new(host.clone(), port);
         let coordinator = RefCell::new(Coordinator::new(
             ollama.clone(),
             model.clone(),
@@ -31,6 +55,8 @@ impl OllamaProvider {
         OllamaProvider {
             ollama,
             model,
+            host,
+            port,
             coordinator,
         }
     }
@@ -58,6 +84,8 @@ impl Default for OllamaProvider {
     fn default() -> Self {
         let ollama = Ollama::default();
         let model = "qwen3:1.7b".to_string();
+        let host = "http://localhost".to_string();
+        let port = 11434u16;
         let coordinator = Coordinator::new(
             ollama.clone(),
             model.clone(),
@@ -66,13 +94,15 @@ impl Default for OllamaProvider {
         OllamaProvider {
             ollama,
             model,
+            host,
+            port,
             coordinator: RefCell::new(coordinator),
         }
     }
 }
 
 impl LLMProvider<LlmMessage, LlmError> for OllamaProvider {
-    async fn send_message(self, text: String) -> Result<ChatMessageResponse, OllamaError> {
+    async fn send_message(&self, text: String) -> Result<ChatMessageResponse, OllamaError> {
         let user_message = ChatMessage::user(text.to_owned());
         self
             .coordinator

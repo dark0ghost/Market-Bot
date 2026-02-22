@@ -1,0 +1,157 @@
+site_name: AI Trade Bot
+site_description: Документация AI Trade Bot — комплексной торговой системы с ИИ
+site_author: AI Trade Bot Team
+site_url: https://your-username.gitlab.io/ai-trade-bot/
+
+# Репозиторий
+repo_name: ai-trade-bot
+repo_url: https://gitlab.com/your-username/ai-trade-bot
+
+# Тема
+theme:
+  name: material
+  language: ru
+  features:
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.expand
+    - navigation.indexes
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.tabs.link
+    - content.code.annotation
+    - content.code.copy
+    - content.code.select
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  font:
+    text: Roboto
+    code: Roboto Mono
+  favicon: assets/favicon.ico
+  logo: assets/logo.svg
+
+# Навигация
+nav:
+  - Главная: index.md
+  - Быстрый старт:
+    - Что такое AI Trade Bot?: getting-started/what-is.md
+    - Быстрый старт: getting-started/quickstart.md
+    - Первые шаги: getting-started/first-steps.md
+  - Руководство пользователя:
+    - Введение: user-guide/introduction.md
+    - Конфигурация: user-guide/configuration.md
+    - Стратегии: user-guide/strategies.md
+    - Управление рисками: user-guide/risk-management.md
+    - Мониторинг: user-guide/monitoring.md
+  - Стратегии:
+    - Grid Bot: strategies/grid-bot.md
+    - Interval: strategies/interval.md
+    - Momentum: strategies/momentum.md
+    - Mean Reversion: strategies/mean-reversion.md
+  - Разработчикам:
+    - Архитектура: developer-guide/architecture.md
+    - API документация: developer-guide/api.md
+    - Вклад в проект: developer-guide/contributing.md
+    - Changelog: developer-guide/changelog.md
+  - Поддержка:
+    - FAQ: faq.md
+    - Troubleshooting: troubleshooting.md
+
+# Плагины
+plugins:
+  - search:
+      lang:
+        - ru
+        - en
+  - minify:
+      minify_html: true
+  - git-revision-date-localized:
+      type: date
+      locale: ru
+  - mermaid2:
+      version: 9.4.3
+
+# Расширения Markdown
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - def_list
+  - footnotes
+  - toc:
+      permalink: true
+      toc_depth: 3
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.betterem:
+      smart_enable: all
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:materialx.emoji.twemoji
+      emoji_generator: !!python/name:materialx.emoji.to_svg
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.magiclink:
+      normalize_issue_symbols: true
+      repo_url_shorthand: true
+      user: your-username
+      repo: ai-trade-bot
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.snippets:
+      auto_append:
+        - includes/mkdocs.md
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+      combine_header_slug: true
+      slugify: !!python/object/apply:pymdownx.slugs.slugify
+        kwds:
+          case: lower
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+
+# Дополнительные CSS/JS
+extra_css:
+  - stylesheets/extra.css
+
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://polyfill.io/v3/polyfill.min.js?features=es6
+  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+
+# Переменные
+extra:
+  version:
+    provider: mike
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/your-username/ai-trade-bot
+    - icon: fontawesome/brands/telegram
+      link: https://t.me/your-channel
+  analytics:
+    provider: google
+    property: G-XXXXXXXXXX

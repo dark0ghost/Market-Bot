@@ -1,0 +1,109 @@
+# GitLab CI/CD для AI Trade Bot
+
+stages:
+  - test
+  - build
+  - deploy
+
+# Переменные
+variables:
+  CARGO_HOME: "${CI_PROJECT_DIR}/.cargo"
+  RUST_VERSION: "1.75.0"
+  PYTHON_VERSION: "3.11"
+  MKDOCS_VERSION: "1.5.3"
+
+# Кэширование
+.cache: &cache
+  cache:
+    key: "${CI_JOB_NAME}"
+    paths:
+      - .cargo/
+      - target/
+
+# Тестирование Rust
+test:rust:
+  <<: *cache
+  stage: test
+  image: rust:${RUST_VERSION}
+  script:
+    - rustc --version
+    - cargo --version
+    - cargo fmt --all -- --check
+    - cargo clippy -- -D warnings
+    - cargo test --all
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == "main"
+
+# Тестирование документации
+test:docs:
+  stage: test
+  image: python:${PYTHON_VERSION}
+  script:
+    - pip install mkdocs mkdocs-material mkdocs-minify-plugin mkdocs-git-revision-date-localized-plugin mkdocs-mermaid2-plugin
+    - mkdocs build --strict
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == "main"
+  allow_failure: true
+
+# Сборка бота
+build:bot:
+  <<: *cache
+  stage: build
+  image: rust:${RUST_VERSION}
+  script:
+    - cargo build --release
+    - mkdir -p artifacts/
+    - cp target/release/trader-bot artifacts/
+  artifacts:
+    paths:
+      - artifacts/trader-bot
+    expire_in: 1 week
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_COMMIT_BRANCH == "main"
+
+# Деплой документации на GitLab Pages
+pages:
+  stage: deploy
+  image: python:${PYTHON_VERSION}
+  script:
+    - pip install mkdocs mkdocs-material mkdocs-minify-plugin mkdocs-git-revision-date-localized-plugin mkdocs-mermaid2-plugin
+    - mkdocs build --clean --site-dir public
+    - echo "Документация успешно собрана"
+  artifacts:
+    paths:
+      - public
+    expire_in: 30 days
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      when: always
+
+# Ручной деплой конкретной версии
+deploy:version:
+  stage: deploy
+  image: python:${PYTHON_VERSION}
+  script:
+    - pip install mkdocs mkdocs-material mike
+    - git config user.name "${GITLAB_USER_NAME}"
+    - git config user.email "${GITLAB_USER_EMAIL}"
+    - mike deploy --push ${CI_COMMIT_TAG}
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: manual
+
+# Уведомления
+notify:
+  stage: .post
+  image: curlimages/curl:latest
+  script:
+    - |
+      if [ "$CI_JOB_STATUS" == "failed" ]; then
+        curl -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+          -d "chat_id=${TELEGRAM_CHAT_ID}" \
+          -d "text=❌ CI/CD Failed: ${CI_PROJECT_NAME} - ${CI_JOB_NAME}%0A${CI_COMMIT_MESSAGE}%0A${CI_JOB_URL}"
+      fi
+  rules:
+    - if: $TELEGRAM_BOT_TOKEN != null
+      when: on_failure
