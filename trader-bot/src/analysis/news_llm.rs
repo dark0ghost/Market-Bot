@@ -2,6 +2,7 @@ use anyhow::Result;
 use mcp_client::ollama::OllamaProvider;
 use mcp_client::llm_provider::LLMProvider;
 use std::sync::Arc;
+use super::news::Sentiment;
 
 /// Сервис для LLM-анализа новостей
 pub struct NewsLLMService {
@@ -206,12 +207,4 @@ pub struct NewsItem {
     pub content: String,
     pub source: String,
     pub url: String,
-}
-
-/// Тональность новости
-#[derive(Debug, Clone, PartialEq)]
-pub enum Sentiment {
-    Positive,
-    Negative,
-    Neutral,
 }

@@ -4016,6 +4016,7 @@ dependencies = [
  "serde_with",
  "t-invest-sdk",
  "ta",
+ "thiserror 2.0.18",
  "tokio",
  "tonic 0.13.1",
 ]

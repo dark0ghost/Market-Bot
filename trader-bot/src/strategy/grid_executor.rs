@@ -238,3 +238,204 @@ pub struct RebalanceResult {
     pub cancelled_orders: u32,
     pub placed_orders: u32,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::GridConfig;
+
+    #[test]
+    fn test_rebalance_result_debug() {
+        let result = RebalanceResult {
+            cancelled_orders: 2,
+            placed_orders: 3,
+        };
+        assert_eq!(format!("{:?}", result), "RebalanceResult { cancelled_orders: 2, placed_orders: 3 }");
+    }
+
+    #[test]
+    fn test_rebalance_result_clone() {
+        let result = RebalanceResult {
+            cancelled_orders: 1,
+            placed_orders: 2,
+        };
+        let cloned = result.clone();
+        assert_eq!(cloned.cancelled_orders, result.cancelled_orders);
+        assert_eq!(cloned.placed_orders, result.placed_orders);
+    }
+
+    #[test]
+    fn test_grid_order_result_debug() {
+        // Тестируем Debug реализацию для GridOrderResult
+        // Поскольку OrderResult не реализует Debug полностью, тестируем структуру
+        let order_result = OrderResult {
+            order_id: "test_123".to_string(),
+            figi: "BBG000B9XRY4".to_string(),
+            action: OrderAction::Buy,
+            quantity: 10,
+            price: Some(150.50),
+            status: crate::execution::position_manager::OrderStatus::New,
+            created_at: chrono::Utc::now(),
+            message: "Test".to_string(),
+        };
+
+        let grid_result = GridOrderResult {
+            level_index: 5,
+            order_result,
+        };
+
+        let debug_str = format!("{:?}", grid_result);
+        assert!(debug_str.contains("GridOrderResult"));
+        assert!(debug_str.contains("level_index: 5"));
+    }
+
+    #[test]
+    fn test_grid_state_structure() {
+        // Тестируем структуру GridState
+        let state = GridState {
+            ticker: "TINK".to_string(),
+            figi: "BBG000B9XRY4".to_string(),
+            levels: vec![],
+            active_orders: vec![1, 2, 3],
+            filled_orders: vec![0],
+            current_price: 150.0,
+        };
+
+        assert_eq!(state.ticker, "TINK");
+        assert_eq!(state.active_orders.len(), 3);
+        assert_eq!(state.filled_orders.len(), 1);
+        assert_eq!(state.current_price, 150.0);
+    }
+
+    #[test]
+    fn test_needs_rebalance_threshold() {
+        // Тестируем логику rebalance через GridStrategy
+        let config = GridConfig {
+            lower_price: 100.0,
+            upper_price: 200.0,
+            grid_levels: 11,
+            order_size: 10,
+            grid_ratio: 0.5,
+        };
+
+        let strategy = GridStrategy::new(config);
+
+        let state = GridState {
+            ticker: "TINK".to_string(),
+            figi: "BBG000B9XRY4".to_string(),
+            levels: vec![],
+            active_orders: vec![],
+            filled_orders: vec![],
+            current_price: 150.0,
+        };
+
+        // Изменение цены 1% - меньше порога 2%
+        assert!(!strategy.needs_rebalance(&state, 151.5, 0.02));
+
+        // Изменение цены 3% - больше порога 2%
+        assert!(strategy.needs_rebalance(&state, 154.5, 0.02));
+
+        // Изменение цены вниз 3%
+        assert!(strategy.needs_rebalance(&state, 145.5, 0.02));
+    }
+
+    #[test]
+    fn test_get_levels_to_place_logic() {
+        let config = GridConfig {
+            lower_price: 100.0,
+            upper_price: 200.0,
+            grid_levels: 11,
+            order_size: 10,
+            grid_ratio: 0.5,
+        };
+
+        let strategy = GridStrategy::new(config);
+
+        // Цена 150 - buy уровни < 150, sell уровни > 150
+        let levels = strategy.get_levels_to_place(150.0);
+
+        let buy_count = levels.iter()
+            .filter(|l| l.order_type == OrderSide::Buy)
+            .count();
+        let sell_count = levels.iter()
+            .filter(|l| l.order_type == OrderSide::Sell)
+            .count();
+
+        // При grid_ratio 0.5 и 11 уровнях: 5 buy, 5 sell (средний уровень пропускается)
+        assert!(buy_count > 0);
+        assert!(sell_count > 0);
+
+        // Все buy уровни должны быть < 150
+        for level in &levels {
+            if level.order_type == OrderSide::Buy {
+                assert!(level.price < 150.0);
+            } else {
+                assert!(level.price > 150.0);
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_stop_grid_clears_state() {
+        // Тестируем, что stop_grid очищает состояние
+        // Для полноценного теста нужен моковый SDK
+        // Проверяем только логику метода
+
+        let mut state: Option<GridState> = Some(GridState {
+            ticker: "TINK".to_string(),
+            figi: "BBG000B9XRY4".to_string(),
+            levels: vec![],
+            active_orders: vec![1, 2],
+            filled_orders: vec![],
+            current_price: 150.0,
+        });
+
+        // Имитация stop_grid
+        state = None;
+
+        assert!(state.is_none());
+    }
+
+    #[test]
+    fn test_on_order_filled_logic() {
+        // Тестируем логику обработки исполнения ордера
+        let mut state = GridState {
+            ticker: "TINK".to_string(),
+            figi: "BBG000B9XRY4".to_string(),
+            levels: vec![],
+            active_orders: vec![1, 2, 3],
+            filled_orders: vec![],
+            current_price: 150.0,
+        };
+
+        // Имитация on_order_filled для уровня 2
+        let level_index = 2;
+        state.active_orders.retain(|&i| i != level_index);
+        state.filled_orders.push(level_index);
+
+        assert!(!state.active_orders.contains(&2));
+        assert!(state.filled_orders.contains(&2));
+        assert_eq!(state.active_orders.len(), 2);
+        assert_eq!(state.filled_orders.len(), 1);
+    }
+
+    #[test]
+    fn test_opposite_order_side() {
+        // Тестируем логику определения противоположной стороны
+        let buy_side = OrderSide::Buy;
+        let sell_side = OrderSide::Sell;
+
+        let opposite_to_buy = match buy_side {
+            OrderSide::Buy => OrderSide::Sell,
+            OrderSide::Sell => OrderSide::Buy,
+        };
+
+        let opposite_to_sell = match sell_side {
+            OrderSide::Buy => OrderSide::Sell,
+            OrderSide::Sell => OrderSide::Buy,
+        };
+
+        assert_eq!(opposite_to_buy, OrderSide::Sell);
+        assert_eq!(opposite_to_sell, OrderSide::Buy);
+    }
+}

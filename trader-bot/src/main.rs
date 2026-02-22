@@ -7,6 +7,7 @@ mod instrument;
 mod analysis;
 mod agent;
 mod execution;
+pub mod error;
 
 use anyhow::{anyhow, Result};
 use std::env;
@@ -274,14 +275,10 @@ async fn main() -> Result<()> {
                                 if !llm_result.risks.is_empty() {
                                     log::warn!("Риски: {}", llm_result.risks.join(", "));
                                 }
-                                
-                                // Конвертация Sentiment из news_llm в news
-                                let overall_sentiment = match llm_result.overall_sentiment {
-                                    analysis::news_llm::Sentiment::Positive => Sentiment::Positive,
-                                    analysis::news_llm::Sentiment::Negative => Sentiment::Negative,
-                                    analysis::news_llm::Sentiment::Neutral => Sentiment::Neutral,
-                                };
-                                
+
+                                // Sentiment теперь единый, конвертация не нужна
+                                let overall_sentiment = llm_result.overall_sentiment;
+
                                 // Возвращаем обогащенный результат
                                 Some(NewsSentiment {
                                     ticker: instrument.ticker.clone(),

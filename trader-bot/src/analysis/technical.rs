@@ -442,7 +442,6 @@ impl Default for TechnicalAnalyzer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use t_invest_sdk::types::Decimal;
 
     #[test]
     fn test_recommendation_from_score() {

@@ -1,6 +1,6 @@
 use anyhow::Result;
 use reqwest::Client;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
 /// Результат поиска новостей
@@ -15,11 +15,43 @@ pub struct NewsArticle {
 }
 
 /// Тональность новости
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Sentiment {
     Positive,
     Negative,
     Neutral,
+}
+
+impl Sentiment {
+    /// Конвертация в числовое значение
+    pub fn to_score(&self) -> f64 {
+        match self {
+            Sentiment::Positive => 1.0,
+            Sentiment::Negative => -1.0,
+            Sentiment::Neutral => 0.0,
+        }
+    }
+
+    /// Конвертация из числового значения
+    pub fn from_score(score: f64) -> Self {
+        if score > 0.2 {
+            Sentiment::Positive
+        } else if score < -0.2 {
+            Sentiment::Negative
+        } else {
+            Sentiment::Neutral
+        }
+    }
+}
+
+impl std::fmt::Display for Sentiment {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Sentiment::Positive => write!(f, "Positive"),
+            Sentiment::Negative => write!(f, "Negative"),
+            Sentiment::Neutral => write!(f, "Neutral"),
+        }
+    }
 }
 
 /// Агрегированный новостной фон по инструменту
@@ -134,28 +166,16 @@ impl NewsAnalyzer {
             return Ok(0.0);
         }
 
-        let mut total_score = 0.0;
-        for article in articles {
-            let score = match article.sentiment {
-                Some(Sentiment::Positive) => 1.0,
-                Some(Sentiment::Negative) => -1.0,
-                Some(Sentiment::Neutral) | None => 0.0,
-            };
-            total_score += score;
-        }
+        let total_score: f64 = articles.iter()
+            .map(|article| article.sentiment.as_ref().map_or(0.0, Sentiment::to_score))
+            .sum();
 
         Ok(total_score / articles.len() as f64)
     }
 
     /// Конвертация score в Sentiment
     fn score_to_sentiment(&self, score: f64) -> Sentiment {
-        if score > 0.2 {
-            Sentiment::Positive
-        } else if score < -0.2 {
-            Sentiment::Negative
-        } else {
-            Sentiment::Neutral
-        }
+        Sentiment::from_score(score)
     }
 
     /// Извлечение ключевых событий из новостей
@@ -194,9 +214,42 @@ mod tests {
     #[tokio::test]
     async fn test_sentiment_conversion() {
         let analyzer = NewsAnalyzer::new(vec![]);
-        
+
         assert_eq!(analyzer.score_to_sentiment(0.5), Sentiment::Positive);
         assert_eq!(analyzer.score_to_sentiment(-0.5), Sentiment::Negative);
         assert_eq!(analyzer.score_to_sentiment(0.0), Sentiment::Neutral);
+    }
+
+    #[test]
+    fn test_sentiment_to_score() {
+        assert_eq!(Sentiment::Positive.to_score(), 1.0);
+        assert_eq!(Sentiment::Negative.to_score(), -1.0);
+        assert_eq!(Sentiment::Neutral.to_score(), 0.0);
+    }
+
+    #[test]
+    fn test_sentiment_from_score() {
+        assert_eq!(Sentiment::from_score(0.5), Sentiment::Positive);
+        assert_eq!(Sentiment::from_score(-0.5), Sentiment::Negative);
+        assert_eq!(Sentiment::from_score(0.0), Sentiment::Neutral);
+        assert_eq!(Sentiment::from_score(0.2), Sentiment::Neutral);
+        assert_eq!(Sentiment::from_score(-0.2), Sentiment::Neutral);
+        assert_eq!(Sentiment::from_score(0.21), Sentiment::Positive);
+        assert_eq!(Sentiment::from_score(-0.21), Sentiment::Negative);
+    }
+
+    #[test]
+    fn test_sentiment_roundtrip() {
+        // Проверяем, что from_score(to_score(x)) == x
+        assert_eq!(Sentiment::from_score(Sentiment::Positive.to_score()), Sentiment::Positive);
+        assert_eq!(Sentiment::from_score(Sentiment::Negative.to_score()), Sentiment::Negative);
+        assert_eq!(Sentiment::from_score(Sentiment::Neutral.to_score()), Sentiment::Neutral);
+    }
+
+    #[test]
+    fn test_sentiment_display() {
+        assert_eq!(format!("{}", Sentiment::Positive), "Positive");
+        assert_eq!(format!("{}", Sentiment::Negative), "Negative");
+        assert_eq!(format!("{}", Sentiment::Neutral), "Neutral");
     }
 }
