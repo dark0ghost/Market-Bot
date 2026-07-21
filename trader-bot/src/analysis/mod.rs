@@ -3,6 +3,7 @@ pub mod technical;
 pub mod fundamental;
 pub mod fundamental_data;
 pub mod news_llm;
+pub mod regime;
 
 pub use news::{NewsAnalyzer, NewsSentiment, Sentiment, NewsArticle};
 pub use technical::{
@@ -13,6 +14,7 @@ pub use fundamental::{
 };
 pub use fundamental_data::FundamentalDataService;
 pub use news_llm::{NewsLLMService, NewsSentimentResult, BatchSentimentResult, NewsItem};
+pub use regime::{MarketRegime, RegimeDetector};
 
 // Re-export Sentiment from news_llm for backward compatibility
 pub use news::Sentiment as LlmSentiment;

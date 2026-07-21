@@ -1,6 +1,6 @@
 use crate::analysis::{
     NewsSentiment, TechnicalAnalysis, FundamentalAnalysis,
-    Sentiment, Trend, Recommendation, CompanyRating,
+    Sentiment, Trend, Recommendation, CompanyRating, MarketRegime,
 };
 use crate::config::RiskManagementConfig;
 use mcp_client::llm_provider::LLMProvider;
@@ -26,7 +26,7 @@ pub struct TradingDecision {
 }
 
 /// Тип действия
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum Action {
     Buy,
     Sell,
@@ -54,6 +54,8 @@ pub struct DecisionContext {
     pub current_position: Option<CurrentPosition>,
     pub risk_config: Option<RiskManagementConfig>,
     pub max_position_pct: f64,
+    pub market_regime: MarketRegime,
+    pub candles: Vec<crate::client::order_book::OrderBookLevel>,
 }
 
 /// Текущая позиция
@@ -595,6 +597,8 @@ mod tests {
             current_position: None,
             risk_config: None,
             max_position_pct: 0.15,
+            market_regime: MarketRegime::Quiet,
+            candles: vec![],
         };
 
         // Для теста нужен реальный LLM provider, поэтому пропускаем LLM тест
