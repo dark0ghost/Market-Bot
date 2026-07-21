@@ -1,0 +1,15 @@
+{
+  "name": "ai-trade-bot",
+  "display_name": "AI Trade Bot",
+  "description": "Multi-broker algorithmic trading system with ONNX ML inference",
+  "version": "0.3.0",
+  "author": "AI Trade Bot Contributors",
+  "license": "MIT",
+  "repository": "https://github.com/AlexWan/ai-trade-bot",
+  "skills": ["trade-api"],
+  "env": {
+    "API_TOKEN": { "description": "Tinkoff Invest API token", "required": false },
+    "FINAM_API_KEY": { "description": "Finam Trade API key", "required": false },
+    "FINAM_ACCOUNT_ID": { "description": "Finam account ID", "required": false }
+  }
+}

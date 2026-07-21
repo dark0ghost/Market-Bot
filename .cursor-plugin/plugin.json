@@ -1,0 +1,12 @@
+{
+  "name": "ai-trade-bot",
+  "display_name": "AI Trade Bot",
+  "description": "Multi-broker algorithmic trading system with ONNX ML inference",
+  "version": "0.3.0",
+  "skills": ["trade-api"],
+  "env": {
+    "API_TOKEN": { "type": "string", "description": "Tinkoff Invest API token" },
+    "FINAM_API_KEY": { "type": "string", "description": "Finam Trade API key" },
+    "FINAM_ACCOUNT_ID": { "type": "string", "description": "Finam account ID" }
+  }
+}
