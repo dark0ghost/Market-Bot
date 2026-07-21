@@ -1,0 +1,43 @@
+# ─── Data Collection Config for FinBERT SFT ───────────────────────────
+
+rss_feeds:
+  - name: "rbc_macro"
+    url: "https://www.rbc.ru/v8/rss?category=news&tag=macro"
+  - name: "rbc_finance"
+    url: "https://www.rbc.ru/v8/rss?category=news&tag=finance"
+  - name: "interfax"
+    url: "https://www.interfax.ru/rss.asp"
+  - name: "banki_ru"
+    url: "https://www.banki.ru/news/rss/"
+  - name: "cbr"
+    url: "https://www.cbr.ru/rss/"
+
+perplexica:
+  base_url: "http://localhost:3000"
+  topics:
+    - "российский фондовый рынок сегодня"
+    - "ключевая ставка ЦБ РФ"
+    - "нефть и газ финансовые новости"
+    - "курс рубля и валютный рынок"
+    - "санкции влияние на экономику"
+    - "IPO и размещения акций РФ"
+    - "дивиденды российских компаний"
+    - "инфляция и макроэкономика РФ"
+
+ollama:
+  base_url: "http://localhost:11434"
+  model: "fin-expert"
+  temperature: 0.1
+  max_retries: 3
+
+output:
+  dir: "../data_collected"
+  train_ratio: 0.8
+  max_samples_per_source: 5000
+  dedup_field: "text_hash"
+
+collection:
+  interval_minutes: 60
+  max_days_back: 7
+  request_timeout: 15
+  user_agent: "Mozilla/5.0"

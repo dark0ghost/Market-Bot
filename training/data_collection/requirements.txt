@@ -1,0 +1,6 @@
+# Data collection dependencies (extras for training/requirements.txt)
+requests>=2.31.0
+pandas>=2.0.0
+pyyaml>=6.0
+feedparser>=6.0.10
+lxml>=4.9.0
