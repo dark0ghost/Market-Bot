@@ -74,11 +74,11 @@ pub struct DividendMetrics {
 /// Рейтинг компании
 #[derive(Debug, Clone, PartialEq)]
 pub enum CompanyRating {
-    Excellent,    // 80-100
-    Good,         // 60-79
-    Fair,         // 40-59
-    Poor,         // 20-39
-    VeryPoor,     // 0-19
+    Excellent, // 80-100
+    Good,      // 60-79
+    Fair,      // 40-59
+    Poor,      // 20-39
+    VeryPoor,  // 0-19
 }
 
 /// Сервис фундаментального анализа
@@ -122,17 +122,18 @@ impl FundamentalAnalyzer {
         let dividend_score = dividends.as_ref().map_or(0.0, |d| self.score_dividends(d));
 
         // Общий score (взвешенный)
-        let overall_score = (
-            valuation_score * 0.25 +
-            profitability_score * 0.25 +
-            financial_health_score * 0.20 +
-            growth_score * 0.20 +
-            dividend_score * 0.10
-        ).min(100.0).max(0.0);
+        let overall_score = (valuation_score * 0.25
+            + profitability_score * 0.25
+            + financial_health_score * 0.20
+            + growth_score * 0.20
+            + dividend_score * 0.10)
+            .min(100.0)
+            .max(0.0);
 
         let rating = self.score_to_rating(overall_score);
         let key_risks = self.identify_risks(&valuation, &profitability, &financial_health, &growth);
-        let key_strengths = self.identify_strengths(&valuation, &profitability, &financial_health, &growth);
+        let key_strengths =
+            self.identify_strengths(&valuation, &profitability, &financial_health, &growth);
 
         // Market cap расчет (если есть данные)
         let market_cap = None; // Требуется из внешних данных

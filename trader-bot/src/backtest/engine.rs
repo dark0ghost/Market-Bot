@@ -1,8 +1,8 @@
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use t_invest_sdk::api::HistoricCandle;
 use std::collections::VecDeque;
+use t_invest_sdk::api::HistoricCandle;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BacktestConfig {
@@ -43,7 +43,8 @@ pub fn run_backtest(
     config: &BacktestConfig,
     strategy_fn: impl Fn(&[f64], &[f64]) -> f64,
 ) -> Result<BacktestResult> {
-    let closes: Vec<f64> = candles.iter()
+    let closes: Vec<f64> = candles
+        .iter()
         .filter_map(|c| c.close.as_ref())
         .map(|q| q.units as f64 + q.nano as f64 / 1_000_000_000.0)
         .collect();
@@ -66,13 +67,15 @@ pub fn run_backtest(
 
     for i in lookback..closes.len() {
         let window_prices = &closes[i - lookback..=i];
-        let window_volumes: Vec<f64> = candles[i - lookback..=i].iter()
+        let window_volumes: Vec<f64> = candles[i - lookback..=i]
+            .iter()
             .map(|c| c.volume as f64)
             .collect();
 
         let signal = strategy_fn(window_prices, &window_volumes);
         let current_price = closes[i];
-        let timestamp = candles[i].time
+        let timestamp = candles[i]
+            .time
             .as_ref()
             .and_then(|t| DateTime::from_timestamp(t.seconds as i64, 0))
             .unwrap_or(Utc::now());
@@ -107,7 +110,11 @@ pub fn run_backtest(
             let trade_pnl = cost - commission - (balance - cost);
             total_pnl += trade_pnl;
 
-            if trade_pnl > 0.0 { winners += 1; } else { losers += 1; }
+            if trade_pnl > 0.0 {
+                winners += 1;
+            } else {
+                losers += 1;
+            }
 
             trades.push(BacktestTrade {
                 timestamp,
@@ -147,9 +154,11 @@ pub fn run_backtest(
         0.0
     };
     let variance = if returns.len() > 1 {
-        returns.iter()
+        returns
+            .iter()
             .map(|r| (r - avg_return).powi(2))
-            .sum::<f64>() / (returns.len() - 1) as f64
+            .sum::<f64>()
+            / (returns.len() - 1) as f64
     } else {
         0.0
     };
@@ -166,7 +175,11 @@ pub fn run_backtest(
         total_trades: total,
         winning_trades: winners,
         losing_trades: losers,
-        win_rate: if total > 0 { winners as f64 / total as f64 } else { 0.0 },
+        win_rate: if total > 0 {
+            winners as f64 / total as f64
+        } else {
+            0.0
+        },
         total_pnl,
         max_drawdown,
         sharpe_ratio,
@@ -184,7 +197,8 @@ pub fn backtest_grid(
     order_size: u32,
     config: &BacktestConfig,
 ) -> Result<BacktestResult> {
-    let closes: Vec<f64> = candles.iter()
+    let closes: Vec<f64> = candles
+        .iter()
         .filter_map(|c| c.close.as_ref())
         .map(|q| q.units as f64 + q.nano as f64 / 1_000_000_000.0)
         .collect();
@@ -205,9 +219,11 @@ pub fn backtest_grid(
             continue;
         }
 
-        let current_value = balance + grid_positions.iter()
-            .map(|(buy_price, qty)| qty * (price - buy_price))
-            .sum::<f64>();
+        let current_value = balance
+            + grid_positions
+                .iter()
+                .map(|(buy_price, qty)| qty * (price - buy_price))
+                .sum::<f64>();
 
         peak_balance = peak_balance.max(current_value);
         let drawdown = (peak_balance - current_value) / peak_balance;
@@ -220,7 +236,11 @@ pub fn backtest_grid(
             let cost = order_size as f64 * buy_price;
             let with_commission = cost * (1.0 + config.commission_pct);
 
-            if with_commission <= balance && !grid_positions.iter().any(|(p, _)| (p - buy_price).abs() < 0.01) {
+            if with_commission <= balance
+                && !grid_positions
+                    .iter()
+                    .any(|(p, _)| (p - buy_price).abs() < 0.01)
+            {
                 balance -= with_commission;
                 grid_positions.push((buy_price, order_size as f64));
             }
@@ -243,9 +263,11 @@ pub fn backtest_grid(
         }
     }
 
-    let final_value = balance + grid_positions.iter()
-        .map(|(buy_price, qty)| qty * (closes[closes.len() - 1] - buy_price))
-        .sum::<f64>();
+    let final_value = balance
+        + grid_positions
+            .iter()
+            .map(|(buy_price, qty)| qty * (closes[closes.len() - 1] - buy_price))
+            .sum::<f64>();
 
     let total_return = (final_value - config.initial_balance) / config.initial_balance;
 

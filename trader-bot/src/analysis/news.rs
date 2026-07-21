@@ -149,14 +149,14 @@ impl NewsAnalyzer {
         // Примечание: Это упрощенная реализация
         // В продакшене нужно использовать полноценный API или парсинг
         let url = format!("https://html.duckduckgo.com/html/?q={}", query);
-        
+
         match self.client.get(&url).send().await {
             Ok(response) => {
                 let text = response.text().await?;
                 // Упрощенный парсинг - в реальности нужно использовать HTML парсер
                 Ok(vec![]) // Заглушка - реальная реализация через task agent
             }
-            Err(_) => Ok(vec![])
+            Err(_) => Ok(vec![]),
         }
     }
 
@@ -166,7 +166,8 @@ impl NewsAnalyzer {
             return Ok(0.0);
         }
 
-        let total_score: f64 = articles.iter()
+        let total_score: f64 = articles
+            .iter()
             .map(|article| article.sentiment.as_ref().map_or(0.0, Sentiment::to_score))
             .sum();
 
@@ -183,17 +184,18 @@ impl NewsAnalyzer {
         // Здесь будет LLM анализ для извлечения ключевых событий
         // Например: "расконвертация", "дивиденды", "отчетность"
         let mut events = Vec::new();
-        
+
         for article in articles {
             let title_lower = article.title.to_lowercase();
-            
+
             if title_lower.contains("расконверт") {
                 events.push("Расконвертация акций".to_string());
             }
             if title_lower.contains("дивиденд") {
                 events.push("Дивидендные выплаты".to_string());
             }
-            if title_lower.contains("отчет") || title_lower.contains("финансовый результат") {
+            if title_lower.contains("отчет") || title_lower.contains("финансовый результат")
+            {
                 events.push("Финансовая отчетность".to_string());
             }
             if title_lower.contains("санкц") || title_lower.contains("ограничен") {
@@ -241,9 +243,18 @@ mod tests {
     #[test]
     fn test_sentiment_roundtrip() {
         // Проверяем, что from_score(to_score(x)) == x
-        assert_eq!(Sentiment::from_score(Sentiment::Positive.to_score()), Sentiment::Positive);
-        assert_eq!(Sentiment::from_score(Sentiment::Negative.to_score()), Sentiment::Negative);
-        assert_eq!(Sentiment::from_score(Sentiment::Neutral.to_score()), Sentiment::Neutral);
+        assert_eq!(
+            Sentiment::from_score(Sentiment::Positive.to_score()),
+            Sentiment::Positive
+        );
+        assert_eq!(
+            Sentiment::from_score(Sentiment::Negative.to_score()),
+            Sentiment::Negative
+        );
+        assert_eq!(
+            Sentiment::from_score(Sentiment::Neutral.to_score()),
+            Sentiment::Neutral
+        );
     }
 
     #[test]

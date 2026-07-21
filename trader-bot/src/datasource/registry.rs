@@ -26,8 +26,7 @@ impl DataSourceRegistry {
     }
 
     pub fn get_by_kind(&self, kind: DataSourceKind) -> Option<&Arc<dyn DataSource>> {
-        self.sources.values()
-            .find(|s| s.source_kind() == kind)
+        self.sources.values().find(|s| s.source_kind() == kind)
     }
 
     pub fn all(&self) -> Vec<&Arc<dyn DataSource>> {

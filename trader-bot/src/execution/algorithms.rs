@@ -1,7 +1,7 @@
-use anyhow::Result;
-use chrono::Utc;
 use crate::execution::position_manager::{OrderAction, OrderResult};
 use crate::provider::ExecutionProvider;
+use anyhow::Result;
+use chrono::Utc;
 
 pub struct TwapExecutor<E: ExecutionProvider> {
     executor: E,
@@ -48,7 +48,8 @@ impl<E: ExecutionProvider> TwapExecutor<E> {
             }
 
             let start = Utc::now();
-            let result = self.executor
+            let result = self
+                .executor
                 .place_market_order(&self.figi, self.direction.clone(), adjusted)
                 .await?;
             results.push(result);
@@ -56,8 +57,9 @@ impl<E: ExecutionProvider> TwapExecutor<E> {
             let elapsed = Utc::now() - start;
             if elapsed.num_seconds() < self.interval_secs as i64 {
                 tokio::time::sleep(
-                    std::time::Duration::from_secs(self.interval_secs) - elapsed.to_std()?
-                ).await;
+                    std::time::Duration::from_secs(self.interval_secs) - elapsed.to_std()?,
+                )
+                .await;
             }
         }
 
@@ -73,12 +75,7 @@ pub struct VwapExecutor<E: ExecutionProvider> {
 }
 
 impl<E: ExecutionProvider> VwapExecutor<E> {
-    pub fn new(
-        executor: E,
-        figi: String,
-        total_quantity: i32,
-        direction: OrderAction,
-    ) -> Self {
+    pub fn new(executor: E, figi: String, total_quantity: i32, direction: OrderAction) -> Self {
         VwapExecutor {
             executor,
             total_quantity,
@@ -102,7 +99,8 @@ impl<E: ExecutionProvider> VwapExecutor<E> {
                 continue;
             }
 
-            let result = self.executor
+            let result = self
+                .executor
                 .place_limit_order(&self.figi, self.direction.clone(), adjusted, price)
                 .await?;
             results.push(result);

@@ -1,20 +1,20 @@
-pub mod config;
-pub mod utils;
-pub mod provider;
-pub mod strategy;
-pub mod client;
-pub mod mcp;
-pub mod instrument;
-pub mod analysis;
 pub mod agent;
-pub mod execution;
-pub mod error;
-pub mod scanner;
+pub mod analysis;
 pub mod backtest;
-pub mod stream;
-pub mod storage;
-pub mod telemetry;
+pub mod client;
+pub mod config;
+pub mod error;
+pub mod execution;
+pub mod instrument;
+pub mod mcp;
+pub mod provider;
+pub mod scanner;
 pub mod scheduler;
+pub mod storage;
+pub mod strategy;
+pub mod stream;
+pub mod telemetry;
+pub mod utils;
 
 // ─── New Architecture Modules ────────────────────────────────────────
 
@@ -38,11 +38,20 @@ pub mod ml_inference;
 
 // ─── Re-exports for backward compatibility ───────────────────────────
 
-pub use analysis::{Sentiment, NewsSentiment, NewsArticle};
-pub use strategy::{GridStrategy, GridState, GridLevel, OrderSide};
-pub use execution::{PositionManager, TradingExecutor, OrderAction, OrderResult, OrderStatus, TradeJournal, TradeRecord, SignalRecord};
-pub use error::{BotError, OrderError, StrategyError, NewsAnalysisError};
-pub use backtest::{BacktestConfig, BacktestResult, run_backtest, backtest_grid};
+pub use analysis::{NewsArticle, NewsSentiment, Sentiment};
+pub use backtest::{BacktestConfig, BacktestResult, backtest_grid, run_backtest};
+pub use error::{BotError, NewsAnalysisError, OrderError, StrategyError};
+pub use execution::{
+    OrderAction, OrderResult, OrderStatus, PositionManager, SignalRecord, TradeJournal,
+    TradeRecord, TradingExecutor,
+};
+pub use strategy::{GridLevel, GridState, GridStrategy, OrderSide};
 
-pub use analysis::technical::{MacdValues, BollingerValues, VolumeAnalysis, TechnicalAnalysis, TechnicalAnalyzer, Trend, Recommendation};
-pub use analysis::fundamental::{ValuationMetrics, ProfitabilityMetrics, FinancialHealthMetrics, GrowthMetrics, DividendMetrics, FundamentalAnalysis, CompanyRating, FundamentalAnalyzer};
+pub use analysis::fundamental::{
+    CompanyRating, DividendMetrics, FinancialHealthMetrics, FundamentalAnalysis,
+    FundamentalAnalyzer, GrowthMetrics, ProfitabilityMetrics, ValuationMetrics,
+};
+pub use analysis::technical::{
+    BollingerValues, MacdValues, Recommendation, TechnicalAnalysis, TechnicalAnalyzer, Trend,
+    VolumeAnalysis,
+};

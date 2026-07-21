@@ -1,11 +1,11 @@
 use crate::analysis::{
-    NewsSentiment, TechnicalAnalysis, FundamentalAnalysis,
-    Sentiment, Trend, Recommendation, CompanyRating, MarketRegime,
+    CompanyRating, FundamentalAnalysis, MarketRegime, NewsSentiment, Recommendation, Sentiment,
+    TechnicalAnalysis, Trend,
 };
 use crate::config::RiskManagementConfig;
+use anyhow::Result;
 use mcp_client::llm_provider::LLMProvider;
 use mcp_client::ollama::OllamaProvider;
-use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
 /// Решение торгового агента
@@ -13,9 +13,9 @@ use serde::{Deserialize, Serialize};
 pub struct TradingDecision {
     pub ticker: String,
     pub action: Action,
-    pub confidence: f64,           // 0.0 - 1.0
-    pub entry_price: Option<f64>,  // Рекомендуемая цена входа
-    pub position_size_pct: f64,    // Доля от портфеля (0.0 - 1.0)
+    pub confidence: f64,          // 0.0 - 1.0
+    pub entry_price: Option<f64>, // Рекомендуемая цена входа
+    pub position_size_pct: f64,   // Доля от портфеля (0.0 - 1.0)
     pub stop_loss: Option<f64>,
     pub take_profit: Option<f64>,
     pub rationale: String,
@@ -36,9 +36,9 @@ pub enum Action {
 /// Горизонт инвестирования
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum TimeHorizon {
-    Short,   // 1-7 дней
-    Medium,  // 1-4 недели
-    Long,    // 1+ месяцев
+    Short,  // 1-7 дней
+    Medium, // 1-4 недели
+    Long,   // 1+ месяцев
 }
 
 /// Контекст для принятия решения
@@ -108,8 +108,7 @@ impl TradingAgent {
                     confidence += 0.1;
                     rationale_parts.push(format!(
                         "Позитивный новостной фон (score: {:.2}, статей: {})",
-                        news.sentiment_score,
-                        news.articles_count
+                        news.sentiment_score, news.articles_count
                     ));
                 }
                 Sentiment::Negative => {
@@ -127,10 +126,7 @@ impl TradingAgent {
 
             // Ключевые события
             if !news.key_events.is_empty() {
-                rationale_parts.push(format!(
-                    "Ключевые события: {}",
-                    news.key_events.join(", ")
-                ));
+                rationale_parts.push(format!("Ключевые события: {}", news.key_events.join(", ")));
             }
         }
 
@@ -231,18 +227,11 @@ impl TradingAgent {
         }
 
         // Расчет размера позиции
-        let position_size_pct = self.calculate_position_size(
-            &context,
-            &action,
-            confidence,
-        );
+        let position_size_pct = self.calculate_position_size(&context, &action, confidence);
 
         // Stop Loss и Take Profit
-        let (stop_loss, take_profit) = self.calculate_levels(
-            context.current_price,
-            &action,
-            &context.risk_config,
-        );
+        let (stop_loss, take_profit) =
+            self.calculate_levels(context.current_price, &action, &context.risk_config);
 
         // Время горизонта
         let time_horizon = self.determine_time_horizon(&context);
@@ -290,7 +279,8 @@ impl TradingAgent {
             // Если цена близко к сопротивлению - уменьшаем позицию
             if !tech.resistance_levels.is_empty() {
                 if let Some(&resistance) = tech.resistance_levels.first() {
-                    let distance_to_resistance = (resistance - context.current_price) / context.current_price;
+                    let distance_to_resistance =
+                        (resistance - context.current_price) / context.current_price;
                     if distance_to_resistance < 0.02 {
                         base_size * 0.5 // Уменьшаем на 50%
                     } else {
@@ -356,8 +346,8 @@ impl TradingAgent {
 
         // Если сильный технический сигнал - короткий горизонт
         if let Some(tech) = &context.technical_analysis {
-            if tech.recommendation == Recommendation::StrongBuy 
-                || tech.recommendation == Recommendation::StrongSell 
+            if tech.recommendation == Recommendation::StrongBuy
+                || tech.recommendation == Recommendation::StrongSell
             {
                 return TimeHorizon::Short;
             }
@@ -426,7 +416,10 @@ impl TradingAgent {
         // Фундаментальный анализ
         if let Some(fund) = &context.fundamental_analysis {
             prompt.push_str("ФУНДАМЕНТАЛЬНЫЙ АНАЛИЗ:\n");
-            prompt.push_str(&format!("Рейтинг: {:?} (score: {:.1}/100)\n", fund.rating, fund.overall_score));
+            prompt.push_str(&format!(
+                "Рейтинг: {:?} (score: {:.1}/100)\n",
+                fund.rating, fund.overall_score
+            ));
             if let Some(pe) = fund.valuation.pe_ratio {
                 prompt.push_str(&format!("P/E: {:.2}\n", pe));
             }
@@ -456,8 +449,14 @@ impl TradingAgent {
 
         // Контекст портфеля
         prompt.push_str("КОНТЕКСТ ПОРТФЕЛЯ:\n");
-        prompt.push_str(&format!("Доступный баланс: {:.2}\n", context.available_balance));
-        prompt.push_str(&format!("Макс. доля позиции: {:.1}%\n", context.max_position_pct * 100.0));
+        prompt.push_str(&format!(
+            "Доступный баланс: {:.2}\n",
+            context.available_balance
+        ));
+        prompt.push_str(&format!(
+            "Макс. доля позиции: {:.1}%\n",
+            context.max_position_pct * 100.0
+        ));
         if let Some(pos) = &context.current_position {
             prompt.push_str(&format!(
                 "Текущая позиция: {} лотов по средней {:.2}\n",
@@ -485,7 +484,7 @@ impl TradingAgent {
     }
 
     /// Парсинг ответа LLM
-    /// 
+    ///
     /// # Errors
     /// Возвращает ошибку, если JSON некорректен или отсутствуют обязательные поля
     fn parse_llm_response(
@@ -494,15 +493,17 @@ impl TradingAgent {
         context: &DecisionContext,
     ) -> Result<TradingDecision> {
         // Поиск JSON в ответе
-        let json_start = content.find('{')
+        let json_start = content
+            .find('{')
             .ok_or_else(|| anyhow::anyhow!("Не найден JSON в ответе LLM"))?;
-        let json_end = content.rfind('}')
+        let json_end = content
+            .rfind('}')
             .ok_or_else(|| anyhow::anyhow!("Не найден закрывающий символ JSON"))?;
-        
+
         if json_start > json_end {
             anyhow::bail!("Некорректный JSON: открывающая скобка после закрывающей");
         }
-        
+
         let json_str = &content[json_start..=json_end];
 
         // Парсинг JSON с обработкой ошибок
@@ -522,11 +523,18 @@ impl TradingAgent {
         let position_size_pct = parsed["position_size_pct"].as_f64().unwrap_or(0.0);
         let stop_loss = parsed["stop_loss"].as_f64();
         let take_profit = parsed["take_profit"].as_f64();
-        let rationale = parsed["rationale"].as_str().unwrap_or("No rationale provided").to_string();
-        
+        let rationale = parsed["rationale"]
+            .as_str()
+            .unwrap_or("No rationale provided")
+            .to_string();
+
         let risks = parsed["risks"]
             .as_array()
-            .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect()
+            })
             .unwrap_or_default();
 
         let time_horizon_str = parsed["time_horizon"].as_str().unwrap_or("MEDIUM");
@@ -604,7 +612,7 @@ mod tests {
         // Для теста нужен реальный LLM provider, поэтому пропускаем LLM тест
         // let agent = TradingAgent::new(OllamaProvider::default(), "fin-expert".to_string());
         // let decision = agent.make_rule_based_decision(context).await.unwrap();
-        
+
         // Проверяем структуру контекста
         assert_eq!(context.ticker, "TTECH");
         assert!(context.news_sentiment.is_some());

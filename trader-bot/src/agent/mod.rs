@@ -1,12 +1,11 @@
-pub mod trading_agent;
-pub mod memory;
 pub mod calibration;
+pub mod memory;
 pub mod multi_agent;
+pub mod trading_agent;
 
-pub use trading_agent::{
-    TradingAgent, TradingDecision, Action,
-    DecisionContext, CurrentPosition, TimeHorizon,
-};
-pub use memory::DecisionMemory;
 pub use calibration::PredictionTracker;
+pub use memory::DecisionMemory;
 pub use multi_agent::{AnalystAgent, RiskAgent, SupervisorAgent};
+pub use trading_agent::{
+    Action, CurrentPosition, DecisionContext, TimeHorizon, TradingAgent, TradingDecision,
+};

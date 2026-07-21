@@ -1,10 +1,10 @@
 use anyhow::Result;
+use chrono::Utc;
 use std::collections::HashMap;
 use std::sync::Arc;
-use chrono::Utc;
 
-use crate::core::*;
 use crate::backtest::{BacktestConfig, BacktestResult, run_backtest};
+use crate::core::*;
 
 /// Strategy function type used by the optimizer.
 pub type StrategyFn = Arc<dyn Fn(&[f64], &[f64], &HashMap<String, f64>) -> f64 + Send + Sync>;
@@ -47,8 +47,13 @@ impl Optimizer {
 
         let elapsed = start.elapsed();
 
-        let best = trials.iter()
-            .max_by(|a, b| a.score.partial_cmp(&b.score).unwrap_or(std::cmp::Ordering::Equal))
+        let best = trials
+            .iter()
+            .max_by(|a, b| {
+                a.score
+                    .partial_cmp(&b.score)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
             .cloned()
             .unwrap_or(OptimizationTrial {
                 params: HashMap::new(),
@@ -67,10 +72,17 @@ impl Optimizer {
     }
 
     fn grid_search(&self) -> Result<Vec<OptimizationTrial>> {
-        let param_names: Vec<String> = self.config.param_ranges.iter()
-            .map(|p| p.name.clone()).collect();
+        let param_names: Vec<String> = self
+            .config
+            .param_ranges
+            .iter()
+            .map(|p| p.name.clone())
+            .collect();
 
-        let ranges: Vec<Vec<f64>> = self.config.param_ranges.iter()
+        let ranges: Vec<Vec<f64>> = self
+            .config
+            .param_ranges
+            .iter()
             .map(|p| {
                 let mut values = Vec::new();
                 let mut v = p.min;
@@ -104,7 +116,8 @@ impl Optimizer {
         trials: &mut Vec<OptimizationTrial>,
     ) {
         if depth == ranges.len() {
-            let params: HashMap<String, f64> = param_names.iter()
+            let params: HashMap<String, f64> = param_names
+                .iter()
                 .enumerate()
                 .map(|(i, name)| (name.clone(), current[i]))
                 .collect();
@@ -125,7 +138,10 @@ impl Optimizer {
         let mut trials = Vec::new();
 
         for _ in 0..self.config.max_iterations {
-            let params: HashMap<String, f64> = self.config.param_ranges.iter()
+            let params: HashMap<String, f64> = self
+                .config
+                .param_ranges
+                .iter()
                 .map(|p| {
                     let value = rng.gen_range(p.min..=p.max);
                     // Round to step
@@ -163,12 +179,16 @@ impl Optimizer {
             OptimizationMetric::CalmarRatio => {
                 if result.max_drawdown > 0.0 {
                     result.total_return_pct / result.max_drawdown
-                } else { 0.0 }
+                } else {
+                    0.0
+                }
             }
             OptimizationMetric::ProfitFactor => {
                 if result.losing_trades > 0 {
                     result.winning_trades as f64 / result.losing_trades as f64
-                } else { result.winning_trades as f64 }
+                } else {
+                    result.winning_trades as f64
+                }
             }
         };
 
@@ -196,10 +216,16 @@ fn run_backtest_with_fn(
 ) -> BacktestResult {
     if closes.is_empty() {
         return BacktestResult {
-            total_trades: 0, winning_trades: 0, losing_trades: 0,
-            win_rate: 0.0, total_pnl: 0.0, max_drawdown: 0.0,
-            sharpe_ratio: 0.0, final_balance: config.initial_balance,
-            total_return_pct: 0.0, trades: vec![],
+            total_trades: 0,
+            winning_trades: 0,
+            losing_trades: 0,
+            win_rate: 0.0,
+            total_pnl: 0.0,
+            max_drawdown: 0.0,
+            sharpe_ratio: 0.0,
+            final_balance: config.initial_balance,
+            total_return_pct: 0.0,
+            trades: vec![],
         };
     }
 
@@ -250,7 +276,11 @@ fn run_backtest_with_fn(
             balance += cost - commission;
             total_pnl += trade_pnl;
 
-            if trade_pnl > 0.0 { winners += 1; } else { losers += 1; }
+            if trade_pnl > 0.0 {
+                winners += 1;
+            } else {
+                losers += 1;
+            }
 
             trades.push(crate::backtest::BacktestTrade {
                 timestamp: Utc::now(),
@@ -282,24 +312,36 @@ fn run_backtest_with_fn(
 
     let avg_return = if !returns.is_empty() {
         returns.iter().sum::<f64>() / returns.len() as f64
-    } else { 0.0 };
+    } else {
+        0.0
+    };
 
     let variance = if returns.len() > 1 {
-        returns.iter()
+        returns
+            .iter()
             .map(|r| (r - avg_return).powi(2))
-            .sum::<f64>() / (returns.len() - 1) as f64
-    } else { 0.0 };
+            .sum::<f64>()
+            / (returns.len() - 1) as f64
+    } else {
+        0.0
+    };
 
     let std_dev = variance.sqrt();
     let sharpe_ratio = if std_dev > 0.0 {
         avg_return / std_dev * (252.0_f64).sqrt()
-    } else { 0.0 };
+    } else {
+        0.0
+    };
 
     BacktestResult {
         total_trades: trades.len() as u32,
         winning_trades: winners,
         losing_trades: losers,
-        win_rate: if !trades.is_empty() { winners as f64 / trades.len() as f64 } else { 0.0 },
+        win_rate: if !trades.is_empty() {
+            winners as f64 / trades.len() as f64
+        } else {
+            0.0
+        },
         total_pnl,
         max_drawdown,
         sharpe_ratio,

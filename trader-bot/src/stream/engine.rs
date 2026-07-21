@@ -2,11 +2,11 @@ use anyhow::Result;
 use chrono::{DateTime, Utc};
 use futures::stream::iter;
 use std::collections::HashMap;
-use t_invest_sdk::api::{
-    self, CandleInstrument, MarketDataRequest,
-    SubscribeCandlesRequest, SubscriptionAction, SubscriptionInterval,
-};
 use t_invest_sdk::TInvestSdk;
+use t_invest_sdk::api::{
+    self, CandleInstrument, MarketDataRequest, SubscribeCandlesRequest, SubscriptionAction,
+    SubscriptionInterval,
+};
 use tokio::sync::mpsc;
 use tonic;
 

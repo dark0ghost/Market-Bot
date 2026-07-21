@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use crate::agent::Action;
+use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 pub struct CalibrationBin {
@@ -32,8 +32,16 @@ impl CalibrationBin {
         (self.lower + self.upper) / 2.0
     }
 
-    pub fn record_prediction(&mut self, predicted_action: &Action, actual_correct: bool, _confidence: f64) {
-        *self.predictions.entry(predicted_action.clone()).or_insert(0) += 1;
+    pub fn record_prediction(
+        &mut self,
+        predicted_action: &Action,
+        actual_correct: bool,
+        _confidence: f64,
+    ) {
+        *self
+            .predictions
+            .entry(predicted_action.clone())
+            .or_insert(0) += 1;
         self.total += 1;
         if actual_correct {
             self.correct += 1;
@@ -86,19 +94,32 @@ impl PredictionTracker {
         bins
     }
 
-    pub fn record_outcome(&mut self, provider: &str, confidence: f64, conviction: f64, action: Action, correct: bool, pnl: Option<f64>) {
-        let stats = self.provider_results.entry(provider.to_string()).or_insert(ProviderStats {
-            total: 0,
-            correct: 0,
-            avg_confidence: 0.0,
-        });
+    pub fn record_outcome(
+        &mut self,
+        provider: &str,
+        confidence: f64,
+        conviction: f64,
+        action: Action,
+        correct: bool,
+        pnl: Option<f64>,
+    ) {
+        let stats = self
+            .provider_results
+            .entry(provider.to_string())
+            .or_insert(ProviderStats {
+                total: 0,
+                correct: 0,
+                avg_confidence: 0.0,
+            });
         stats.total += 1;
         if correct {
             stats.correct += 1;
         }
-        stats.avg_confidence = stats.avg_confidence + (confidence - stats.avg_confidence) / stats.total as f64;
+        stats.avg_confidence =
+            stats.avg_confidence + (confidence - stats.avg_confidence) / stats.total as f64;
 
-        let bin_idx = ((confidence * 10.0) as usize).min(self.calibration_bins.len().saturating_sub(1));
+        let bin_idx =
+            ((confidence * 10.0) as usize).min(self.calibration_bins.len().saturating_sub(1));
         if let Some(bin) = self.calibration_bins.get_mut(bin_idx) {
             bin.record_prediction(&action, correct, confidence);
         }
@@ -117,10 +138,15 @@ impl PredictionTracker {
     }
 
     pub fn provider_accuracy(&self, provider: &str) -> f64 {
-        self.provider_results.get(provider).map(|s| {
-            if s.total == 0 { return 0.5; }
-            s.correct as f64 / s.total as f64
-        }).unwrap_or(0.5)
+        self.provider_results
+            .get(provider)
+            .map(|s| {
+                if s.total == 0 {
+                    return 0.5;
+                }
+                s.correct as f64 / s.total as f64
+            })
+            .unwrap_or(0.5)
     }
 
     pub fn provider_stats(&self, provider: &str) -> Option<&ProviderStats> {
@@ -140,7 +166,11 @@ impl PredictionTracker {
                 total_weight += bin.total as f64;
             }
         }
-        if total_weight == 0.0 { 0.0 } else { total_error / total_weight }
+        if total_weight == 0.0 {
+            0.0
+        } else {
+            total_error / total_weight
+        }
     }
 
     pub fn ece(&self) -> f64 {

@@ -1,6 +1,6 @@
+use crate::agent::Action;
 use std::collections::VecDeque;
 use std::time::{SystemTime, UNIX_EPOCH};
-use crate::agent::Action;
 
 #[derive(Debug, Clone)]
 pub struct DecisionRecord {
@@ -18,8 +18,18 @@ pub struct DecisionRecord {
 }
 
 impl DecisionRecord {
-    pub fn new(ticker: &str, action: Action, conviction: f64, entry_price: f64, rationale: &str, provider: &str) -> Self {
-        let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
+    pub fn new(
+        ticker: &str,
+        action: Action,
+        conviction: f64,
+        entry_price: f64,
+        rationale: &str,
+        provider: &str,
+    ) -> Self {
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
         DecisionRecord {
             timestamp,
             ticker: ticker.to_string(),
@@ -78,28 +88,38 @@ impl DecisionMemory {
 
     pub fn win_rate(&self, n: usize) -> f64 {
         let recent: Vec<&DecisionRecord> = self.recent(n);
-        let completed: Vec<&&DecisionRecord> = recent.iter().filter(|r| r.successful.is_some()).collect();
+        let completed: Vec<&&DecisionRecord> =
+            recent.iter().filter(|r| r.successful.is_some()).collect();
         if completed.is_empty() {
             return 0.0;
         }
-        let wins = completed.iter().filter(|r| r.successful == Some(true)).count();
+        let wins = completed
+            .iter()
+            .filter(|r| r.successful == Some(true))
+            .count();
         wins as f64 / completed.len() as f64
     }
 
     pub fn provider_win_rate(&self, provider: &str, n: usize) -> f64 {
         let recent = self.recent(n);
-        let from_provider: Vec<&&DecisionRecord> = recent.iter()
-            .filter(|r| r.provider == provider && r.successful.is_some()).collect();
+        let from_provider: Vec<&&DecisionRecord> = recent
+            .iter()
+            .filter(|r| r.provider == provider && r.successful.is_some())
+            .collect();
         if from_provider.is_empty() {
             return 0.5;
         }
-        let wins = from_provider.iter().filter(|r| r.successful == Some(true)).count();
+        let wins = from_provider
+            .iter()
+            .filter(|r| r.successful == Some(true))
+            .count();
         wins as f64 / from_provider.len() as f64
     }
 
     pub fn avg_profit_pct(&self, n: usize) -> f64 {
         let recent = self.recent(n);
-        let with_pnl: Vec<&&DecisionRecord> = recent.iter().filter(|r| r.pnl_pct.is_some()).collect();
+        let with_pnl: Vec<&&DecisionRecord> =
+            recent.iter().filter(|r| r.pnl_pct.is_some()).collect();
         if with_pnl.is_empty() {
             return 0.0;
         }

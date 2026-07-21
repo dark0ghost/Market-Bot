@@ -1,18 +1,17 @@
 use std::sync::Arc;
 
+use ollama_rs::Ollama;
 use ollama_rs::coordinator::Coordinator;
 use ollama_rs::error::OllamaError;
 use ollama_rs::generation::chat::{ChatMessage, ChatMessageResponse};
 use ollama_rs::generation::tools::Tool;
 use ollama_rs::models::LocalModel;
-use ollama_rs::Ollama;
 use tokio::sync::Mutex;
 
 use crate::llm_provider::LLMProvider;
 
 pub type LlmError = OllamaError;
 pub type LlmMessage = ChatMessageResponse;
-
 
 /// Провайдер для работы с Ollama API
 pub struct OllamaProvider {
@@ -25,10 +24,7 @@ pub struct OllamaProvider {
 
 impl Clone for OllamaProvider {
     fn clone(&self) -> Self {
-        let ollama = Ollama::new(
-            self.host.clone(),
-            self.port,
-        );
+        let ollama = Ollama::new(self.host.clone(), self.port);
         let coordinator = Arc::new(Mutex::new(Coordinator::new(
             ollama.clone(),
             self.model.clone(),
@@ -64,11 +60,7 @@ impl OllamaProvider {
     }
 
     fn add_tool<T: Tool + 'static>(&mut self, tools: Vec<T>) {
-        let mut coordinator = Coordinator::new(
-            self.ollama.clone(),
-            self.model.clone(),
-            vec![],
-        );
+        let mut coordinator = Coordinator::new(self.ollama.clone(), self.model.clone(), vec![]);
         for tool in tools {
             coordinator = coordinator.add_tool(tool)
         }
@@ -110,16 +102,14 @@ impl LLMProvider<LlmMessage, LlmError> for OllamaProvider {
     async fn send_message(&self, text: String) -> Result<ChatMessageResponse, OllamaError> {
         let user_message = ChatMessage::user(text.to_owned());
         let mut coordinator = self.coordinator.lock().await;
-        coordinator
-            .chat(vec![user_message])
-            .await
+        coordinator.chat(vec![user_message]).await
     }
 }
 
 mod test {
-    use std::fmt::format;
     use crate::llm_provider::LLMProvider;
     use crate::ollama::OllamaProvider;
+    use std::fmt::format;
 
     const CPU_TEMPERATURE: &str = "32";
 
@@ -141,7 +131,12 @@ mod test {
             .await
             .expect("Ollama not working");
 
-        assert!(response.message.content.contains(&CPU_TEMPERATURE.to_string()))
+        assert!(
+            response
+                .message
+                .content
+                .contains(&CPU_TEMPERATURE.to_string())
+        )
     }
 
     /// Get the CPU temperature in Celsius.

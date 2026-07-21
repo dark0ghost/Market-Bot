@@ -1,9 +1,9 @@
-use anyhow::Result;
-use std::collections::HashMap;
 use crate::agent::Action;
 use crate::provider::prediction::{Prediction, PredictionContext};
-use mcp_client::ollama::OllamaProvider;
+use anyhow::Result;
 use mcp_client::llm_provider::LLMProvider;
+use mcp_client::ollama::OllamaProvider;
+use std::collections::HashMap;
 
 #[derive(Clone)]
 pub struct LLMPredictor {
@@ -36,7 +36,7 @@ impl LLMPredictor {
 
     fn build_prompt(&self, ctx: &PredictionContext) -> String {
         let mut prompt = String::from(
-            "You are a professional financial analyst. Analyze the data and respond in JSON.\n\n"
+            "You are a professional financial analyst. Analyze the data and respond in JSON.\n\n",
         );
 
         prompt.push_str(&format!("Ticker: {} ({})\n", ctx.ticker, ctx.company_name));
@@ -89,7 +89,10 @@ impl LLMPredictor {
             _ => Action::Hold,
         };
         let confidence = parsed["confidence"].as_f64().unwrap_or(0.5).clamp(0.0, 1.0);
-        let conviction = parsed["conviction"].as_f64().unwrap_or(0.0).clamp(-1.0, 1.0);
+        let conviction = parsed["conviction"]
+            .as_f64()
+            .unwrap_or(0.0)
+            .clamp(-1.0, 1.0);
         let rationale = parsed["rationale"].as_str().unwrap_or("").to_string();
 
         Ok(Prediction {

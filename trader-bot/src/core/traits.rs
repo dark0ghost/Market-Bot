@@ -1,6 +1,6 @@
-use async_trait::async_trait;
-use anyhow::Result;
 use crate::core::types::*;
+use anyhow::Result;
+use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -11,7 +11,12 @@ pub trait Broker: Send + Sync {
     fn name(&self) -> &str;
     fn broker_kind(&self) -> BrokerKind;
 
-    async fn candles(&self, instrument: &str, interval: CandleInterval, count: u32) -> Result<Vec<Candle>>;
+    async fn candles(
+        &self,
+        instrument: &str,
+        interval: CandleInterval,
+        count: u32,
+    ) -> Result<Vec<Candle>>;
     async fn last_price(&self, instrument: &str) -> Result<f64>;
     async fn order_book(&self, instrument: &str, depth: u32) -> Result<OrderBook>;
     async fn liquidity(&self, instrument: &str, depth: u32) -> Result<LiquidityInfo>;
@@ -35,7 +40,12 @@ pub trait DataSource: Send + Sync {
     fn name(&self) -> &str;
     fn source_kind(&self) -> DataSourceKind;
 
-    async fn candles(&self, ticker: &str, interval: CandleInterval, days: u32) -> Result<Vec<Candle>>;
+    async fn candles(
+        &self,
+        ticker: &str,
+        interval: CandleInterval,
+        days: u32,
+    ) -> Result<Vec<Candle>>;
     async fn find_instrument(&self, query: &str) -> Result<Vec<InstrumentInfo>>;
     async fn instruments(&self, kind: Option<InstrumentKind>) -> Result<Vec<InstrumentInfo>>;
 }

@@ -1,6 +1,6 @@
 use anyhow::Result;
-use t_invest_sdk::api::GetOrderBookRequest;
 use t_invest_sdk::TInvestSdk;
+use t_invest_sdk::api::GetOrderBookRequest;
 
 #[derive(Debug, Clone)]
 pub struct OrderBookLevel {
@@ -38,10 +38,12 @@ impl OrderBookService {
         let response = client.get_order_book(request).await?;
         let book = response.into_inner();
 
-        let bids: Vec<OrderBookLevel> = book.bids
+        let bids: Vec<OrderBookLevel> = book
+            .bids
             .into_iter()
             .map(|l| OrderBookLevel {
-                price: l.price
+                price: l
+                    .price
                     .as_ref()
                     .map(|q| q.units as f64 + q.nano as f64 / 1_000_000_000.0)
                     .unwrap_or(0.0),
@@ -49,10 +51,12 @@ impl OrderBookService {
             })
             .collect();
 
-        let asks: Vec<OrderBookLevel> = book.asks
+        let asks: Vec<OrderBookLevel> = book
+            .asks
             .into_iter()
             .map(|l| OrderBookLevel {
-                price: l.price
+                price: l
+                    .price
                     .as_ref()
                     .map(|q| q.units as f64 + q.nano as f64 / 1_000_000_000.0)
                     .unwrap_or(0.0),
@@ -99,15 +103,9 @@ impl OrderBookService {
     pub async fn get_liquidity(&self, figi: &str, depth: i32) -> Result<LiquidityInfo> {
         let book = self.get_order_book(figi, depth).await?;
 
-        let bid_liquidity: f64 = book.bids
-            .iter()
-            .map(|l| l.price * l.quantity as f64)
-            .sum();
+        let bid_liquidity: f64 = book.bids.iter().map(|l| l.price * l.quantity as f64).sum();
 
-        let ask_liquidity: f64 = book.asks
-            .iter()
-            .map(|l| l.price * l.quantity as f64)
-            .sum();
+        let ask_liquidity: f64 = book.asks.iter().map(|l| l.price * l.quantity as f64).sum();
 
         Ok(LiquidityInfo {
             figi: figi.to_string(),

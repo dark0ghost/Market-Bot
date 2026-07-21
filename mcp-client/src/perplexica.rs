@@ -145,14 +145,8 @@ impl PerplexicaProvider {
 
     /// Выполнить поисковый запрос
     pub async fn search(&self, query: &str) -> Result<SearchResult> {
-        self.search_with_options(
-            query,
-            None,
-            None,
-            None,
-            Some(OptimizationMode::Balanced),
-        )
-        .await
+        self.search_with_options(query, None, None, None, Some(OptimizationMode::Balanced))
+            .await
     }
 
     /// Выполнить поисковый запрос с опциями
@@ -190,8 +184,9 @@ impl PerplexicaProvider {
         };
 
         let url = format!("{}/api/search", self.base_url);
-        
-        let response = self.client
+
+        let response = self
+            .client
             .post(&url)
             .json(&request)
             .send()
@@ -240,7 +235,7 @@ impl PerplexicaProvider {
             "{} ({}) акции новости финансовое состояние аналитика",
             company_name, ticker
         );
-        
+
         self.search_with_options(
             &query,
             Some(vec![SearchSource::Web, SearchSource::Academic]),
@@ -254,7 +249,7 @@ impl PerplexicaProvider {
     /// Поиск новостей по тикеру
     pub async fn search_news(&self, ticker: &str) -> Result<SearchResult> {
         let query = format!("{} акции последние новости", ticker);
-        
+
         self.search_with_options(
             &query,
             Some(vec![SearchSource::Web]),
@@ -266,12 +261,16 @@ impl PerplexicaProvider {
     }
 
     /// Поиск аналитики по компании
-    pub async fn search_analyst_ratings(&self, ticker: &str, company_name: &str) -> Result<SearchResult> {
+    pub async fn search_analyst_ratings(
+        &self,
+        ticker: &str,
+        company_name: &str,
+    ) -> Result<SearchResult> {
         let query = format!(
             "{} {} аналитика рейтинг целевая цена прогноз",
             ticker, company_name
         );
-        
+
         self.search_with_options(
             &query,
             Some(vec![SearchSource::Web, SearchSource::Academic]),
@@ -334,16 +333,34 @@ mod tests {
 
     #[test]
     fn test_optimization_mode_serialization() {
-        assert_eq!(serde_json::to_string(&OptimizationMode::Speed).unwrap(), "\"speed\"");
-        assert_eq!(serde_json::to_string(&OptimizationMode::Balanced).unwrap(), "\"balanced\"");
-        assert_eq!(serde_json::to_string(&OptimizationMode::Quality).unwrap(), "\"quality\"");
+        assert_eq!(
+            serde_json::to_string(&OptimizationMode::Speed).unwrap(),
+            "\"speed\""
+        );
+        assert_eq!(
+            serde_json::to_string(&OptimizationMode::Balanced).unwrap(),
+            "\"balanced\""
+        );
+        assert_eq!(
+            serde_json::to_string(&OptimizationMode::Quality).unwrap(),
+            "\"quality\""
+        );
     }
 
     #[test]
     fn test_focus_mode_serialization() {
-        assert_eq!(serde_json::to_string(&FocusMode::WebSearch).unwrap(), "\"webSearch\"");
-        assert_eq!(serde_json::to_string(&FocusMode::AcademicSearch).unwrap(), "\"academicSearch\"");
-        assert_eq!(serde_json::to_string(&FocusMode::RedditSearch).unwrap(), "\"redditSearch\"");
+        assert_eq!(
+            serde_json::to_string(&FocusMode::WebSearch).unwrap(),
+            "\"webSearch\""
+        );
+        assert_eq!(
+            serde_json::to_string(&FocusMode::AcademicSearch).unwrap(),
+            "\"academicSearch\""
+        );
+        assert_eq!(
+            serde_json::to_string(&FocusMode::RedditSearch).unwrap(),
+            "\"redditSearch\""
+        );
     }
 
     #[test]
@@ -372,11 +389,8 @@ mod tests {
         let searcher = PerplexicaSearcher::new(chat_model.clone(), embedding_model.clone());
         assert_eq!(searcher.provider.chat_model.provider_id, "test");
 
-        let searcher_custom = PerplexicaSearcher::with_url(
-            "http://custom:3000",
-            chat_model,
-            embedding_model,
-        );
+        let searcher_custom =
+            PerplexicaSearcher::with_url("http://custom:3000", chat_model, embedding_model);
         assert_eq!(searcher_custom.provider.base_url, "http://custom:3000");
     }
 }
@@ -403,60 +417,80 @@ impl PerplexicaSearcher {
     }
 
     /// Поиск информации о компании по тикеру и названию
-    pub async fn search_company_info(&self, ticker: String, company_name: String) -> Result<String> {
+    pub async fn search_company_info(
+        &self,
+        ticker: String,
+        company_name: String,
+    ) -> Result<String> {
         let result = self.provider.search_company(&ticker, &company_name).await?;
-        
-        let mut output = format!("=== Информация о компании {} ({}) ===\n\n", company_name, ticker);
+
+        let mut output = format!(
+            "=== Информация о компании {} ({}) ===\n\n",
+            company_name, ticker
+        );
         output.push_str(&result.answer);
         output.push_str("\n\n=== Источники ===\n");
-        
+
         for (i, source) in result.sources.iter().enumerate() {
             output.push_str(&format!("{}. {} - {}\n", i + 1, source.title, source.url));
         }
-        
+
         Ok(output)
     }
 
     /// Поиск последних новостей
     pub async fn search_latest_news(&self, ticker: String) -> Result<String> {
         let result = self.provider.search_news(&ticker).await?;
-        
+
         let mut output = format!("=== Последние новости по {} ===\n\n", ticker);
         output.push_str(&result.answer);
         output.push_str("\n\n=== Источники ===\n");
-        
+
         for (i, source) in result.sources.iter().enumerate() {
             output.push_str(&format!("{}. {} - {}\n", i + 1, source.title, source.url));
         }
-        
+
         Ok(output)
     }
 
     /// Поиск аналитических рейтингов
-    pub async fn search_analyst_ratings(&self, ticker: String, company_name: String) -> Result<String> {
-        let result = self.provider.search_analyst_ratings(&ticker, &company_name).await?;
-        
-        let mut output = format!("=== Аналитические рейтинги {} ({}) ===\n\n", company_name, ticker);
+    pub async fn search_analyst_ratings(
+        &self,
+        ticker: String,
+        company_name: String,
+    ) -> Result<String> {
+        let result = self
+            .provider
+            .search_analyst_ratings(&ticker, &company_name)
+            .await?;
+
+        let mut output = format!(
+            "=== Аналитические рейтинги {} ({}) ===\n\n",
+            company_name, ticker
+        );
         output.push_str(&result.answer);
         output.push_str("\n\n=== Источники ===\n");
-        
+
         for (i, source) in result.sources.iter().enumerate() {
             output.push_str(&format!("{}. {} - {}\n", i + 1, source.title, source.url));
         }
-        
+
         Ok(output)
     }
 
     /// Общий поисковой запрос
     pub async fn search(&self, query: String) -> Result<String> {
         let result = self.provider.search(&query).await?;
-        
-        let mut output = format!("=== Результаты поиска ===\n\n{}\n\n=== Источники ===\n", result.answer);
-        
+
+        let mut output = format!(
+            "=== Результаты поиска ===\n\n{}\n\n=== Источники ===\n",
+            result.answer
+        );
+
         for (i, source) in result.sources.iter().enumerate() {
             output.push_str(&format!("{}. {} - {}\n", i + 1, source.title, source.url));
         }
-        
+
         Ok(output)
     }
 }

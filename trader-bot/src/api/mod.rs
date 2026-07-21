@@ -1,6 +1,6 @@
 pub mod routes;
 
-use axum::{Router, routing::get, extract::State};
+use axum::{Router, extract::State, routing::get};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
@@ -16,10 +16,7 @@ pub struct AppState {
 }
 
 /// Start the embedded Web dashboard.
-pub async fn start_dashboard(
-    state: Arc<Mutex<AppState>>,
-    port: u16,
-) -> anyhow::Result<()> {
+pub async fn start_dashboard(state: Arc<Mutex<AppState>>, port: u16) -> anyhow::Result<()> {
     let app = Router::new()
         .route("/", get(routes::dashboard::index))
         .route("/api/status", get(routes::dashboard::status))

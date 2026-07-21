@@ -1,9 +1,7 @@
 use anyhow::Result;
-use t_invest_sdk::api::{
-    GetCandlesRequest, CandleInterval, GetCandlesResponse, HistoricCandle,
-};
+use chrono::{DateTime, Duration, Utc};
 use t_invest_sdk::TInvestSdk;
-use chrono::{DateTime, Utc, Duration};
+use t_invest_sdk::api::{CandleInterval, GetCandlesRequest, GetCandlesResponse, HistoricCandle};
 
 /// Сервис для работы с рыночными данными
 pub struct MarketDataService {
@@ -21,12 +19,12 @@ impl MarketDataService {
     }
 
     /// Получение исторических свечей
-    /// 
+    ///
     /// # Arguments
     /// * `instrument_id` - ID инструмента
     /// * `interval` - Интервал свечей
     /// * `days` - Количество дней для загрузки
-    /// 
+    ///
     /// # Returns
     /// Вектор свечей, отсортированный по времени (от старых к новым)
     pub async fn get_historical_candles(
@@ -84,7 +82,7 @@ impl MarketDataService {
     /// Получение последней цены по инструменту
     pub async fn get_last_price(&self, instrument_id: &str) -> Result<f64> {
         let candles = self.get_minute_candles(instrument_id, 1).await?;
-        
+
         if let Some(last_candle) = candles.last() {
             return extract_price(&last_candle.close);
         }
@@ -114,7 +112,7 @@ mod tests {
             units: 100,
             nano: 500_000_000,
         });
-        
+
         let price = extract_price(&quotation).unwrap();
         assert!((price - 100.5).abs() < 0.001);
     }

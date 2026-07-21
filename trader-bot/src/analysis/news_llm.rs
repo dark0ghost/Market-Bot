@@ -1,8 +1,8 @@
-use anyhow::Result;
-use mcp_client::ollama::OllamaProvider;
-use mcp_client::llm_provider::LLMProvider;
-use std::sync::Arc;
 use super::news::Sentiment;
+use anyhow::Result;
+use mcp_client::llm_provider::LLMProvider;
+use mcp_client::ollama::OllamaProvider;
+use std::sync::Arc;
 
 /// Сервис для LLM-анализа новостей
 pub struct NewsLLMService {
@@ -17,22 +17,31 @@ impl NewsLLMService {
     }
 
     /// Анализ тональности новости
-    pub async fn analyze_sentiment(&self, title: &str, content: &str) -> Result<NewsSentimentResult> {
+    pub async fn analyze_sentiment(
+        &self,
+        title: &str,
+        content: &str,
+    ) -> Result<NewsSentimentResult> {
         let prompt = self.build_sentiment_prompt(title, content);
-        
+
         let response = self.llm_provider.send_message(prompt).await?;
         let result = self.parse_sentiment_response(&response.message.content)?;
-        
+
         Ok(result)
     }
 
     /// Анализ набора новостей для инструмента
-    pub async fn analyze_news_batch(&self, ticker: &str, company_name: &str, news_items: &[NewsItem]) -> Result<BatchSentimentResult> {
+    pub async fn analyze_news_batch(
+        &self,
+        ticker: &str,
+        company_name: &str,
+        news_items: &[NewsItem],
+    ) -> Result<BatchSentimentResult> {
         let prompt = self.build_batch_prompt(ticker, company_name, news_items);
-        
+
         let response = self.llm_provider.send_message(prompt).await?;
         let result = self.parse_batch_response(&response.message.content)?;
-        
+
         Ok(result)
     }
 
@@ -64,7 +73,12 @@ impl NewsLLMService {
     }
 
     /// Построение промпта для анализа набора новостей
-    fn build_batch_prompt(&self, ticker: &str, company_name: &str, news_items: &[NewsItem]) -> String {
+    fn build_batch_prompt(
+        &self,
+        ticker: &str,
+        company_name: &str,
+        news_items: &[NewsItem],
+    ) -> String {
         let mut news_text = String::new();
         for (i, item) in news_items.iter().enumerate() {
             news_text.push_str(&format!("{}. [{}] {}\n", i + 1, item.source, item.title));
@@ -102,8 +116,8 @@ impl NewsLLMService {
         let json_end = content.rfind('}').unwrap_or(content.len());
         let json_str = &content[json_start..=json_end];
 
-        let parsed: serde_json::Value = serde_json::from_str(json_str)
-            .unwrap_or_else(|_| serde_json::json!({}));
+        let parsed: serde_json::Value =
+            serde_json::from_str(json_str).unwrap_or_else(|_| serde_json::json!({}));
 
         let sentiment_str = parsed["sentiment"].as_str().unwrap_or("Neutral");
         let sentiment = match sentiment_str {
@@ -118,7 +132,11 @@ impl NewsLLMService {
 
         let key_events = parsed["key_events"]
             .as_array()
-            .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect()
+            })
             .unwrap_or_default();
 
         Ok(NewsSentimentResult {
@@ -137,8 +155,8 @@ impl NewsLLMService {
         let json_end = content.rfind('}').unwrap_or(content.len());
         let json_str = &content[json_start..=json_end];
 
-        let parsed: serde_json::Value = serde_json::from_str(json_str)
-            .unwrap_or_else(|_| serde_json::json!({}));
+        let parsed: serde_json::Value =
+            serde_json::from_str(json_str).unwrap_or_else(|_| serde_json::json!({}));
 
         let sentiment_str = parsed["overall_sentiment"].as_str().unwrap_or("Neutral");
         let overall_sentiment = match sentiment_str {
@@ -153,17 +171,29 @@ impl NewsLLMService {
 
         let key_events = parsed["key_events"]
             .as_array()
-            .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect()
+            })
             .unwrap_or_default();
 
         let risks = parsed["risks"]
             .as_array()
-            .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect()
+            })
             .unwrap_or_default();
 
         let opportunities = parsed["opportunities"]
             .as_array()
-            .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect()
+            })
             .unwrap_or_default();
 
         Ok(BatchSentimentResult {

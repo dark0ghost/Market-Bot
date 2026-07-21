@@ -1,14 +1,14 @@
-use anyhow::Result;
-use crate::agent::{Action, DecisionContext};
-use crate::analysis::regime::MarketRegime;
-use crate::provider::prediction::{Prediction, PredictionContext};
-use crate::provider::prediction::technical::TechnicalPredictor;
-use crate::provider::prediction::llm::LLMPredictor;
-use crate::provider::prediction::stat_arb::StatArbPredictor;
-use crate::provider::prediction::fundamental::FundamentalPredictor;
-use crate::provider::prediction::EnsemblePredictor;
 use crate::agent::DecisionMemory;
 use crate::agent::PredictionTracker;
+use crate::agent::{Action, DecisionContext};
+use crate::analysis::regime::MarketRegime;
+use crate::provider::prediction::EnsemblePredictor;
+use crate::provider::prediction::fundamental::FundamentalPredictor;
+use crate::provider::prediction::llm::LLMPredictor;
+use crate::provider::prediction::stat_arb::StatArbPredictor;
+use crate::provider::prediction::technical::TechnicalPredictor;
+use crate::provider::prediction::{Prediction, PredictionContext};
+use anyhow::Result;
 
 #[derive(Debug, Clone)]
 pub struct AnalystProposal {
@@ -46,16 +46,22 @@ pub struct AnalystAgent {
 }
 
 impl AnalystAgent {
-    pub fn new(
-        llm_provider: mcp_client::ollama::OllamaProvider,
-        model_name: &str,
-    ) -> Self {
+    pub fn new(llm_provider: mcp_client::ollama::OllamaProvider, model_name: &str) -> Self {
         let tracker = PredictionTracker::new();
         let providers = vec![
-            crate::provider::prediction::PredictionProviderKind::Technical(TechnicalPredictor::new()),
-            crate::provider::prediction::PredictionProviderKind::LLM(LLMPredictor::new(llm_provider, model_name)),
-            crate::provider::prediction::PredictionProviderKind::StatArb(StatArbPredictor::new(2.0, 0.5, 20)),
-            crate::provider::prediction::PredictionProviderKind::Fundamental(FundamentalPredictor::new()),
+            crate::provider::prediction::PredictionProviderKind::Technical(
+                TechnicalPredictor::new(),
+            ),
+            crate::provider::prediction::PredictionProviderKind::LLM(LLMPredictor::new(
+                llm_provider,
+                model_name,
+            )),
+            crate::provider::prediction::PredictionProviderKind::StatArb(StatArbPredictor::new(
+                2.0, 0.5, 20,
+            )),
+            crate::provider::prediction::PredictionProviderKind::Fundamental(
+                FundamentalPredictor::new(),
+            ),
         ];
         AnalystAgent {
             ensemble: EnsemblePredictor::new(providers, tracker),
@@ -134,13 +140,18 @@ impl RiskAgent {
             _ => {}
         }
 
-        let price_volatility = ctx.technical_analysis.as_ref()
+        let price_volatility = ctx
+            .technical_analysis
+            .as_ref()
             .and_then(|t| t.rsi)
             .map(|rsi| if rsi > 70.0 || rsi < 30.0 { 0.15 } else { 0.0 })
             .unwrap_or(0.0);
         risk_score += price_volatility;
 
-        let win_rate = proposal.prediction.metadata.get("total_weight")
+        let win_rate = proposal
+            .prediction
+            .metadata
+            .get("total_weight")
             .and_then(|v: &serde_json::Value| v.as_f64())
             .map(|w: f64| if w < 0.3 { 0.1 } else { 0.0 })
             .unwrap_or(0.0);
@@ -191,7 +202,10 @@ impl SupervisorAgent {
         let risk_assessment = self.risk.assess(&proposal, ctx);
 
         let (final_action, final_rationale) = if !risk_assessment.allowed {
-            (Action::Hold, format!("Risk blocked: {}", risk_assessment.rationale))
+            (
+                Action::Hold,
+                format!("Risk blocked: {}", risk_assessment.rationale),
+            )
         } else if proposal.action == Action::Hold {
             (Action::Hold, "Analyst recommends hold".to_string())
         } else {
@@ -200,8 +214,16 @@ impl SupervisorAgent {
 
         Ok(SupervisorDecision {
             action: final_action,
-            confidence: if risk_assessment.allowed { proposal.confidence } else { 0.0 },
-            conviction: if risk_assessment.allowed { proposal.conviction } else { 0.0 },
+            confidence: if risk_assessment.allowed {
+                proposal.confidence
+            } else {
+                0.0
+            },
+            conviction: if risk_assessment.allowed {
+                proposal.conviction
+            } else {
+                0.0
+            },
             proposal,
             risk: risk_assessment,
             final_rationale,

@@ -1,6 +1,6 @@
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::fs;
-use anyhow::Result;
 
 /// Основная конфигурация торгового бота (расширенная)
 #[derive(Debug, Clone, Deserialize, Serialize)]

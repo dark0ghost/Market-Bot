@@ -1,6 +1,6 @@
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 use tokio::sync::RwLock;
 
@@ -39,17 +39,13 @@ impl Default for StrategyMetrics {
 impl StrategyMetrics {
     pub async fn record_signal(&self, strategy: &str) {
         let mut signals = self.signals.write().await;
-        let entry = signals
-            .entry(strategy.to_string())
-            .or_default();
+        let entry = signals.entry(strategy.to_string()).or_default();
         entry.signals_generated.fetch_add(1, Ordering::Relaxed);
     }
 
     pub async fn record_execution(&self, strategy: &str, pnl: f64) {
         let mut signals = self.signals.write().await;
-        let entry = signals
-            .entry(strategy.to_string())
-            .or_default();
+        let entry = signals.entry(strategy.to_string()).or_default();
         entry.signals_executed.fetch_add(1, Ordering::Relaxed);
         let mut total = entry.total_pnl.write().await;
         *total += pnl;
@@ -58,9 +54,7 @@ impl StrategyMetrics {
     pub async fn record_order_latency(&self, strategy: &str, latency: Duration) {
         let latency_ms = latency.as_secs_f64() * 1000.0;
         let mut perf = self.performance.write().await;
-        let entry = perf
-            .entry(strategy.to_string())
-            .or_default();
+        let entry = perf.entry(strategy.to_string()).or_default();
         let mut avg = entry.avg_latency_ms.write().await;
         let mut last = entry.last_latency_ms.write().await;
         let count = entry.orders_placed.load(Ordering::Relaxed) as f64;
@@ -70,9 +64,7 @@ impl StrategyMetrics {
 
     pub async fn record_order_status(&self, strategy: &str, filled: bool, rejected: bool) {
         let mut perf = self.performance.write().await;
-        let entry = perf
-            .entry(strategy.to_string())
-            .or_default();
+        let entry = perf.entry(strategy.to_string()).or_default();
         entry.orders_placed.fetch_add(1, Ordering::Relaxed);
         if filled {
             entry.orders_filled.fetch_add(1, Ordering::Relaxed);
@@ -149,13 +141,16 @@ impl TelemetryServer {
         let metrics = self.metrics.clone();
         let addr: std::net::SocketAddr = self.bind_addr.parse()?;
 
-        let app = axum::Router::new()
-            .route("/metrics", axum::routing::get(move || {
+        let app = axum::Router::new().route(
+            "/metrics",
+            axum::routing::get(move || {
                 let metrics = metrics.clone();
                 async move {
                     let snapshot = metrics.snapshot().await;
                     let mut output = String::new();
-                    output.push_str("# HELP ai_trade_bot_signal_signals_generated Signals generated\n");
+                    output.push_str(
+                        "# HELP ai_trade_bot_signal_signals_generated Signals generated\n",
+                    );
                     output.push_str("# TYPE ai_trade_bot_signal_signals_generated gauge\n");
 
                     for (strategy, data) in &snapshot {
@@ -169,7 +164,8 @@ impl TelemetryServer {
 
                     output
                 }
-            }));
+            }),
+        );
 
         let listener = tokio::net::TcpListener::bind(&addr).await?;
         axum::serve(listener, app).await?;

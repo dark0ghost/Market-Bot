@@ -1,65 +1,67 @@
-mod config;
-mod utils;
-mod provider;
-mod strategy;
-mod client;
-mod mcp;
-mod instrument;
-mod analysis;
 mod agent;
-mod execution;
-mod error;
-mod scanner;
+mod analysis;
 mod backtest;
-mod stream;
-mod storage;
-mod telemetry;
+mod client;
+mod config;
+mod error;
+mod execution;
+mod instrument;
+mod mcp;
+mod provider;
+mod scanner;
 mod scheduler;
+mod storage;
+mod strategy;
+mod stream;
+mod telemetry;
+mod utils;
 
 // ─── New Architecture ────────────────────────────────────────────────
-mod core;
+mod api;
 mod broker;
+mod core;
 mod datasource;
 mod optimizer;
-mod api;
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use std::env;
 use std::sync::Arc;
-use tokio::sync::Mutex;
-use t_invest_sdk::api::{
-    FindInstrumentRequest, InstrumentType,
-};
+use t_invest_sdk::api::{FindInstrumentRequest, InstrumentType};
 use t_invest_sdk::{Environment, TInvestSdk};
+use tokio::sync::Mutex;
 
-use config::{TradingConfig, StrategyType};
-use analysis::{NewsAnalyzer, TechnicalAnalyzer, FundamentalAnalyzer, FundamentalDataService, NewsLLMService, NewsItem, NewsSentiment, Sentiment, MarketRegime, RegimeDetector};
-use agent::{TradingAgent, DecisionContext};
-use execution::{PositionManager, TradingExecutor};
+use agent::{DecisionContext, TradingAgent};
+use analysis::{
+    FundamentalAnalyzer, FundamentalDataService, MarketRegime, NewsAnalyzer, NewsItem,
+    NewsLLMService, NewsSentiment, RegimeDetector, Sentiment, TechnicalAnalyzer,
+};
 use client::{MarketDataService, PortfolioService};
-use strategy::{GridStrategy, GridExecutor, GridBot, GridBotConfig};
+use config::{StrategyType, TradingConfig};
+use execution::{PositionManager, TradingExecutor};
+use strategy::{GridBot, GridBotConfig, GridExecutor, GridStrategy};
 
 use mcp_client::ollama::OllamaProvider;
 
 // New imports
-use core::*;
 use broker::TinkoffBroker;
-use datasource::{TinkoffDataSource, DataSourceRegistry};
+use core::*;
+use datasource::{DataSourceRegistry, TinkoffDataSource};
 use strategy::registry::StrategyRegistry;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    env_logger::Builder::from_env(
-        env_logger::Env::default().default_filter_or("info")
-    ).init();
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
 
     log::info!("╔══════════════════════════════════════════╗");
-    log::info!("║     AI Trade Bot v{} (refactored)      ║", env!("CARGO_PKG_VERSION"));
+    log::info!(
+        "║     AI Trade Bot v{} (refactored)      ║",
+        env!("CARGO_PKG_VERSION")
+    );
     log::info!("╚══════════════════════════════════════════╝");
 
     // ── 1. Load Configuration ────────────────────────────────────────
-    let config = TradingConfig::load_default()
-        .map_err(|e| anyhow!("Failed to load config: {}", e))?;
+    let config =
+        TradingConfig::load_default().map_err(|e| anyhow!("Failed to load config: {}", e))?;
 
     log::info!("Configuration loaded. Mode: {:?}", config.mode);
 
@@ -89,22 +91,17 @@ async fn main() -> Result<()> {
     // ── 4. Initialize LLM ─────────────────────────────────────────────
     let llm_config = config.llm_config.as_ref();
     let ollama_provider = if let Some(llm_cfg) = llm_config {
-        OllamaProvider::new(
-            llm_cfg.model.clone(),
-            llm_cfg.host.clone(),
-            llm_cfg.port,
-        )
+        OllamaProvider::new(llm_cfg.model.clone(), llm_cfg.host.clone(), llm_cfg.port)
     } else {
         OllamaProvider::default()
     };
-    let model_name = llm_config.map(|c| c.model.clone()).unwrap_or_else(|| "fin-expert".to_string());
+    let model_name = llm_config
+        .map(|c| c.model.clone())
+        .unwrap_or_else(|| "fin-expert".to_string());
     log::info!("LLM model: {}", model_name);
 
     // ── 5. Initialize Analysis Services ───────────────────────────────
-    let news_analyzer = NewsAnalyzer::new(vec![
-        "tinkoff".to_string(),
-        "investing".to_string(),
-    ]);
+    let news_analyzer = NewsAnalyzer::new(vec!["tinkoff".to_string(), "investing".to_string()]);
     let technical_analyzer = TechnicalAnalyzer::new();
     let fundamental_analyzer = FundamentalAnalyzer::default();
     let news_llm_service = NewsLLMService::new(ollama_provider.clone());
@@ -119,7 +116,9 @@ async fn main() -> Result<()> {
     let mut strategy_registry = StrategyRegistry::new();
 
     // Register Grid strategy for each account with grid config
-    let grid_accounts: Vec<_> = config.accounts.iter()
+    let grid_accounts: Vec<_> = config
+        .accounts
+        .iter()
         .filter(|acc| matches!(acc.strategy.strategy, StrategyType::Grid))
         .collect();
 
@@ -127,10 +126,16 @@ async fn main() -> Result<()> {
         if let Some(grid_cfg) = &account.strategy.parameters.grid_config {
             let grid_strategy = crate::strategy::grid::GridStrategy::new(grid_cfg.clone());
             strategy_registry.register(Box::new(grid_strategy));
-            log::info!("Grid strategy registered for account {}", account.account_id);
+            log::info!(
+                "Grid strategy registered for account {}",
+                account.account_id
+            );
         }
     }
-    log::info!("Strategies registered: {:?}", strategy_registry.list_names());
+    log::info!(
+        "Strategies registered: {:?}",
+        strategy_registry.list_names()
+    );
 
     // ── 8. Get Balance ────────────────────────────────────────────────
     let available_balance = match portfolio_service.get_available_balance().await {
@@ -198,8 +203,18 @@ async fn main() -> Result<()> {
             // Example: optimize a simple SMA crossover strategy
             let opt_config = OptimizerConfig {
                 param_ranges: vec![
-                    ParamRange { name: "fast_period".to_string(), min: 5.0, max: 50.0, step: 5.0 },
-                    ParamRange { name: "slow_period".to_string(), min: 20.0, max: 200.0, step: 10.0 },
+                    ParamRange {
+                        name: "fast_period".to_string(),
+                        min: 5.0,
+                        max: 50.0,
+                        step: 5.0,
+                    },
+                    ParamRange {
+                        name: "slow_period".to_string(),
+                        min: 20.0,
+                        max: 200.0,
+                        step: 10.0,
+                    },
                 ],
                 metric: opt_metric,
                 method: opt_method,
@@ -208,19 +223,27 @@ async fn main() -> Result<()> {
 
             // Get some candles for optimization
             if let Some(instrument) = config.get_enabled_instruments().first() {
-                if let Ok(candles) = market_data_service.get_5min_candles(&instrument.figi, 30).await {
-                    let core_candles: Vec<Candle> = candles.iter().filter_map(|c| {
-                        let time = c.time.as_ref().and_then(|t| chrono::DateTime::from_timestamp(t.seconds, t.nanos as u32))?;
-                        Some(Candle {
-                            open: crate::client::market_data::extract_price(&c.open).ok()?,
-                            high: crate::client::market_data::extract_price(&c.high).ok()?,
-                            low: crate::client::market_data::extract_price(&c.low).ok()?,
-                            close: crate::client::market_data::extract_price(&c.close).ok()?,
-                            volume: c.volume as f64,
-                            time,
-                            ticker: instrument.ticker.clone(),
+                if let Ok(candles) = market_data_service
+                    .get_5min_candles(&instrument.figi, 30)
+                    .await
+                {
+                    let core_candles: Vec<Candle> = candles
+                        .iter()
+                        .filter_map(|c| {
+                            let time = c.time.as_ref().and_then(|t| {
+                                chrono::DateTime::from_timestamp(t.seconds, t.nanos as u32)
+                            })?;
+                            Some(Candle {
+                                open: crate::client::market_data::extract_price(&c.open).ok()?,
+                                high: crate::client::market_data::extract_price(&c.high).ok()?,
+                                low: crate::client::market_data::extract_price(&c.low).ok()?,
+                                close: crate::client::market_data::extract_price(&c.close).ok()?,
+                                volume: c.volume as f64,
+                                time,
+                                ticker: instrument.ticker.clone(),
+                            })
                         })
-                    }).collect();
+                        .collect();
 
                     let bt_config = backtest::BacktestConfig {
                         initial_balance: 100000.0,
@@ -231,16 +254,27 @@ async fn main() -> Result<()> {
                     };
 
                     // SMA crossover strategy function
-                    let strategy_fn: optimizer::StrategyFn = Arc::new(|prices, _volumes, params| {
-                        let fast = params.get("fast_period").copied().unwrap_or(10.0) as usize;
-                        let slow = params.get("slow_period").copied().unwrap_or(30.0) as usize;
-                        if prices.len() < slow { return 0.0; }
+                    let strategy_fn: optimizer::StrategyFn =
+                        Arc::new(|prices, _volumes, params| {
+                            let fast = params.get("fast_period").copied().unwrap_or(10.0) as usize;
+                            let slow = params.get("slow_period").copied().unwrap_or(30.0) as usize;
+                            if prices.len() < slow {
+                                return 0.0;
+                            }
 
-                        let fast_sma: f64 = prices[prices.len()-fast..].iter().sum::<f64>() / fast as f64;
-                        let slow_sma: f64 = prices[prices.len()-slow..].iter().sum::<f64>() / slow as f64;
+                            let fast_sma: f64 =
+                                prices[prices.len() - fast..].iter().sum::<f64>() / fast as f64;
+                            let slow_sma: f64 =
+                                prices[prices.len() - slow..].iter().sum::<f64>() / slow as f64;
 
-                        if fast_sma > slow_sma { 1.0 } else if fast_sma < slow_sma { -1.0 } else { 0.0 }
-                    });
+                            if fast_sma > slow_sma {
+                                1.0
+                            } else if fast_sma < slow_sma {
+                                -1.0
+                            } else {
+                                0.0
+                            }
+                        });
 
                     let optimizer = optimizer::Optimizer::new(opt_config, strategy_fn, bt_config)
                         .with_data(core_candles);
@@ -249,7 +283,11 @@ async fn main() -> Result<()> {
                         Ok(report) => {
                             log::info!("Optimization complete in {}ms", report.total_time_ms);
                             log::info!("Best params: {:?}", report.best_params);
-                            log::info!("Best score ({:?}): {:.4}", config.optimizer.as_ref().unwrap().metric, report.best_score);
+                            log::info!(
+                                "Best score ({:?}): {:.4}",
+                                config.optimizer.as_ref().unwrap().metric,
+                                report.best_score
+                            );
                             log::info!("Total trials: {}", report.trials.len());
                         }
                         Err(e) => log::error!("Optimization failed: {}", e),
@@ -264,7 +302,9 @@ async fn main() -> Result<()> {
         if let Some(grid_config) = &account.strategy.parameters.grid_config {
             for instrument in account.instruments.iter().filter(|i| i.enabled) {
                 log::info!(
-                    "Starting Grid bot for {} ({})", instrument.ticker, instrument.figi
+                    "Starting Grid bot for {} ({})",
+                    instrument.ticker,
+                    instrument.figi
                 );
 
                 let bot_config = GridBotConfig {
@@ -287,10 +327,15 @@ async fn main() -> Result<()> {
 
     // ── 12. Main Trading Loop ─────────────────────────────────────────
     let enabled_instruments = config.get_enabled_instruments();
-    log::info!("Active instruments for analysis: {}", enabled_instruments.len());
+    log::info!(
+        "Active instruments for analysis: {}",
+        enabled_instruments.len()
+    );
 
     for instrument in enabled_instruments {
-        if !instrument.enabled { continue; }
+        if !instrument.enabled {
+            continue;
+        }
         log::info!("Analyzing: {} ({})", instrument.ticker, instrument.name);
 
         let mut instruments_service_client = sdk.instruments();
@@ -308,41 +353,84 @@ async fn main() -> Result<()> {
             .first()
             .ok_or_else(|| anyhow!("Instrument not found: {}", instrument.ticker))?;
 
-        let days_for_analysis = config.accounts.first()
+        let days_for_analysis = config
+            .accounts
+            .first()
             .map(|a| a.strategy.parameters.days_back_to_consider)
             .unwrap_or(30);
 
-        let candles = match market_data_service.get_5min_candles(&found_instrument.figi, days_for_analysis).await {
-            Ok(c) => { log::info!("Loaded {} candles", c.len()); c }
-            Err(e) => { log::warn!("Candle load error: {}", e); vec![] }
+        let candles = match market_data_service
+            .get_5min_candles(&found_instrument.figi, days_for_analysis)
+            .await
+        {
+            Ok(c) => {
+                log::info!("Loaded {} candles", c.len());
+                c
+            }
+            Err(e) => {
+                log::warn!("Candle load error: {}", e);
+                vec![]
+            }
         };
 
-        let current_price = match market_data_service.get_last_price(&found_instrument.figi).await {
-            Ok(p) => { log::info!("Current price: {:.2}", p); p }
-            Err(e) => { log::warn!("Price fetch error: {}", e); 0.0 }
+        let current_price = match market_data_service
+            .get_last_price(&found_instrument.figi)
+            .await
+        {
+            Ok(p) => {
+                log::info!("Current price: {:.2}", p);
+                p
+            }
+            Err(e) => {
+                log::warn!("Price fetch error: {}", e);
+                0.0
+            }
         };
 
         // Technical Analysis
         let tech_analysis = if !candles.is_empty() {
             match technical_analyzer.analyze(&instrument.ticker, &candles) {
-                Ok(a) => { log::info!("Technical: trend={:?}, recommendation={:?}", a.trend, a.recommendation); Some(a) }
-                Err(e) => { log::warn!("TA error: {}", e); None }
+                Ok(a) => {
+                    log::info!(
+                        "Technical: trend={:?}, recommendation={:?}",
+                        a.trend,
+                        a.recommendation
+                    );
+                    Some(a)
+                }
+                Err(e) => {
+                    log::warn!("TA error: {}", e);
+                    None
+                }
             }
-        } else { None };
+        } else {
+            None
+        };
 
         // News Analysis
         let news_sentiment = if instrument.analysis_config.check_news {
-            match news_analyzer.analyze(&instrument.ticker, &instrument.name).await {
+            match news_analyzer
+                .analyze(&instrument.ticker, &instrument.name)
+                .await
+            {
                 Ok(base) => {
                     if base.articles_count > 0 {
-                        let news_items: Vec<NewsItem> = base.articles.iter().take(5).map(|a| NewsItem {
-                            title: a.title.clone(),
-                            content: a.content.clone(),
-                            source: a.source.clone(),
-                            url: a.url.clone(),
-                        }).collect();
+                        let news_items: Vec<NewsItem> = base
+                            .articles
+                            .iter()
+                            .take(5)
+                            .map(|a| NewsItem {
+                                title: a.title.clone(),
+                                content: a.content.clone(),
+                                source: a.source.clone(),
+                                url: a.url.clone(),
+                            })
+                            .collect();
 
-                        match news_llm_service.analyze_news_batch(&instrument.ticker, &instrument.name, &news_items).await {
+                        match news_llm_service
+                            .analyze_news_batch(&instrument.ticker, &instrument.name, &news_items)
+                            .await
+                        {
                             Ok(llm) => Some(NewsSentiment {
                                 ticker: instrument.ticker.clone(),
                                 overall_sentiment: llm.overall_sentiment,
@@ -351,37 +439,82 @@ async fn main() -> Result<()> {
                                 articles: base.articles,
                                 key_events: llm.key_events,
                             }),
-                            Err(e) => { log::warn!("LLM news error: {}", e); Some(base) }
+                            Err(e) => {
+                                log::warn!("LLM news error: {}", e);
+                                Some(base)
+                            }
                         }
-                    } else { Some(base) }
+                    } else {
+                        Some(base)
+                    }
                 }
-                Err(e) => { log::warn!("News fetch error: {}", e); None }
+                Err(e) => {
+                    log::warn!("News fetch error: {}", e);
+                    None
+                }
             }
-        } else { None };
+        } else {
+            None
+        };
 
         // Fundamental Analysis
         let fundamental_analysis = if instrument.analysis_config.fundamental_analysis {
-            match fundamental_data_service.get_fundamental_data(&instrument.ticker, &instrument.name).await {
-                Ok(Some(a)) => { log::info!("Fundamental: rating={:?}, score={:.1}", a.rating, a.overall_score); Some(a) }
-                Ok(None) => { log::info!("No fundamental data for {}", instrument.ticker); None }
-                Err(e) => { log::warn!("Fundamental error: {}", e); None }
+            match fundamental_data_service
+                .get_fundamental_data(&instrument.ticker, &instrument.name)
+                .await
+            {
+                Ok(Some(a)) => {
+                    log::info!(
+                        "Fundamental: rating={:?}, score={:.1}",
+                        a.rating,
+                        a.overall_score
+                    );
+                    Some(a)
+                }
+                Ok(None) => {
+                    log::info!("No fundamental data for {}", instrument.ticker);
+                    None
+                }
+                Err(e) => {
+                    log::warn!("Fundamental error: {}", e);
+                    None
+                }
             }
-        } else { None };
+        } else {
+            None
+        };
 
         // Market Regime
-        if current_price > 0.0 { regime_detector.add_price(current_price); }
+        if current_price > 0.0 {
+            regime_detector.add_price(current_price);
+        }
         let market_regime = regime_detector.detect();
         log::info!("Market regime: {:?}", market_regime);
 
         // Agent Decision
-        let use_price = if current_price > 0.0 { current_price }
-            else if let Some(tech) = &tech_analysis { tech.current_price }
-            else { log::warn!("No price data for {}", instrument.ticker); continue; };
+        let use_price = if current_price > 0.0 {
+            current_price
+        } else if let Some(tech) = &tech_analysis {
+            tech.current_price
+        } else {
+            log::warn!("No price data for {}", instrument.ticker);
+            continue;
+        };
 
         let current_position = match portfolio_service.get_position(&found_instrument.figi).await {
-            Ok(Some(pos)) => { log::info!("Position: {} lots, avg: {:.2}", pos.quantity, pos.average_price); Some(pos) }
+            Ok(Some(pos)) => {
+                log::info!(
+                    "Position: {} lots, avg: {:.2}",
+                    pos.quantity,
+                    pos.average_price
+                );
+                Some(pos)
+            }
             Ok(None) => None,
-            Err(e) => { log::warn!("Position error: {}", e); None }
+            Err(e) => {
+                log::warn!("Position error: {}", e);
+                None
+            }
         };
 
         let trading_agent = TradingAgent::new(ollama_provider.clone(), model_name.clone());
@@ -397,7 +530,10 @@ async fn main() -> Result<()> {
             fundamental_analysis: fundamental_analysis.clone(),
             available_balance,
             current_position,
-            risk_config: config.accounts.first().and_then(|a| a.risk_management.clone()),
+            risk_config: config
+                .accounts
+                .first()
+                .and_then(|a| a.risk_management.clone()),
             max_position_pct: instrument.max_position_pct,
             market_regime,
             candles: vec![],
@@ -406,19 +542,28 @@ async fn main() -> Result<()> {
         let decision = if config.llm_config.is_some() {
             match trading_agent.make_decision(context.clone()).await {
                 Ok(d) => d,
-                Err(e) => { log::warn!("LLM error, using rule-based: {}", e);
-                    trading_agent.make_rule_based_decision(context)? }
+                Err(e) => {
+                    log::warn!("LLM error, using rule-based: {}", e);
+                    trading_agent.make_rule_based_decision(context)?
+                }
             }
         } else {
             trading_agent.make_rule_based_decision(context)?
         };
 
-        log::info!("Agent decision: {:?} (conf: {:.2}, pos: {:.1}%)",
-            decision.action, decision.confidence, decision.position_size_pct * 100.0);
+        log::info!(
+            "Agent decision: {:?} (conf: {:.2}, pos: {:.1}%)",
+            decision.action,
+            decision.confidence,
+            decision.position_size_pct * 100.0
+        );
         log::info!("Rationale: {}", decision.rationale);
 
         if decision.action != agent::Action::Hold && decision.confidence >= 0.6 {
-            match trading_executor.execute_decision(&decision, &found_instrument.figi).await {
+            match trading_executor
+                .execute_decision(&decision, &found_instrument.figi)
+                .await
+            {
                 Ok(results) => {
                     for r in results {
                         log::info!("Order placed: ID={}, status={:?}", r.order_id, r.status);
@@ -431,10 +576,13 @@ async fn main() -> Result<()> {
         }
 
         tokio::time::sleep(tokio::time::Duration::from_secs(
-            config.accounts.first()
+            config
+                .accounts
+                .first()
                 .map(|a| a.strategy.parameters.check_interval as u64)
-                .unwrap_or(60)
-        )).await;
+                .unwrap_or(60),
+        ))
+        .await;
     }
 
     log::info!("Analysis cycle completed. Waiting for background tasks...");

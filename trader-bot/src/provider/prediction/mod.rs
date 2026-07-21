@@ -1,13 +1,13 @@
-pub mod technical;
+pub mod fundamental;
 pub mod llm;
 pub mod stat_arb;
-pub mod fundamental;
+pub mod technical;
 
-use anyhow::Result;
-use std::collections::HashMap;
 use crate::agent::Action;
 use crate::agent::calibration::PredictionTracker;
 use crate::analysis::regime::MarketRegime;
+use anyhow::Result;
+use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 pub struct Prediction {
@@ -115,7 +115,11 @@ impl EnsemblePredictor {
                 Volatile => vec![0.15, 0.45, 0.25, 0.15],
                 Quiet => vec![0.30, 0.25, 0.20, 0.25],
             };
-            let w = if w.len() == n { w } else { vec![1.0 / n as f64; n] };
+            let w = if w.len() == n {
+                w
+            } else {
+                vec![1.0 / n as f64; n]
+            };
             self.regime_weights.insert(regime, w);
         }
     }
@@ -145,7 +149,11 @@ impl EnsemblePredictor {
         }
 
         let total_weight: f64 = weighted_predictions.iter().map(|(w, _, _, _)| w).sum();
-        let total_weight = if total_weight == 0.0 { 1.0 } else { total_weight };
+        let total_weight = if total_weight == 0.0 {
+            1.0
+        } else {
+            total_weight
+        };
 
         let mut buy_score = 0.0;
         let mut sell_score = 0.0;
@@ -160,7 +168,12 @@ impl EnsemblePredictor {
             }
             let norm_weight = weight / total_weight;
             combined_features.insert(provider.clone(), *signal);
-            combined_rationale.push(format!("[{}] {:.1}%: {}", provider, norm_weight * 100.0, rationale));
+            combined_rationale.push(format!(
+                "[{}] {:.1}%: {}",
+                provider,
+                norm_weight * 100.0,
+                rationale
+            ));
         }
 
         let action = if buy_score > sell_score && buy_score > 0.05 {

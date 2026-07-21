@@ -1,10 +1,9 @@
-pub mod position_manager;
-pub mod journal;
 pub mod algorithms;
+pub mod journal;
+pub mod position_manager;
 
-pub use position_manager::{
-    PositionManager, TradingExecutor,
-    OrderAction, OrderResult, OrderStatus,
-};
-pub use journal::{TradeJournal, TradeRecord, SignalRecord};
 pub use algorithms::{TwapExecutor, VwapExecutor};
+pub use journal::{SignalRecord, TradeJournal, TradeRecord};
+pub use position_manager::{
+    OrderAction, OrderResult, OrderStatus, PositionManager, TradingExecutor,
+};

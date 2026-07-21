@@ -52,20 +52,31 @@ impl MockBroker {
     }
 
     pub fn set_position(&self, instrument: &str, quantity: i32, avg_price: f64) {
-        let current_price = self.state.lock().unwrap()
-            .price_map.get(instrument).copied().unwrap_or(avg_price);
+        let current_price = self
+            .state
+            .lock()
+            .unwrap()
+            .price_map
+            .get(instrument)
+            .copied()
+            .unwrap_or(avg_price);
         let mut state = self.state.lock().unwrap();
-        state.positions.insert(instrument.to_string(), PositionView {
-            instrument: instrument.to_string(),
-            quantity,
-            average_price: avg_price,
-            current_price,
-            pnl: (current_price - avg_price) * quantity as f64,
-            pnl_pct: if avg_price > 0.0 {
-                (current_price - avg_price) / avg_price * 100.0
-            } else { 0.0 },
-            total_value: current_price * quantity as f64,
-        });
+        state.positions.insert(
+            instrument.to_string(),
+            PositionView {
+                instrument: instrument.to_string(),
+                quantity,
+                average_price: avg_price,
+                current_price,
+                pnl: (current_price - avg_price) * quantity as f64,
+                pnl_pct: if avg_price > 0.0 {
+                    (current_price - avg_price) / avg_price * 100.0
+                } else {
+                    0.0
+                },
+                total_value: current_price * quantity as f64,
+            },
+        );
     }
 }
 
@@ -79,16 +90,25 @@ impl Broker for MockBroker {
         BrokerKind::Mock
     }
 
-    async fn candles(&self, instrument: &str, _interval: CandleInterval, _count: u32) -> Result<Vec<Candle>> {
+    async fn candles(
+        &self,
+        instrument: &str,
+        _interval: CandleInterval,
+        _count: u32,
+    ) -> Result<Vec<Candle>> {
         let state = self.state.lock().unwrap();
-        Ok(state.candles_map.get(instrument)
+        Ok(state
+            .candles_map
+            .get(instrument)
             .cloned()
             .unwrap_or_default())
     }
 
     async fn last_price(&self, instrument: &str) -> Result<f64> {
         let state = self.state.lock().unwrap();
-        state.price_map.get(instrument)
+        state
+            .price_map
+            .get(instrument)
             .copied()
             .ok_or_else(|| anyhow::anyhow!("No price set for {}", instrument))
     }
@@ -97,8 +117,14 @@ impl Broker for MockBroker {
         let price = self.last_price(instrument).await?;
         Ok(OrderBook {
             figi: instrument.to_string(),
-            bids: vec![OrderBookLevel { price: price * 0.999, volume: 1000.0 }],
-            asks: vec![OrderBookLevel { price: price * 1.001, volume: 1000.0 }],
+            bids: vec![OrderBookLevel {
+                price: price * 0.999,
+                volume: 1000.0,
+            }],
+            asks: vec![OrderBookLevel {
+                price: price * 1.001,
+                volume: 1000.0,
+            }],
             timestamp: Utc::now(),
         })
     }
@@ -114,7 +140,8 @@ impl Broker for MockBroker {
 
     async fn place_order(&self, request: OrderRequest) -> Result<OrderResponse> {
         let mut state = self.state.lock().unwrap();
-        let price = request.price
+        let price = request
+            .price
             .or_else(|| state.price_map.get(&request.instrument).copied())
             .unwrap_or(100.0);
 
@@ -139,25 +166,34 @@ impl Broker for MockBroker {
             OrderAction::Buy => {
                 if cost <= state.balance {
                     state.balance -= cost;
-                    let avg = state.positions.get(&request.instrument)
+                    let avg = state
+                        .positions
+                        .get(&request.instrument)
                         .map(|p| p.average_price)
                         .unwrap_or(0.0);
-                    let total_qty = state.positions.get(&request.instrument)
+                    let total_qty = state
+                        .positions
+                        .get(&request.instrument)
                         .map(|p| p.quantity)
                         .unwrap_or(0);
                     let new_qty = total_qty + request.quantity;
                     let new_avg = if new_qty > 0 {
                         (avg * total_qty as f64 + cost) / new_qty as f64
-                    } else { price };
-                    state.positions.insert(request.instrument.clone(), PositionView {
-                        instrument: request.instrument.clone(),
-                        quantity: new_qty,
-                        average_price: new_avg,
-                        current_price: price,
-                        pnl: 0.0,
-                        pnl_pct: 0.0,
-                        total_value: price * new_qty as f64,
-                    });
+                    } else {
+                        price
+                    };
+                    state.positions.insert(
+                        request.instrument.clone(),
+                        PositionView {
+                            instrument: request.instrument.clone(),
+                            quantity: new_qty,
+                            average_price: new_avg,
+                            current_price: price,
+                            pnl: 0.0,
+                            pnl_pct: 0.0,
+                            total_value: price * new_qty as f64,
+                        },
+                    );
                 }
             }
             OrderAction::Sell => {
@@ -170,15 +206,19 @@ impl Broker for MockBroker {
                             let pnl = (price - p.average_price) * request.quantity as f64;
                             state.balance += cost;
                             if remaining > 0 {
-                                state.positions.insert(request.instrument.clone(), PositionView {
-                                    instrument: request.instrument.clone(),
-                                    quantity: remaining,
-                                    average_price: p.average_price,
-                                    current_price: price,
-                                    pnl,
-                                    pnl_pct: (price - p.average_price) / p.average_price * 100.0,
-                                    total_value: price * remaining as f64,
-                                });
+                                state.positions.insert(
+                                    request.instrument.clone(),
+                                    PositionView {
+                                        instrument: request.instrument.clone(),
+                                        quantity: remaining,
+                                        average_price: p.average_price,
+                                        current_price: price,
+                                        pnl,
+                                        pnl_pct: (price - p.average_price) / p.average_price
+                                            * 100.0,
+                                        total_value: price * remaining as f64,
+                                    },
+                                );
                             } else {
                                 state.positions.remove(&request.instrument);
                             }
@@ -205,7 +245,9 @@ impl Broker for MockBroker {
 
     async fn get_order_status(&self, order_id: &str) -> Result<OrderStatus> {
         let state = self.state.lock().unwrap();
-        Ok(state.orders.iter()
+        Ok(state
+            .orders
+            .iter()
             .find(|o| o.order_id == order_id)
             .map(|o| o.status.clone())
             .unwrap_or(OrderStatus::Cancelled))

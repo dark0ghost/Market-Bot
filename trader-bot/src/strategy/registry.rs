@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
-use crate::core::{Broker, Strategy, StrategyKind, Signal};
+use crate::core::{Broker, Signal, Strategy, StrategyKind};
 use anyhow::Result;
 
 /// Thread-safe registry of trading strategies.
@@ -27,11 +27,10 @@ impl StrategyRegistry {
     }
 
     pub fn get_by_kind(&self, kind: StrategyKind) -> Option<&Arc<Mutex<Box<dyn Strategy>>>> {
-        self.strategies.values()
-            .find(|s| {
-                let guard = s.try_lock();
-                guard.map(|g| g.kind() == kind).unwrap_or(false)
-            })
+        self.strategies.values().find(|s| {
+            let guard = s.try_lock();
+            guard.map(|g| g.kind() == kind).unwrap_or(false)
+        })
     }
 
     pub fn list_names(&self) -> Vec<String> {

@@ -1,10 +1,10 @@
+use crate::analysis::fundamental::{
+    DividendMetrics, FinancialHealthMetrics, FundamentalAnalysis, FundamentalAnalyzer,
+    GrowthMetrics, IndustryAverages, ProfitabilityMetrics, ValuationMetrics,
+};
 use anyhow::Result;
 use reqwest::Client;
 use std::time::Duration;
-use crate::analysis::fundamental::{
-    FundamentalAnalyzer, FundamentalAnalysis, ValuationMetrics, ProfitabilityMetrics,
-    FinancialHealthMetrics, GrowthMetrics, DividendMetrics, IndustryAverages,
-};
 
 /// Сервис для сбора фундаментальных данных
 pub struct FundamentalDataService {
@@ -23,7 +23,7 @@ impl FundamentalDataService {
     }
 
     /// Получение фундаментальных данных по тикеру
-    /// 
+    ///
     /// В продакшене здесь будет интеграция с:
     /// - Tinkoff API (финансовые показатели компаний)
     /// - Finviz API
@@ -36,13 +36,17 @@ impl FundamentalDataService {
     ) -> Result<Option<FundamentalAnalysis>> {
         // Заглушка - в реальности здесь будет загрузка из API
         // Для примера возвращаем None, чтобы использовать rule-based решение
-        
-        log::info!("Загрузка фундаментальных данных для {} ({})...", ticker, company_name);
-        
+
+        log::info!(
+            "Загрузка фундаментальных данных для {} ({})...",
+            ticker,
+            company_name
+        );
+
         // Пример данных для Т-Технологии (искусственные данные для демонстрации)
         if ticker == "TTECH" {
             let analyzer = FundamentalAnalyzer::default();
-            
+
             let valuation = ValuationMetrics {
                 pe_ratio: Some(12.5),
                 forward_pe: Some(10.2),

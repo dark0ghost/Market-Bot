@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
-use ort::session::builder::{GraphOptimizationLevel, SessionBuilder};
 use ort::session::Session;
+use ort::session::builder::{GraphOptimizationLevel, SessionBuilder};
 use ort::value::Tensor;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
@@ -63,10 +63,7 @@ impl OrtSessionPool {
             .context("ORT extract logits failed")?;
 
         let dims: Vec<usize> = logits_shape.iter().map(|d| *d as usize).collect();
-        let logits = ndarray::Array2::from_shape_vec(
-            (dims[0], dims[1]),
-            logits_data.to_vec(),
-        )?;
+        let logits = ndarray::Array2::from_shape_vec((dims[0], dims[1]), logits_data.to_vec())?;
 
         Ok(logits)
     }

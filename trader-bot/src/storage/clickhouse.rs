@@ -139,28 +139,36 @@ impl TimeSeriesDb {
     }
 
     pub async fn insert_candle(&self, row: CandleRow) -> Result<()> {
-        let mut insert = self.client.insert(format!("{}.candles", self.database).as_str())?;
+        let mut insert = self
+            .client
+            .insert(format!("{}.candles", self.database).as_str())?;
         insert.write(&row).await?;
         insert.end().await?;
         Ok(())
     }
 
     pub async fn insert_trade(&self, row: TradeRow) -> Result<()> {
-        let mut insert = self.client.insert(format!("{}.trades", self.database).as_str())?;
+        let mut insert = self
+            .client
+            .insert(format!("{}.trades", self.database).as_str())?;
         insert.write(&row).await?;
         insert.end().await?;
         Ok(())
     }
 
     pub async fn insert_order_book(&self, row: OrderBookSnapshotRow) -> Result<()> {
-        let mut insert = self.client.insert(format!("{}.order_book_snapshots", self.database).as_str())?;
+        let mut insert = self
+            .client
+            .insert(format!("{}.order_book_snapshots", self.database).as_str())?;
         insert.write(&row).await?;
         insert.end().await?;
         Ok(())
     }
 
     pub async fn insert_signal(&self, row: SignalRow) -> Result<()> {
-        let mut insert = self.client.insert(format!("{}.signals", self.database).as_str())?;
+        let mut insert = self
+            .client
+            .insert(format!("{}.signals", self.database).as_str())?;
         insert.write(&row).await?;
         insert.end().await?;
         Ok(())

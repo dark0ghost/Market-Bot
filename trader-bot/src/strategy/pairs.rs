@@ -55,13 +55,15 @@ impl PairsTrader {
             return 1.0;
         }
 
-        let returns_a: Vec<f64> = self.prices_a
+        let returns_a: Vec<f64> = self
+            .prices_a
             .iter()
             .zip(self.prices_a.iter().skip(1))
             .map(|(a, b)| (b - a) / a)
             .collect();
 
-        let returns_b: Vec<f64> = self.prices_b
+        let returns_b: Vec<f64> = self
+            .prices_b
             .iter()
             .zip(self.prices_b.iter().skip(1))
             .map(|(a, b)| (b - a) / a)
@@ -70,14 +72,13 @@ impl PairsTrader {
         let mean_a = returns_a.iter().sum::<f64>() / returns_a.len() as f64;
         let mean_b = returns_b.iter().sum::<f64>() / returns_b.len() as f64;
 
-        let num: f64 = returns_a.iter()
+        let num: f64 = returns_a
+            .iter()
             .zip(returns_b.iter())
             .map(|(ra, rb)| (ra - mean_a) * (rb - mean_b))
             .sum();
 
-        let den: f64 = returns_b.iter()
-            .map(|rb| (rb - mean_b).powi(2))
-            .sum();
+        let den: f64 = returns_b.iter().map(|rb| (rb - mean_b).powi(2)).sum();
 
         if den == 0.0 { 1.0 } else { num / den }
     }
@@ -95,12 +96,13 @@ impl PairsTrader {
             return 0.0;
         }
         let mean = spread.iter().sum::<f64>() / spread.len() as f64;
-        let variance: f64 = spread.iter()
-            .map(|s| (s - mean).powi(2))
-            .sum::<f64>() / spread.len() as f64;
+        let variance: f64 =
+            spread.iter().map(|s| (s - mean).powi(2)).sum::<f64>() / spread.len() as f64;
         let std = variance.sqrt();
 
-        if std == 0.0 { 0.0 } else {
+        if std == 0.0 {
+            0.0
+        } else {
             (spread[spread.len() - 1] - mean) / std
         }
     }
@@ -111,7 +113,9 @@ impl PairsTrader {
         }
 
         let hedge_ratio = self.calculate_hedge_ratio();
-        let spread_values: Vec<f64> = self.prices_a.iter()
+        let spread_values: Vec<f64> = self
+            .prices_a
+            .iter()
             .zip(self.prices_b.iter())
             .map(|(pa, pb)| pa - hedge_ratio * pb)
             .collect();

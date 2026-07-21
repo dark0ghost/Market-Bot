@@ -1,6 +1,6 @@
-use anyhow::Result;
 use crate::agent::CurrentPosition;
 use crate::client::portfolio::{PortfolioInfo, PortfolioService};
+use anyhow::Result;
 
 pub trait PortfolioProvider {
     async fn get_portfolio(&self) -> Result<PortfolioInfo>;

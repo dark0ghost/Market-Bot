@@ -3,4 +3,6 @@ pub mod llm_provider;
 pub mod ollama;
 pub mod perplexica;
 
-pub use perplexica::{ModelConfig, PerplexicaProvider, PerplexicaSearcher, SearchSource, OptimizationMode, FocusMode};
+pub use perplexica::{
+    FocusMode, ModelConfig, OptimizationMode, PerplexicaProvider, PerplexicaSearcher, SearchSource,
+};

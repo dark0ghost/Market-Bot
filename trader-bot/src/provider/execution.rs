@@ -1,5 +1,5 @@
-use anyhow::Result;
 use crate::execution::position_manager::{OrderAction, OrderResult, PositionManager};
+use anyhow::Result;
 
 pub trait ExecutionProvider {
     async fn place_limit_order(

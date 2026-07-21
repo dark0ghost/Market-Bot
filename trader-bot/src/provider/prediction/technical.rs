@@ -1,7 +1,7 @@
-use anyhow::Result;
-use std::collections::HashMap;
 use crate::agent::Action;
 use crate::provider::prediction::{Prediction, PredictionContext};
+use anyhow::Result;
+use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 pub struct TechnicalPredictor {
@@ -30,26 +30,51 @@ impl TechnicalPredictor {
         let mut rationale_parts = Vec::new();
 
         if let Some(ref tech) = ctx.technical {
-            let rsi_signal = tech.rsi.map(|r| {
-                if r < 30.0 { 0.6 } else if r < 40.0 { 0.3 }
-                else if r > 70.0 { -0.6 } else if r > 60.0 { -0.3 }
-                else { 0.0 }
-            }).unwrap_or(0.0);
+            let rsi_signal = tech
+                .rsi
+                .map(|r| {
+                    if r < 30.0 {
+                        0.6
+                    } else if r < 40.0 {
+                        0.3
+                    } else if r > 70.0 {
+                        -0.6
+                    } else if r > 60.0 {
+                        -0.3
+                    } else {
+                        0.0
+                    }
+                })
+                .unwrap_or(0.0);
             features.insert("rsi_signal".into(), rsi_signal);
 
-            let macd_signal = tech.macd.as_ref().map(|m| {
-                if m.histogram > 0.0 && m.macd_line > m.signal_line { 0.5 }
-                else if m.histogram < 0.0 && m.macd_line < m.signal_line { -0.5 }
-                else { 0.0 }
-            }).unwrap_or(0.0);
+            let macd_signal = tech
+                .macd
+                .as_ref()
+                .map(|m| {
+                    if m.histogram > 0.0 && m.macd_line > m.signal_line {
+                        0.5
+                    } else if m.histogram < 0.0 && m.macd_line < m.signal_line {
+                        -0.5
+                    } else {
+                        0.0
+                    }
+                })
+                .unwrap_or(0.0);
             features.insert("macd_signal".into(), macd_signal);
 
             let bb_signal = if let Some(ref bb) = tech.bollinger {
                 let p = ctx.current_price;
-                if p <= bb.lower { 0.4 }
-                else if p >= bb.upper { -0.4 }
-                else { 0.0 }
-            } else { 0.0 };
+                if p <= bb.lower {
+                    0.4
+                } else if p >= bb.upper {
+                    -0.4
+                } else {
+                    0.0
+                }
+            } else {
+                0.0
+            };
             features.insert("bb_signal".into(), bb_signal);
 
             let trend_signal = match tech.trend {
@@ -60,8 +85,14 @@ impl TechnicalPredictor {
             features.insert("trend_signal".into(), trend_signal);
 
             let volume_signal = if tech.volume_analysis.is_unusual {
-                if tech.volume_analysis.volume_ratio > 1.5 { 0.3 } else { -0.1 }
-            } else { 0.0 };
+                if tech.volume_analysis.volume_ratio > 1.5 {
+                    0.3
+                } else {
+                    -0.1
+                }
+            } else {
+                0.0
+            };
             features.insert("volume_signal".into(), volume_signal);
 
             conviction = self.rsi_weight * rsi_signal

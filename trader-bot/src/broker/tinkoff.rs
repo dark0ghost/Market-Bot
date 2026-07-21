@@ -3,10 +3,8 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use t_invest_sdk::TInvestSdk;
 
+use crate::client::{MarketDataService, OrderBookService, PortfolioService};
 use crate::core::*;
-use crate::client::{
-    MarketDataService, PortfolioService, OrderBookService,
-};
 
 /// Tinkoff implementation of the Broker trait.
 /// Delegates to existing client wrappers.
@@ -18,7 +16,7 @@ pub struct TinkoffBroker {
 
 impl TinkoffBroker {
     pub async fn new(token: &str, account_id: String, sandbox: bool) -> Result<Self> {
-        use t_invest_sdk::{Environment};
+        use t_invest_sdk::Environment;
         let env = if sandbox {
             Environment::Sandbox
         } else {
@@ -59,7 +57,12 @@ impl Broker for TinkoffBroker {
         BrokerKind::Tinkoff
     }
 
-    async fn candles(&self, instrument: &str, interval: CandleInterval, _days: u32) -> Result<Vec<Candle>> {
+    async fn candles(
+        &self,
+        instrument: &str,
+        interval: CandleInterval,
+        _days: u32,
+    ) -> Result<Vec<Candle>> {
         use t_invest_sdk::api::CandleInterval as TI;
         let ti = match interval {
             CandleInterval::Min1 => TI::CandleInterval1Min,
@@ -72,22 +75,28 @@ impl Broker for TinkoffBroker {
         };
 
         let sdk = self.market_data();
-        let hist = sdk.get_historical_candles(instrument, ti, _days.max(1)).await?;
+        let hist = sdk
+            .get_historical_candles(instrument, ti, _days.max(1))
+            .await?;
 
-        Ok(hist.iter().filter_map(|c| {
-            let time = c.time.as_ref().and_then(|t| {
-                DateTime::from_timestamp(t.seconds, t.nanos as u32)
-            })?;
-            Some(Candle {
-                open: crate::client::market_data::extract_price(&c.open).ok()?,
-                high: crate::client::market_data::extract_price(&c.high).ok()?,
-                low: crate::client::market_data::extract_price(&c.low).ok()?,
-                close: crate::client::market_data::extract_price(&c.close).ok()?,
-                volume: c.volume as f64,
-                time,
-                ticker: instrument.to_string(),
+        Ok(hist
+            .iter()
+            .filter_map(|c| {
+                let time = c
+                    .time
+                    .as_ref()
+                    .and_then(|t| DateTime::from_timestamp(t.seconds, t.nanos as u32))?;
+                Some(Candle {
+                    open: crate::client::market_data::extract_price(&c.open).ok()?,
+                    high: crate::client::market_data::extract_price(&c.high).ok()?,
+                    low: crate::client::market_data::extract_price(&c.low).ok()?,
+                    close: crate::client::market_data::extract_price(&c.close).ok()?,
+                    volume: c.volume as f64,
+                    time,
+                    ticker: instrument.to_string(),
+                })
             })
-        }).collect())
+            .collect())
     }
 
     async fn last_price(&self, instrument: &str) -> Result<f64> {
@@ -100,14 +109,22 @@ impl Broker for TinkoffBroker {
 
         Ok(OrderBook {
             figi: instrument.to_string(),
-            bids: book.bids.iter().map(|b| OrderBookLevel {
-                price: b.price,
-                volume: b.quantity as f64,
-            }).collect(),
-            asks: book.asks.iter().map(|a| OrderBookLevel {
-                price: a.price,
-                volume: a.quantity as f64,
-            }).collect(),
+            bids: book
+                .bids
+                .iter()
+                .map(|b| OrderBookLevel {
+                    price: b.price,
+                    volume: b.quantity as f64,
+                })
+                .collect(),
+            asks: book
+                .asks
+                .iter()
+                .map(|a| OrderBookLevel {
+                    price: a.price,
+                    volume: a.quantity as f64,
+                })
+                .collect(),
             timestamp: Utc::now(),
         })
     }
@@ -121,7 +138,11 @@ impl Broker for TinkoffBroker {
         Ok(LiquidityInfo {
             total_bid_volume: total_bid,
             total_ask_volume: total_ask,
-            bid_ask_ratio: if total_ask > 0.0 { total_bid / total_ask } else { 1.0 },
+            bid_ask_ratio: if total_ask > 0.0 {
+                total_bid / total_ask
+            } else {
+                1.0
+            },
             spread: spread.max(0.0),
         })
     }
@@ -148,7 +169,8 @@ impl Broker for TinkoffBroker {
             direction: direction as i32,
             account_id: self.account_id.clone(),
             order_type: tinkoff_order_type as i32,
-            order_id: request.client_order_id
+            order_id: request
+                .client_order_id
                 .unwrap_or_else(|| format!("order_{}", Utc::now().timestamp())),
             instrument_id: request.instrument.clone(),
             confirm_margin_trade: false,
@@ -194,24 +216,28 @@ impl Broker for TinkoffBroker {
         let response = self.sdk.orders().get_orders(req).await?;
         let r = response.into_inner();
 
-        Ok(r.orders.iter().map(|o| OrderResponse {
-            order_id: o.order_id.clone(),
-            client_order_id: None,
-            instrument: o.figi.clone(),
-            action: OrderAction::Buy,
-            quantity: o.lots_requested as i32,
-            filled_quantity: o.lots_executed as i32,
-            price: None,
-            avg_fill_price: None,
-            status: OrderStatus::New,
-            created_at: Utc::now(),
-            message: "Fetched from Tinkoff".to_string(),
-        }).collect())
+        Ok(r.orders
+            .iter()
+            .map(|o| OrderResponse {
+                order_id: o.order_id.clone(),
+                client_order_id: None,
+                instrument: o.figi.clone(),
+                action: OrderAction::Buy,
+                quantity: o.lots_requested as i32,
+                filled_quantity: o.lots_executed as i32,
+                price: None,
+                avg_fill_price: None,
+                status: OrderStatus::New,
+                created_at: Utc::now(),
+                message: "Fetched from Tinkoff".to_string(),
+            })
+            .collect())
     }
 
     async fn get_order_status(&self, order_id: &str) -> Result<OrderStatus> {
         let orders = self.get_orders(None).await?;
-        Ok(orders.iter()
+        Ok(orders
+            .iter()
             .find(|o| o.order_id == order_id)
             .map(|o| o.status.clone())
             .unwrap_or(OrderStatus::Cancelled))
@@ -230,8 +256,11 @@ impl Broker for TinkoffBroker {
                 current_price: pos.current_price,
                 pnl: (pos.current_price - pos.average_position_price) * pos.quantity as f64,
                 pnl_pct: if pos.average_position_price > 0.0 {
-                    (pos.current_price - pos.average_position_price) / pos.average_position_price * 100.0
-                } else { 0.0 },
+                    (pos.current_price - pos.average_position_price) / pos.average_position_price
+                        * 100.0
+                } else {
+                    0.0
+                },
                 total_value: pos.current_price * pos.quantity as f64,
             });
         }
@@ -266,7 +295,9 @@ impl Broker for TinkoffBroker {
                     pnl: (current_price - p.average_price) * p.quantity as f64,
                     pnl_pct: if p.average_price > 0.0 {
                         (current_price - p.average_price) / p.average_price * 100.0
-                    } else { 0.0 },
+                    } else {
+                        0.0
+                    },
                     total_value: current_price * p.quantity as f64,
                 }))
             }

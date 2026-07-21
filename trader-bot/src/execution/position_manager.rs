@@ -1,12 +1,9 @@
+use crate::provider::ExecutionProvider;
 use anyhow::Result;
-use t_invest_sdk::api::{
-    PostOrderRequest, OrderDirection, OrderType,
-    GetOrdersRequest,
-};
-use t_invest_sdk::TInvestSdk;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use crate::provider::ExecutionProvider;
+use t_invest_sdk::TInvestSdk;
+use t_invest_sdk::api::{GetOrdersRequest, OrderDirection, OrderType, PostOrderRequest};
 
 /// Тип заявки
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -46,10 +43,7 @@ pub struct PositionManager {
 
 impl PositionManager {
     pub fn new(sdk: TInvestSdk, account_id: String) -> Self {
-        PositionManager {
-            sdk,
-            account_id,
-        }
+        PositionManager { sdk, account_id }
     }
 
     /// Размещение лимитной заявки
@@ -198,10 +192,7 @@ impl<E: ExecutionProvider> TradingExecutor<E> {
         match decision.action {
             Action::Buy => {
                 if let Some(entry_price) = decision.entry_price {
-                    let quantity = self.calculate_quantity(
-                        entry_price,
-                        decision.position_size_pct,
-                    );
+                    let quantity = self.calculate_quantity(entry_price, decision.position_size_pct);
 
                     if quantity > 0 {
                         log::info!(
@@ -211,8 +202,14 @@ impl<E: ExecutionProvider> TradingExecutor<E> {
                             quantity as f64 * entry_price
                         );
 
-                        let order_result = self.executor
-                            .place_limit_order(instrument_uid, OrderAction::Buy, quantity, entry_price)
+                        let order_result = self
+                            .executor
+                            .place_limit_order(
+                                instrument_uid,
+                                OrderAction::Buy,
+                                quantity,
+                                entry_price,
+                            )
                             .await?;
                         results.push(order_result);
 
@@ -232,10 +229,8 @@ impl<E: ExecutionProvider> TradingExecutor<E> {
             Action::Sell => {
                 if let Some(current_position) = decision.current_position {
                     // Для продажи используем текущую позицию
-                    let quantity = self.calculate_sell_quantity(
-                        current_position,
-                        decision.position_size_pct,
-                    );
+                    let quantity =
+                        self.calculate_sell_quantity(current_position, decision.position_size_pct);
 
                     if quantity > 0 {
                         // Используем текущую цену для заявки
@@ -246,7 +241,8 @@ impl<E: ExecutionProvider> TradingExecutor<E> {
                             price
                         );
 
-                        let order_result = self.executor
+                        let order_result = self
+                            .executor
                             .place_limit_order(instrument_uid, OrderAction::Sell, quantity, price)
                             .await?;
                         results.push(order_result);
@@ -347,7 +343,7 @@ mod executor_tests {
     fn test_calculate_quantity_basic() {
         // Тестируем логику расчета количества через closure
         let balance = 10000.0;
-        
+
         // Closure для тестирования логики
         let calc_qty = |price: f64, position_pct: f64| -> i32 {
             if price <= 0.0 || position_pct <= 0.0 {
@@ -361,10 +357,10 @@ mod executor_tests {
         // При балансе 10000 и 10% позиции = 1000
         // При цене 100 = 10 лотов
         assert_eq!(calc_qty(100.0, 0.1), 10);
-        
+
         // При цене 50 = 20 лотов
         assert_eq!(calc_qty(50.0, 0.1), 20);
-        
+
         // При 50% позиции = 5000, цена 100 = 50 лотов
         assert_eq!(calc_qty(100.0, 0.5), 50);
     }
@@ -372,7 +368,7 @@ mod executor_tests {
     #[test]
     fn test_calculate_quantity_edge_cases() {
         let balance = 10000.0;
-        
+
         let calc_qty = |price: f64, position_pct: f64| -> i32 {
             if price <= 0.0 || position_pct <= 0.0 {
                 return 0;
@@ -384,13 +380,13 @@ mod executor_tests {
 
         // Нулевая цена
         assert_eq!(calc_qty(0.0, 0.1), 0);
-        
+
         // Отрицательная цена
         assert_eq!(calc_qty(-100.0, 0.1), 0);
-        
+
         // Нулевой процент позиции
         assert_eq!(calc_qty(100.0, 0.0), 0);
-        
+
         // Отрицательный процент
         assert_eq!(calc_qty(100.0, -0.1), 0);
     }
@@ -408,10 +404,10 @@ mod executor_tests {
 
         // Продажа 50% от 100 лотов = 50 лотов
         assert_eq!(calc_sell(100, 0.5), 50);
-        
+
         // Продажа 25% от 100 лотов = 25 лотов
         assert_eq!(calc_sell(100, 0.25), 25);
-        
+
         // Продажа 100% от 100 лотов = 100 лотов
         assert_eq!(calc_sell(100, 1.0), 100);
     }
@@ -428,7 +424,7 @@ mod executor_tests {
 
         // Продажа 1% от 100 лотов = 1 лот (минимум 1)
         assert_eq!(calc_sell(100, 0.01), 1);
-        
+
         // Продажа 0.1% от 100 лотов = 1 лот (минимум 1)
         assert_eq!(calc_sell(100, 0.001), 1);
     }
@@ -445,13 +441,13 @@ mod executor_tests {
 
         // Нулевая позиция
         assert_eq!(calc_sell(0, 0.5), 0);
-        
+
         // Отрицательная позиция
         assert_eq!(calc_sell(-10, 0.5), 0);
-        
+
         // Нулевой процент
         assert_eq!(calc_sell(100, 0.0), 0);
-        
+
         // Отрицательный процент
         assert_eq!(calc_sell(100, -0.5), 0);
     }

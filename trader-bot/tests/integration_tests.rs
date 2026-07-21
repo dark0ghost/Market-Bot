@@ -7,7 +7,7 @@ use trader_bot::error::{BotError, StrategyError};
 /// Тест интеграции Sentiment анализа
 #[test]
 fn test_sentiment_analysis_integration() {
-    use trader_bot::analysis::{Sentiment, NewsArticle};
+    use trader_bot::analysis::{NewsArticle, Sentiment};
 
     // Создаём тестовые новости
     let articles = vec![
@@ -38,7 +38,8 @@ fn test_sentiment_analysis_integration() {
     ];
 
     // Проверяем конвертацию sentiment в score
-    let scores: Vec<f64> = articles.iter()
+    let scores: Vec<f64> = articles
+        .iter()
         .map(|a| a.sentiment.as_ref().map_or(0.0, Sentiment::to_score))
         .collect();
 
@@ -71,10 +72,12 @@ fn test_grid_strategy_integration() {
     let levels = strategy.calculate_grid_levels();
 
     // Проверяем, что уровни корректно разделены
-    let buy_levels: Vec<_> = levels.iter()
+    let buy_levels: Vec<_> = levels
+        .iter()
         .filter(|l| l.order_type == OrderSide::Buy)
         .collect();
-    let sell_levels: Vec<_> = levels.iter()
+    let sell_levels: Vec<_> = levels
+        .iter()
         .filter(|l| l.order_type == OrderSide::Sell)
         .collect();
 
@@ -84,7 +87,7 @@ fn test_grid_strategy_integration() {
     // Проверяем, что buy уровни ниже sell уровней
     let max_buy = buy_levels.iter().map(|l| l.price).fold(f64::MIN, f64::max);
     let min_sell = sell_levels.iter().map(|l| l.price).fold(f64::MAX, f64::min);
-    
+
     assert!(max_buy <= min_sell);
 }
 
@@ -129,13 +132,13 @@ fn test_error_types_integration() {
 /// Тест интеграции TechnicalAnalyzer
 #[test]
 fn test_technical_analyzer_integration() {
-    use trader_bot::{TechnicalAnalyzer};
+    use trader_bot::TechnicalAnalyzer;
 
     // TechnicalAnalyzer требует свечи для анализа
     // Проверяем, что создание анализатора работает корректно
     // Полноценный тест требует моковых данных SDK
     let analyzer = TechnicalAnalyzer::new();
-    
+
     // Просто проверяем, что анализатор создаётся
     drop(analyzer);
 }
@@ -143,7 +146,10 @@ fn test_technical_analyzer_integration() {
 /// Тест интеграции FundamentalAnalyzer
 #[test]
 fn test_fundamental_analyzer_integration() {
-    use trader_bot::{FundamentalAnalyzer, CompanyRating, ValuationMetrics, ProfitabilityMetrics, FinancialHealthMetrics, GrowthMetrics, DividendMetrics};
+    use trader_bot::{
+        CompanyRating, DividendMetrics, FinancialHealthMetrics, FundamentalAnalyzer, GrowthMetrics,
+        ProfitabilityMetrics, ValuationMetrics,
+    };
 
     let analyzer = FundamentalAnalyzer::default();
 
@@ -192,26 +198,49 @@ fn test_fundamental_analyzer_integration() {
     });
 
     // Проверяем, что анализ возвращает результат
-    let result = analyzer.analyze("TINK", "Tinkoff", valuation, profitability, financial_health, growth, dividends);
-    
+    let result = analyzer.analyze(
+        "TINK",
+        "Tinkoff",
+        valuation,
+        profitability,
+        financial_health,
+        growth,
+        dividends,
+    );
+
     // Результат должен содержать рейтинг
     assert!(result.overall_score >= 0.0);
-    assert!(matches!(result.rating, CompanyRating::Excellent | CompanyRating::Good | CompanyRating::Fair | CompanyRating::Poor | CompanyRating::VeryPoor));
+    assert!(matches!(
+        result.rating,
+        CompanyRating::Excellent
+            | CompanyRating::Good
+            | CompanyRating::Fair
+            | CompanyRating::Poor
+            | CompanyRating::VeryPoor
+    ));
 }
 
 /// Тест интеграции GridState и RebalanceResult
 #[test]
 fn test_grid_state_rebalance_integration() {
-    use trader_bot::strategy::{GridState, GridLevel, OrderSide};
     use trader_bot::strategy::grid_executor::RebalanceResult;
+    use trader_bot::strategy::{GridLevel, GridState, OrderSide};
 
     // Создаём начальное состояние сетки
     let mut state = GridState {
         ticker: "TINK".to_string(),
         figi: "BBG000B9XRY4".to_string(),
         levels: vec![
-            GridLevel { price: 100.0, order_type: OrderSide::Buy, level_index: 0 },
-            GridLevel { price: 150.0, order_type: OrderSide::Sell, level_index: 1 },
+            GridLevel {
+                price: 100.0,
+                order_type: OrderSide::Buy,
+                level_index: 0,
+            },
+            GridLevel {
+                price: 150.0,
+                order_type: OrderSide::Sell,
+                level_index: 1,
+            },
         ],
         active_orders: vec![0, 1],
         filled_orders: vec![],
@@ -289,23 +318,21 @@ fn test_recommendation_integration() {
 /// Тест интеграции NewsSentiment
 #[test]
 fn test_news_sentiment_integration() {
-    use trader_bot::analysis::{NewsSentiment, Sentiment, NewsArticle};
+    use trader_bot::analysis::{NewsArticle, NewsSentiment, Sentiment};
 
     let sentiment = NewsSentiment {
         ticker: "TINK".to_string(),
         overall_sentiment: Sentiment::Positive,
         sentiment_score: 0.5,
         articles_count: 3,
-        articles: vec![
-            NewsArticle {
-                title: "News 1".to_string(),
-                content: "Content 1".to_string(),
-                source: "tinkoff".to_string(),
-                url: "https://example.com/1".to_string(),
-                published_at: None,
-                sentiment: Some(Sentiment::Positive),
-            },
-        ],
+        articles: vec![NewsArticle {
+            title: "News 1".to_string(),
+            content: "Content 1".to_string(),
+            source: "tinkoff".to_string(),
+            url: "https://example.com/1".to_string(),
+            published_at: None,
+            sentiment: Some(Sentiment::Positive),
+        }],
         key_events: vec!["Событие 1".to_string()],
     };
 

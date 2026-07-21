@@ -1,7 +1,10 @@
 use anyhow::Result;
-use ta::{indicators::{RelativeStrengthIndex, MovingAverageConvergenceDivergence, BollingerBands}, Next};
-use t_invest_sdk::api::Quotation;
 use chrono::{DateTime, Utc};
+use t_invest_sdk::api::Quotation;
+use ta::{
+    Next,
+    indicators::{BollingerBands, MovingAverageConvergenceDivergence, RelativeStrengthIndex},
+};
 
 /// Извлечение цены из Quotation
 fn extract_price(quotation: &Option<Quotation>) -> Result<f64> {
@@ -94,7 +97,11 @@ impl TechnicalAnalyzer {
     }
 
     /// Анализ свечных данных
-    pub fn analyze(&self, ticker: &str, candles: &[t_invest_sdk::api::HistoricCandle]) -> Result<TechnicalAnalysis> {
+    pub fn analyze(
+        &self,
+        ticker: &str,
+        candles: &[t_invest_sdk::api::HistoricCandle],
+    ) -> Result<TechnicalAnalysis> {
         if candles.is_empty() {
             // Возвращаем дефолтный анализ если нет данных
             return Ok(TechnicalAnalysis {
@@ -128,10 +135,7 @@ impl TechnicalAnalyzer {
             .collect();
 
         // Извлечение объемов - HistoricCandle.volume это i64
-        let volumes: Vec<f64> = candles
-            .iter()
-            .map(|c| c.volume as f64)
-            .collect();
+        let volumes: Vec<f64> = candles.iter().map(|c| c.volume as f64).collect();
 
         // RSI
         let rsi = self.calculate_rsi(&closes);
@@ -203,7 +207,8 @@ impl TechnicalAnalyzer {
             self.macd_fast,
             self.macd_slow,
             self.macd_signal,
-        ).unwrap();
+        )
+        .unwrap();
 
         let mut macd_line = 0.0;
         let mut signal_line = 0.0;
@@ -230,7 +235,7 @@ impl TechnicalAnalyzer {
         };
 
         let mut bb = BollingerBands::new(period, self.bollinger_std_dev).unwrap();
-        
+
         let mut upper = 0.0;
         let mut middle = 0.0;
         let mut lower = 0.0;
@@ -297,7 +302,7 @@ impl TechnicalAnalyzer {
         let price_trend = if prices.len() >= 10 {
             let recent_avg: f64 = prices.iter().rev().take(5).sum::<f64>() / 5.0;
             let older_avg: f64 = prices.iter().rev().skip(5).take(5).sum::<f64>() / 5.0;
-            
+
             if recent_avg > older_avg * 1.02 {
                 Trend::Bullish
             } else if recent_avg < older_avg * 0.98 {
@@ -311,12 +316,24 @@ impl TechnicalAnalyzer {
 
         // Подтверждение по RSI
         let rsi_confirmation = rsi.map_or(0, |&v| {
-            if v > 50.0 { 1 } else if v < 50.0 { -1 } else { 0 }
+            if v > 50.0 {
+                1
+            } else if v < 50.0 {
+                -1
+            } else {
+                0
+            }
         });
 
         // Подтверждение по MACD
         let macd_confirmation = macd.map_or(0, |m| {
-            if m.histogram > 0.0 { 1 } else if m.histogram < 0.0 { -1 } else { 0 }
+            if m.histogram > 0.0 {
+                1
+            } else if m.histogram < 0.0 {
+                -1
+            } else {
+                0
+            }
         });
 
         // Комбинированный сигнал
@@ -324,7 +341,8 @@ impl TechnicalAnalyzer {
             Trend::Bullish => 1,
             Trend::Bearish => -1,
             Trend::Sideways => 0,
-        } + rsi_confirmation + macd_confirmation;
+        } + rsi_confirmation
+            + macd_confirmation;
 
         if combined >= 2 {
             Trend::Bullish
@@ -446,7 +464,7 @@ mod tests {
     #[test]
     fn test_recommendation_from_score() {
         let analyzer = TechnicalAnalyzer::new();
-        
+
         // Тестовые данные
         let trend = Trend::Bullish;
         let rsi = Some(35.0);

@@ -1,6 +1,6 @@
-use axum::{extract::State, Json};
-use std::sync::Arc;
+use axum::{Json, extract::State};
 use serde::Serialize;
+use std::sync::Arc;
 use tokio::sync::Mutex;
 
 use crate::api::AppState;
@@ -36,9 +36,7 @@ pub async fn index() -> &'static str {
     "AI Trade Bot Dashboard\n\nEndpoints:\n  /api/status\n  /api/portfolio\n  /api/strategies\n  /api/brokers\n  /api/health"
 }
 
-pub async fn status(
-    State(state): State<Arc<Mutex<AppState>>>,
-) -> Json<StatusResponse> {
+pub async fn status(State(state): State<Arc<Mutex<AppState>>>) -> Json<StatusResponse> {
     let guard = state.lock().await;
     let sources: Vec<String> = guard.data_sources.list_names();
 
@@ -52,9 +50,7 @@ pub async fn status(
     })
 }
 
-pub async fn portfolio(
-    State(state): State<Arc<Mutex<AppState>>>,
-) -> Json<Vec<serde_json::Value>> {
+pub async fn portfolio(State(state): State<Arc<Mutex<AppState>>>) -> Json<Vec<serde_json::Value>> {
     let guard = state.lock().await;
     let mut results = Vec::new();
 
@@ -69,21 +65,21 @@ pub async fn portfolio(
     Json(results)
 }
 
-pub async fn strategies_list(
-    State(state): State<Arc<Mutex<AppState>>>,
-) -> Json<Vec<String>> {
+pub async fn strategies_list(State(state): State<Arc<Mutex<AppState>>>) -> Json<Vec<String>> {
     let guard = state.lock().await;
     Json(guard.strategies.list_names())
 }
 
-pub async fn brokers_list(
-    State(state): State<Arc<Mutex<AppState>>>,
-) -> Json<Vec<BrokerInfo>> {
+pub async fn brokers_list(State(state): State<Arc<Mutex<AppState>>>) -> Json<Vec<BrokerInfo>> {
     let guard = state.lock().await;
-    let brokers: Vec<BrokerInfo> = guard.brokers.iter().map(|b| BrokerInfo {
-        name: b.name().to_string(),
-        kind: format!("{:?}", b.broker_kind()),
-        account_id: b.account_id().to_string(),
-    }).collect();
+    let brokers: Vec<BrokerInfo> = guard
+        .brokers
+        .iter()
+        .map(|b| BrokerInfo {
+            name: b.name().to_string(),
+            kind: format!("{:?}", b.broker_kind()),
+            account_id: b.account_id().to_string(),
+        })
+        .collect();
     Json(brokers)
 }

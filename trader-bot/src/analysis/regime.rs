@@ -57,7 +57,11 @@ impl RegimeDetector {
         let adx = Self::adx(&vec, self.adx_period);
         let avg_price = vec.iter().sum::<f64>() / vec.len() as f64;
         let atr_pct = atr / avg_price;
-        match (adx > self.adx_threshold, atr_pct > self.atr_threshold_high, atr_pct < self.atr_threshold_low) {
+        match (
+            adx > self.adx_threshold,
+            atr_pct > self.atr_threshold_high,
+            atr_pct < self.atr_threshold_low,
+        ) {
             (true, _, _) => MarketRegime::Trending,
             (false, true, _) => MarketRegime::Volatile,
             (false, _, true) => MarketRegime::Quiet,
@@ -66,23 +70,35 @@ impl RegimeDetector {
     }
 
     fn atr(values: &[f64], period: usize) -> f64 {
-        if values.len() < 2 { return 0.0; }
-        let ranges: Vec<f64> = values.windows(2)
-            .map(|w| (w[1] - w[0]).abs())
-            .collect();
+        if values.len() < 2 {
+            return 0.0;
+        }
+        let ranges: Vec<f64> = values.windows(2).map(|w| (w[1] - w[0]).abs()).collect();
         let start = ranges.len().saturating_sub(period);
         let recent: &[f64] = &ranges[start..];
         recent.iter().sum::<f64>() / recent.len() as f64
     }
 
     fn adx(values: &[f64], period: usize) -> f64 {
-        if values.len() < period + 1 { return 0.0; }
+        if values.len() < period + 1 {
+            return 0.0;
+        }
         let start = values.len().saturating_sub(period + 1);
         let slice = &values[start..];
-        let up_moves: f64 = slice.windows(2).filter(|w| w[1] > w[0]).map(|w| (w[1] - w[0])).sum();
-        let down_moves: f64 = slice.windows(2).filter(|w| w[1] < w[0]).map(|w| (w[0] - w[1])).sum();
+        let up_moves: f64 = slice
+            .windows(2)
+            .filter(|w| w[1] > w[0])
+            .map(|w| (w[1] - w[0]))
+            .sum();
+        let down_moves: f64 = slice
+            .windows(2)
+            .filter(|w| w[1] < w[0])
+            .map(|w| (w[0] - w[1]))
+            .sum();
         let total = up_moves + down_moves;
-        if total == 0.0 { return 0.0; }
+        if total == 0.0 {
+            return 0.0;
+        }
         let di_diff = (up_moves - down_moves).abs() / total * 100.0;
         di_diff
     }

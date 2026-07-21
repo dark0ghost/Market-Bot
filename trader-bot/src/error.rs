@@ -142,7 +142,10 @@ mod tests {
         let err = BotError::Strategy("invalid config".to_string());
         assert!(err.to_string().contains("Ошибка стратегии"));
 
-        let err = BotError::InsufficientFunds { required: 100.0, available: 50.0 };
+        let err = BotError::InsufficientFunds {
+            required: 100.0,
+            available: 50.0,
+        };
         assert!(err.to_string().contains("100"));
         assert!(err.to_string().contains("50"));
     }
@@ -152,7 +155,9 @@ mod tests {
         let err = OrderError::Rejected("margin call".to_string());
         assert!(err.to_string().contains("margin call"));
 
-        let err = OrderError::NotFound { order_id: "123".to_string() };
+        let err = OrderError::NotFound {
+            order_id: "123".to_string(),
+        };
         assert!(err.to_string().contains("123"));
 
         let err = OrderError::PriceLimitExceeded { price: 150.0 };

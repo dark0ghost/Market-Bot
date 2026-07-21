@@ -45,9 +45,8 @@ impl StatisticalArbitrage {
         let prices: Vec<f64> = self.prices.iter().copied().collect();
         let mean = prices.iter().sum::<f64>() / prices.len() as f64;
 
-        let variance: f64 = prices.iter()
-            .map(|p| (p - mean).powi(2))
-            .sum::<f64>() / prices.len() as f64;
+        let variance: f64 =
+            prices.iter().map(|p| (p - mean).powi(2)).sum::<f64>() / prices.len() as f64;
 
         let std = variance.sqrt();
         if std == 0.0 {

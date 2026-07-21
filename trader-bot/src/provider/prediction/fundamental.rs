@@ -1,8 +1,8 @@
-use anyhow::Result;
-use std::collections::HashMap;
 use crate::agent::Action;
 use crate::analysis::CompanyRating;
 use crate::provider::prediction::{Prediction, PredictionContext};
+use anyhow::Result;
+use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 pub struct FundamentalPredictor {
@@ -38,29 +38,57 @@ impl FundamentalPredictor {
             features.insert("rating_signal".into(), rating_signal);
             rationale_parts.push(format!("rating={:?}", fund.rating));
 
-            let pe_signal = fund.valuation.pe_ratio.map(|pe| {
-                if pe < 0.0 { 0.0 }
-                else if pe < 10.0 { 0.3 }
-                else if pe < 20.0 { 0.1 }
-                else if pe < 30.0 { -0.1 }
-                else { -0.3 }
-            }).unwrap_or(0.0);
+            let pe_signal = fund
+                .valuation
+                .pe_ratio
+                .map(|pe| {
+                    if pe < 0.0 {
+                        0.0
+                    } else if pe < 10.0 {
+                        0.3
+                    } else if pe < 20.0 {
+                        0.1
+                    } else if pe < 30.0 {
+                        -0.1
+                    } else {
+                        -0.3
+                    }
+                })
+                .unwrap_or(0.0);
             features.insert("pe_signal".into(), pe_signal);
 
-            let roe_signal = fund.profitability.roe.map(|roe| {
-                if roe > 20.0 { 0.4 }
-                else if roe > 10.0 { 0.2 }
-                else if roe > 5.0 { 0.0 }
-                else { -0.2 }
-            }).unwrap_or(0.0);
+            let roe_signal = fund
+                .profitability
+                .roe
+                .map(|roe| {
+                    if roe > 20.0 {
+                        0.4
+                    } else if roe > 10.0 {
+                        0.2
+                    } else if roe > 5.0 {
+                        0.0
+                    } else {
+                        -0.2
+                    }
+                })
+                .unwrap_or(0.0);
             features.insert("roe_signal".into(), roe_signal);
 
-            let growth_signal = fund.growth.revenue_growth_yoy.map(|g| {
-                if g > 20.0 { 0.4 }
-                else if g > 10.0 { 0.2 }
-                else if g > 0.0 { 0.0 }
-                else { -0.3 }
-            }).unwrap_or(0.0);
+            let growth_signal = fund
+                .growth
+                .revenue_growth_yoy
+                .map(|g| {
+                    if g > 20.0 {
+                        0.4
+                    } else if g > 10.0 {
+                        0.2
+                    } else if g > 0.0 {
+                        0.0
+                    } else {
+                        -0.3
+                    }
+                })
+                .unwrap_or(0.0);
             features.insert("growth_signal".into(), growth_signal);
 
             conviction = self.rating_weight * rating_signal

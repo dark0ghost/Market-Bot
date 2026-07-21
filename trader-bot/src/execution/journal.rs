@@ -51,14 +51,14 @@ impl TradeJournal {
             OpenOptions::new()
                 .create(true)
                 .append(true)
-                .open(&trades_path)?
+                .open(&trades_path)?,
         );
 
         let signals_writer = csv::Writer::from_writer(
             OpenOptions::new()
                 .create(true)
                 .append(true)
-                .open(&signals_path)?
+                .open(&signals_path)?,
         );
 
         Ok(TradeJournal {

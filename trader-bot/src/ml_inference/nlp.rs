@@ -66,13 +66,11 @@ impl FinBertInference {
 
     pub fn predict(&self, text: &str) -> Result<NlpResult> {
         let (input_ids, attention_mask) = self.tokenize(text)?;
-        let logits = self.session.run(input_ids, attention_mask, self.max_length)?;
+        let logits = self
+            .session
+            .run(input_ids, attention_mask, self.max_length)?;
 
-        let scores = [
-            logits[[0, 0]],
-            logits[[0, 1]],
-            logits[[0, 2]],
-        ];
+        let scores = [logits[[0, 0]], logits[[0, 1]], logits[[0, 2]]];
         let (idx, confidence) = Self::softmax(&scores);
         let label = LABELS[idx].to_string();
 

@@ -1,8 +1,8 @@
+use crate::execution::position_manager::{OrderAction, OrderResult, PositionManager};
+use crate::strategy::grid::{GridLevel, GridState, GridStrategy, OrderSide};
 use anyhow::Result;
+use log::{error, info, warn};
 use t_invest_sdk::TInvestSdk;
-use crate::execution::position_manager::{PositionManager, OrderAction, OrderResult};
-use crate::strategy::grid::{GridStrategy, GridState, GridLevel, OrderSide};
-use log::{info, warn, error};
 
 /// Результат размещения ордера в Grid
 #[derive(Debug, Clone)]
@@ -31,7 +31,7 @@ impl GridExecutor {
         figi: String,
     ) -> Self {
         let order_size = grid_strategy.config().order_size;
-        
+
         GridExecutor {
             position_manager: PositionManager::new(sdk, account_id),
             grid_strategy,
@@ -45,14 +45,14 @@ impl GridExecutor {
     pub async fn initialize_grid(&mut self, current_price: f64) -> Result<Vec<GridOrderResult>> {
         info!("Инициализация Grid сетки для {}", self.figi);
         info!("Текущая цена: {:.2}", current_price);
-        
+
         // Получаем уровни для размещения
         let levels_to_place = self.grid_strategy.get_levels_to_place(current_price);
         info!("Уровней для размещения: {}", levels_to_place.len());
-        
+
         let mut results = Vec::new();
         let mut active_orders = Vec::new();
-        
+
         for level in levels_to_place {
             match self.place_grid_order(&level).await {
                 Ok(order_result) => {
@@ -74,7 +74,7 @@ impl GridExecutor {
                 }
             }
         }
-        
+
         // Сохраняем состояние
         self.grid_state = Some(GridState {
             ticker: self.figi.clone(),
@@ -84,7 +84,7 @@ impl GridExecutor {
             filled_orders: Vec::new(),
             current_price,
         });
-        
+
         Ok(results)
     }
 
@@ -94,7 +94,7 @@ impl GridExecutor {
             OrderSide::Buy => OrderAction::Buy,
             OrderSide::Sell => OrderAction::Sell,
         };
-        
+
         self.position_manager
             .place_limit_order(&self.figi, action, self.order_size as i32, level.price)
             .await
@@ -106,27 +106,32 @@ impl GridExecutor {
             Some(s) => s.clone(),
             None => return Err(anyhow::anyhow!("Grid состояние не инициализировано")),
         };
-        
+
         // Проверяем, нужно ли перебалансировать
-        let needs_rebalance = self.grid_strategy.needs_rebalance(&state, current_price, 0.02); // 2% порог
-        
+        let needs_rebalance = self
+            .grid_strategy
+            .needs_rebalance(&state, current_price, 0.02); // 2% порог
+
         if !needs_rebalance {
             return Ok(RebalanceResult {
                 cancelled_orders: 0,
                 placed_orders: 0,
             });
         }
-        
+
         info!("Перебалансировка Grid сетки...");
-        info!("Старая цена: {:.2}, новая цена: {:.2}", state.current_price, current_price);
-        
+        info!(
+            "Старая цена: {:.2}, новая цена: {:.2}",
+            state.current_price, current_price
+        );
+
         let mut cancelled = 0;
         let mut placed = 0;
-        
+
         // Получаем новые уровни для размещения
         let new_levels = self.grid_strategy.get_levels_to_place(current_price);
         let new_level_indices: Vec<u32> = new_levels.iter().map(|l| l.level_index).collect();
-        
+
         // Отменяем ордера, которые больше не нужны
         for &active_index in &state.active_orders {
             if !new_level_indices.contains(&active_index) {
@@ -138,11 +143,11 @@ impl GridExecutor {
                 }
             }
         }
-        
+
         // Размещаем новые ордера
         for level in new_levels {
-            if !state.active_orders.contains(&level.level_index) 
-                && !state.filled_orders.contains(&level.level_index) 
+            if !state.active_orders.contains(&level.level_index)
+                && !state.filled_orders.contains(&level.level_index)
             {
                 match self.place_grid_order(&level).await {
                     Ok(_) => {
@@ -154,15 +159,18 @@ impl GridExecutor {
                 }
             }
         }
-        
+
         // Обновляем состояние
         if let Some(ref mut state) = self.grid_state {
             state.active_orders = new_level_indices;
             state.current_price = current_price;
         }
-        
-        info!("Перебалансировка завершена: отменено={}, размещено={}", cancelled, placed);
-        
+
+        info!(
+            "Перебалансировка завершена: отменено={}, размещено={}",
+            cancelled, placed
+        );
+
         Ok(RebalanceResult {
             cancelled_orders: cancelled,
             placed_orders: placed,
@@ -211,7 +219,7 @@ impl GridExecutor {
                 }
             }
         }
-        
+
         Ok(())
     }
 
@@ -223,11 +231,11 @@ impl GridExecutor {
     /// Остановка Grid бота - отмена всех ордеров
     pub async fn stop_grid(&mut self) -> Result<()> {
         info!("Остановка Grid бота, отмена всех ордеров...");
-        
+
         // TODO: Отмена всех активных ордеров
-        
+
         self.grid_state = None;
-        
+
         Ok(())
     }
 }
@@ -250,7 +258,10 @@ mod tests {
             cancelled_orders: 2,
             placed_orders: 3,
         };
-        assert_eq!(format!("{:?}", result), "RebalanceResult { cancelled_orders: 2, placed_orders: 3 }");
+        assert_eq!(
+            format!("{:?}", result),
+            "RebalanceResult { cancelled_orders: 2, placed_orders: 3 }"
+        );
     }
 
     #[test]
@@ -354,10 +365,12 @@ mod tests {
         // Цена 150 - buy уровни < 150, sell уровни > 150
         let levels = strategy.get_levels_to_place(150.0);
 
-        let buy_count = levels.iter()
+        let buy_count = levels
+            .iter()
             .filter(|l| l.order_type == OrderSide::Buy)
             .count();
-        let sell_count = levels.iter()
+        let sell_count = levels
+            .iter()
             .filter(|l| l.order_type == OrderSide::Sell)
             .count();
 

@@ -1,7 +1,7 @@
-use anyhow::Result;
-use std::collections::HashMap;
 use crate::agent::Action;
 use crate::provider::prediction::{Prediction, PredictionContext};
+use anyhow::Result;
+use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 pub struct StatArbPredictor {
@@ -12,7 +12,11 @@ pub struct StatArbPredictor {
 
 impl StatArbPredictor {
     pub fn new(z_entry: f64, z_exit: f64, lookback: usize) -> Self {
-        StatArbPredictor { z_entry, z_exit, lookback }
+        StatArbPredictor {
+            z_entry,
+            z_exit,
+            lookback,
+        }
     }
 
     pub async fn predict(&self, ctx: &PredictionContext) -> Result<Prediction> {
@@ -22,9 +26,16 @@ impl StatArbPredictor {
         let (z_score, action, conviction, rationale) = if closes.len() < self.lookback {
             (0.0, Action::Hold, 0.0, "insufficient data".into())
         } else {
-            let window: Vec<f64> = closes.iter().rev().take(self.lookback).copied().rev().collect();
+            let window: Vec<f64> = closes
+                .iter()
+                .rev()
+                .take(self.lookback)
+                .copied()
+                .rev()
+                .collect();
             let mean = window.iter().sum::<f64>() / window.len() as f64;
-            let variance = window.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / window.len() as f64;
+            let variance =
+                window.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / window.len() as f64;
             let std = variance.sqrt();
 
             if std < 1e-10 {
@@ -39,7 +50,12 @@ impl StatArbPredictor {
                 } else {
                     (Action::Hold, 0.0)
                 };
-                (z, act, conf, format!("z={:.2}, mean={:.2}, std={:.2}", z, mean, std))
+                (
+                    z,
+                    act,
+                    conf,
+                    format!("z={:.2}, mean={:.2}, std={:.2}", z, mean, std),
+                )
             }
         };
 

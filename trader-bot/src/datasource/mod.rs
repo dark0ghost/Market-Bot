@@ -1,7 +1,7 @@
-pub mod tinkoff;
 pub mod finam;
 pub mod registry;
+pub mod tinkoff;
 
-pub use tinkoff::TinkoffDataSource;
 pub use finam::FinamDataSource;
 pub use registry::DataSourceRegistry;
+pub use tinkoff::TinkoffDataSource;

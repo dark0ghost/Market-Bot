@@ -1,5 +1,7 @@
+use crate::storage::clickhouse::{
+    CandleRow, OrderBookSnapshotRow, SignalRow, TimeSeriesDb, TradeRow,
+};
 use anyhow::Result;
-use crate::storage::clickhouse::{CandleRow, TradeRow, OrderBookSnapshotRow, SignalRow, TimeSeriesDb};
 
 pub trait StorageProvider {
     async fn initialize(&self) -> Result<()>;

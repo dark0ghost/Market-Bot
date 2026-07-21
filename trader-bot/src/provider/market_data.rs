@@ -1,8 +1,8 @@
-use anyhow::Result;
-use t_invest_sdk::api::{CandleInterval, HistoricCandle, Quotation};
-use crate::client::{OrderBook, OrderBookLevel, LiquidityInfo};
 use crate::client::MarketDataService;
 use crate::client::OrderBookService;
+use crate::client::{LiquidityInfo, OrderBook, OrderBookLevel};
+use anyhow::Result;
+use t_invest_sdk::api::{CandleInterval, HistoricCandle, Quotation};
 
 pub trait MarketDataProvider {
     async fn get_historical_candles(
@@ -30,7 +30,8 @@ impl MarketDataProvider for MarketDataService {
         interval: CandleInterval,
         days: u32,
     ) -> Result<Vec<HistoricCandle>> {
-        self.get_historical_candles(instrument_id, interval, days).await
+        self.get_historical_candles(instrument_id, interval, days)
+            .await
     }
 
     async fn get_last_price(&self, instrument_id: &str) -> Result<f64> {

@@ -1,11 +1,11 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use t_invest_sdk::api::{FindInstrumentRequest, InstrumentType};
 use t_invest_sdk::TInvestSdk;
+use t_invest_sdk::api::{FindInstrumentRequest, InstrumentType};
 
-use crate::core::*;
 use crate::client::MarketDataService;
+use crate::core::*;
 
 /// Tinkoff implementation of DataSource using existing client wrappers.
 pub struct TinkoffDataSource {
@@ -36,7 +36,12 @@ impl DataSource for TinkoffDataSource {
         DataSourceKind::Tinkoff
     }
 
-    async fn candles(&self, ticker: &str, interval: CandleInterval, days: u32) -> Result<Vec<Candle>> {
+    async fn candles(
+        &self,
+        ticker: &str,
+        interval: CandleInterval,
+        days: u32,
+    ) -> Result<Vec<Candle>> {
         use t_invest_sdk::api::CandleInterval as TI;
         let ti = match interval {
             CandleInterval::Min1 => TI::CandleInterval1Min,
@@ -48,22 +53,29 @@ impl DataSource for TinkoffDataSource {
             _ => t_invest_sdk::api::CandleInterval::Day,
         };
 
-        let hist = self.market_data().get_historical_candles(ticker, ti, days).await?;
+        let hist = self
+            .market_data()
+            .get_historical_candles(ticker, ti, days)
+            .await?;
 
-        Ok(hist.iter().filter_map(|c| {
-            let time = c.time.as_ref().and_then(|t| {
-                DateTime::from_timestamp(t.seconds, t.nanos as u32)
-            })?;
-            Some(Candle {
-                open: crate::client::market_data::extract_price(&c.open).ok()?,
-                high: crate::client::market_data::extract_price(&c.high).ok()?,
-                low: crate::client::market_data::extract_price(&c.low).ok()?,
-                close: crate::client::market_data::extract_price(&c.close).ok()?,
-                volume: c.volume as f64,
-                time,
-                ticker: ticker.to_string(),
+        Ok(hist
+            .iter()
+            .filter_map(|c| {
+                let time = c
+                    .time
+                    .as_ref()
+                    .and_then(|t| DateTime::from_timestamp(t.seconds, t.nanos as u32))?;
+                Some(Candle {
+                    open: crate::client::market_data::extract_price(&c.open).ok()?,
+                    high: crate::client::market_data::extract_price(&c.high).ok()?,
+                    low: crate::client::market_data::extract_price(&c.low).ok()?,
+                    close: crate::client::market_data::extract_price(&c.close).ok()?,
+                    volume: c.volume as f64,
+                    time,
+                    ticker: ticker.to_string(),
+                })
             })
-        }).collect())
+            .collect())
     }
 
     async fn find_instrument(&self, query: &str) -> Result<Vec<InstrumentInfo>> {
@@ -75,24 +87,28 @@ impl DataSource for TinkoffDataSource {
         let response = self.sdk.instruments().find_instrument(req).await?;
         let instruments = response.into_inner();
 
-        Ok(instruments.instruments.iter().map(|i| {
-            let kind = match i.instrument_kind() {
-                InstrumentType::Share => InstrumentKind::Share,
-                InstrumentType::Bond => InstrumentKind::Bond,
-                InstrumentType::Etf => InstrumentKind::Etf,
-                InstrumentType::Currency => InstrumentKind::Currency,
-                _ => InstrumentKind::Share,
-            };
-            InstrumentInfo {
-                ticker: i.ticker.clone(),
-                figi: i.figi.clone(),
-                name: i.name.clone(),
-                currency: String::new(),
-                instrument_type: kind,
-                lot_size: i.lot,
-                min_price_step: 0.01,
-            }
-        }).collect())
+        Ok(instruments
+            .instruments
+            .iter()
+            .map(|i| {
+                let kind = match i.instrument_kind() {
+                    InstrumentType::Share => InstrumentKind::Share,
+                    InstrumentType::Bond => InstrumentKind::Bond,
+                    InstrumentType::Etf => InstrumentKind::Etf,
+                    InstrumentType::Currency => InstrumentKind::Currency,
+                    _ => InstrumentKind::Share,
+                };
+                InstrumentInfo {
+                    ticker: i.ticker.clone(),
+                    figi: i.figi.clone(),
+                    name: i.name.clone(),
+                    currency: String::new(),
+                    instrument_type: kind,
+                    lot_size: i.lot,
+                    min_price_step: 0.01,
+                }
+            })
+            .collect())
     }
 
     async fn instruments(&self, _kind: Option<InstrumentKind>) -> Result<Vec<InstrumentInfo>> {
@@ -104,8 +120,11 @@ impl DataSource for TinkoffDataSource {
         let response = self.sdk.instruments().find_instrument(req).await?;
         let instruments = response.into_inner();
 
-        Ok(instruments.instruments.iter().take(100).map(|i| {
-            InstrumentInfo {
+        Ok(instruments
+            .instruments
+            .iter()
+            .take(100)
+            .map(|i| InstrumentInfo {
                 ticker: i.ticker.clone(),
                 figi: i.figi.clone(),
                 name: i.name.clone(),
@@ -113,7 +132,7 @@ impl DataSource for TinkoffDataSource {
                 instrument_type: InstrumentKind::Share,
                 lot_size: i.lot,
                 min_price_step: 0.01,
-            }
-        }).collect())
+            })
+            .collect())
     }
 }

@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use reqwest::Client;
@@ -74,9 +74,7 @@ fn parse_timestamp(ts: &Option<TimestampResponse>) -> Option<DateTime<Utc>> {
 
 impl FinamDataSource {
     pub async fn new(api_token: &str, name: Option<String>) -> Result<Self> {
-        let http = Client::builder()
-            .user_agent("ai-trade-bot/0.2")
-            .build()?;
+        let http = Client::builder().user_agent("ai-trade-bot/0.2").build()?;
 
         let base_url = "https://api.finam.ru".to_string();
 
@@ -137,7 +135,12 @@ impl DataSource for FinamDataSource {
         DataSourceKind::Finam
     }
 
-    async fn candles(&self, ticker: &str, interval: CandleInterval, days: u32) -> Result<Vec<Candle>> {
+    async fn candles(
+        &self,
+        ticker: &str,
+        interval: CandleInterval,
+        days: u32,
+    ) -> Result<Vec<Candle>> {
         let symbol = if ticker.contains('@') {
             ticker.to_string()
         } else {
@@ -159,12 +162,15 @@ impl DataSource for FinamDataSource {
 
         let url = format!(
             "{}/v1/instruments/{}/bars?timeframe={}&interval.start_time={}&interval.end_time={}",
-            self.base_url, symbol, timeframe,
+            self.base_url,
+            symbol,
+            timeframe,
             start.format("%Y-%m-%dT%H:%M:%SZ"),
             end.format("%Y-%m-%dT%H:%M:%SZ"),
         );
 
-        let resp: BarsResponse = self.http
+        let resp: BarsResponse = self
+            .http
             .get(&url)
             .headers(self.headers())
             .send()
@@ -177,8 +183,8 @@ impl DataSource for FinamDataSource {
         let mut candles = Vec::with_capacity(bars.len());
 
         for bar in bars {
-            let time = parse_timestamp(&bar.timestamp)
-                .ok_or_else(|| anyhow!("Invalid bar timestamp"))?;
+            let time =
+                parse_timestamp(&bar.timestamp).ok_or_else(|| anyhow!("Invalid bar timestamp"))?;
             candles.push(Candle {
                 open: parse_decimal(&bar.open).unwrap_or(0.0),
                 high: parse_decimal(&bar.high).unwrap_or(0.0),
@@ -194,12 +200,10 @@ impl DataSource for FinamDataSource {
     }
 
     async fn find_instrument(&self, query: &str) -> Result<Vec<InstrumentInfo>> {
-        let url = format!(
-            "{}/v1/assets?search={}",
-            self.base_url, query
-        );
+        let url = format!("{}/v1/assets?search={}", self.base_url, query);
 
-        let resp: AssetsResponse = self.http
+        let resp: AssetsResponse = self
+            .http
             .get(&url)
             .headers(self.headers())
             .send()
@@ -209,33 +213,37 @@ impl DataSource for FinamDataSource {
             .await?;
 
         let assets = resp.assets.unwrap_or_default();
-        Ok(assets.iter().filter_map(|a| {
-            let ticker = a.ticker.clone().or_else(|| a.symbol.clone())?;
-            let figi = a.symbol.clone().unwrap_or_default();
-            let name = a.name.clone().unwrap_or_default();
-            let kind = match a.r#type.as_deref() {
-                Some("SHARE") => InstrumentKind::Share,
-                Some("BOND") => InstrumentKind::Bond,
-                Some("ETF") => InstrumentKind::Etf,
-                Some("CURRENCY") => InstrumentKind::Currency,
-                _ => InstrumentKind::Share,
-            };
-            Some(InstrumentInfo {
-                ticker,
-                figi: figi.replace('@', "_"),
-                name,
-                currency: "RUB".to_string(),
-                instrument_type: kind,
-                lot_size: 1,
-                min_price_step: 0.01,
+        Ok(assets
+            .iter()
+            .filter_map(|a| {
+                let ticker = a.ticker.clone().or_else(|| a.symbol.clone())?;
+                let figi = a.symbol.clone().unwrap_or_default();
+                let name = a.name.clone().unwrap_or_default();
+                let kind = match a.r#type.as_deref() {
+                    Some("SHARE") => InstrumentKind::Share,
+                    Some("BOND") => InstrumentKind::Bond,
+                    Some("ETF") => InstrumentKind::Etf,
+                    Some("CURRENCY") => InstrumentKind::Currency,
+                    _ => InstrumentKind::Share,
+                };
+                Some(InstrumentInfo {
+                    ticker,
+                    figi: figi.replace('@', "_"),
+                    name,
+                    currency: "RUB".to_string(),
+                    instrument_type: kind,
+                    lot_size: 1,
+                    min_price_step: 0.01,
+                })
             })
-        }).collect())
+            .collect())
     }
 
     async fn instruments(&self, _kind: Option<InstrumentKind>) -> Result<Vec<InstrumentInfo>> {
         let url = format!("{}/v1/assets", self.base_url);
 
-        let resp: AssetsResponse = self.http
+        let resp: AssetsResponse = self
+            .http
             .get(&url)
             .headers(self.headers())
             .send()
@@ -245,26 +253,29 @@ impl DataSource for FinamDataSource {
             .await?;
 
         let assets = resp.assets.unwrap_or_default();
-        Ok(assets.into_iter().filter_map(|a| {
-            let ticker = a.ticker.or_else(|| a.symbol.clone())?;
-            let figi = a.symbol.unwrap_or_default();
-            let name = a.name.unwrap_or_default();
-            let kind = match a.r#type.as_deref() {
-                Some("SHARE") => InstrumentKind::Share,
-                Some("BOND") => InstrumentKind::Bond,
-                Some("ETF") => InstrumentKind::Etf,
-                Some("CURRENCY") => InstrumentKind::Currency,
-                _ => InstrumentKind::Share,
-            };
-            Some(InstrumentInfo {
-                ticker,
-                figi: figi.replace('@', "_"),
-                name,
-                currency: "RUB".to_string(),
-                instrument_type: kind,
-                lot_size: 1,
-                min_price_step: 0.01,
+        Ok(assets
+            .into_iter()
+            .filter_map(|a| {
+                let ticker = a.ticker.or_else(|| a.symbol.clone())?;
+                let figi = a.symbol.unwrap_or_default();
+                let name = a.name.unwrap_or_default();
+                let kind = match a.r#type.as_deref() {
+                    Some("SHARE") => InstrumentKind::Share,
+                    Some("BOND") => InstrumentKind::Bond,
+                    Some("ETF") => InstrumentKind::Etf,
+                    Some("CURRENCY") => InstrumentKind::Currency,
+                    _ => InstrumentKind::Share,
+                };
+                Some(InstrumentInfo {
+                    ticker,
+                    figi: figi.replace('@', "_"),
+                    name,
+                    currency: "RUB".to_string(),
+                    instrument_type: kind,
+                    lot_size: 1,
+                    min_price_step: 0.01,
+                })
             })
-        }).collect())
+            .collect())
     }
 }

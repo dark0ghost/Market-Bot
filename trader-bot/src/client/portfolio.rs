@@ -1,9 +1,7 @@
-use anyhow::Result;
-use t_invest_sdk::api::{
-    GetAccountsRequest, PortfolioRequest, PortfolioPosition,
-};
-use t_invest_sdk::TInvestSdk;
 use crate::agent::CurrentPosition;
+use anyhow::Result;
+use t_invest_sdk::TInvestSdk;
+use t_invest_sdk::api::{GetAccountsRequest, PortfolioPosition, PortfolioRequest};
 
 /// Сервис для работы с портфелем и счетами
 pub struct PortfolioService {
@@ -23,8 +21,9 @@ impl PortfolioService {
         };
         let response = self.sdk.users().get_accounts(request).await?;
         let accounts_response = response.into_inner();
-        
-        let accounts = accounts_response.accounts
+
+        let accounts = accounts_response
+            .accounts
             .into_iter()
             .map(|acc| AccountInfo {
                 id: acc.id,
@@ -33,7 +32,7 @@ impl PortfolioService {
                 access_level: acc.access_level,
             })
             .collect();
-        
+
         Ok(accounts)
     }
 
@@ -43,10 +42,10 @@ impl PortfolioService {
             account_id: self.account_id.clone(),
             currency: None,
         };
-        
+
         let response = self.sdk.operations().get_portfolio(request).await?;
         let portfolio_response = response.into_inner();
-        
+
         let total_amount = portfolio_response
             .total_amount_shares
             .or(portfolio_response.total_amount_bonds)
@@ -55,12 +54,13 @@ impl PortfolioService {
             .or(portfolio_response.total_amount_futures)
             .and_then(|q| Some(q.units as f64 + q.nano as f64 / 1_000_000_000.0))
             .unwrap_or(0.0);
-        
-        let positions = portfolio_response.positions
+
+        let positions = portfolio_response
+            .positions
             .into_iter()
             .map(|pos| PositionInfo::from(pos))
             .collect();
-        
+
         Ok(PortfolioInfo {
             total_amount,
             positions,
@@ -71,21 +71,22 @@ impl PortfolioService {
     /// Получение доступного баланса (свободные деньги)
     pub async fn get_available_balance(&self) -> Result<f64> {
         let portfolio = self.get_portfolio().await?;
-        
+
         // Получаем баланс в рублях - ищем денежные позиции
-        let rub_balance = portfolio.positions
+        let rub_balance = portfolio
+            .positions
             .iter()
             .find(|p| p.instrument_type == "bond" || p.instrument_type == "currency")
             .map(|p| p.current_balance)
             .unwrap_or(0.0);
-        
+
         Ok(rub_balance)
     }
 
     /// Получение текущей позиции по инструменту
     pub async fn get_position(&self, instrument_uid: &str) -> Result<Option<CurrentPosition>> {
         let portfolio = self.get_portfolio().await?;
-        
+
         for position in portfolio.positions {
             if position.uid == instrument_uid {
                 return Ok(Some(CurrentPosition {
@@ -95,7 +96,7 @@ impl PortfolioService {
                 }));
             }
         }
-        
+
         Ok(None)
     }
 
@@ -137,26 +138,30 @@ pub struct PositionInfo {
 
 impl From<PortfolioPosition> for PositionInfo {
     fn from(pos: PortfolioPosition) -> Self {
-        let current_balance = pos.current_price
+        let current_balance = pos
+            .current_price
             .as_ref()
             .map(|q| q.units as f64 + q.nano as f64 / 1_000_000_000.0)
             .unwrap_or(0.0);
-        
-        let current_price = pos.current_price
+
+        let current_price = pos
+            .current_price
             .as_ref()
             .map(|q| q.units as f64 + q.nano as f64 / 1_000_000_000.0)
             .unwrap_or(0.0);
-        
-        let average_price = pos.average_position_price
+
+        let average_price = pos
+            .average_position_price
             .as_ref()
             .map(|q| q.units as f64 + q.nano as f64 / 1_000_000_000.0)
             .unwrap_or(0.0);
-        
-        let expected_yield = pos.expected_yield
+
+        let expected_yield = pos
+            .expected_yield
             .as_ref()
             .map(|q| q.units as f64 + q.nano as f64 / 1_000_000_000.0)
             .unwrap_or(0.0);
-        
+
         PositionInfo {
             uid: pos.instrument_uid,
             instrument_type: pos.instrument_type,

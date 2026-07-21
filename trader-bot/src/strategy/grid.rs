@@ -50,15 +50,15 @@ impl GridStrategy {
     pub fn calculate_grid_levels(&self) -> Vec<GridLevel> {
         let mut levels = Vec::new();
         let num_levels = self.config.grid_levels as usize;
-        
+
         // Расчет шага сетки
         let price_range = self.config.upper_price - self.config.lower_price;
         let step = price_range / (num_levels as f64 - 1.0);
-        
+
         // Разделение на buy и sell уровни
         let buy_levels = (num_levels as f64 * self.config.grid_ratio) as usize;
         let sell_levels = num_levels - buy_levels;
-        
+
         // Создание уровней для покупки (нижняя часть)
         for i in 0..buy_levels {
             let price = self.config.lower_price + (step * i as f64);
@@ -68,7 +68,7 @@ impl GridStrategy {
                 level_index: i as u32,
             });
         }
-        
+
         // Создание уровней для продажи (верхняя часть)
         for i in 0..sell_levels {
             let level_idx = buy_levels + i;
@@ -79,7 +79,7 @@ impl GridStrategy {
                 level_index: level_idx as u32,
             });
         }
-        
+
         levels
     }
 
@@ -87,7 +87,7 @@ impl GridStrategy {
     pub fn get_levels_to_place(&self, current_price: f64) -> Vec<GridLevel> {
         let levels = self.calculate_grid_levels();
         let mut levels_to_place = Vec::new();
-        
+
         for level in levels {
             match level.order_type {
                 OrderSide::Buy => {
@@ -104,19 +104,28 @@ impl GridStrategy {
                 }
             }
         }
-        
+
         levels_to_place
     }
 
     /// Проверка, нужно ли перевыставить ордера
-    pub fn needs_rebalance(&self, state: &GridState, current_price: f64, price_threshold: f64) -> bool {
+    pub fn needs_rebalance(
+        &self,
+        state: &GridState,
+        current_price: f64,
+        price_threshold: f64,
+    ) -> bool {
         // Если цена сильно изменилась с момента последнего обновления
         let price_diff = (state.current_price - current_price).abs() / state.current_price;
         price_diff > price_threshold
     }
 
     /// Получение уровня по индексу
-    pub fn get_level_by_index<'a>(&'a self, levels: &'a [GridLevel], index: u32) -> Option<&'a GridLevel> {
+    pub fn get_level_by_index<'a>(
+        &'a self,
+        levels: &'a [GridLevel],
+        index: u32,
+    ) -> Option<&'a GridLevel> {
         levels.iter().find(|l| l.level_index == index)
     }
 
@@ -127,9 +136,9 @@ impl GridStrategy {
 }
 
 // ─── Strategy trait implementation ────────────────────────────────
-use async_trait::async_trait;
-use anyhow::Result;
 use crate::core::*;
+use anyhow::Result;
+use async_trait::async_trait;
 
 #[async_trait]
 impl Strategy for GridStrategy {
@@ -142,8 +151,12 @@ impl Strategy for GridStrategy {
     }
 
     async fn on_start(&mut self, _broker: &dyn Broker) -> Result<()> {
-        log::info!("GridStrategy: starting with config: levels={}, range={}-{}",
-            self.config.grid_levels, self.config.lower_price, self.config.upper_price);
+        log::info!(
+            "GridStrategy: starting with config: levels={}, range={}-{}",
+            self.config.grid_levels,
+            self.config.lower_price,
+            self.config.upper_price
+        );
         Ok(())
     }
 
@@ -221,10 +234,10 @@ mod tests {
         };
 
         let strategy = GridStrategy::new(config);
-        
+
         // Текущая цена 150 - должны быть buy < 150 и sell > 150
         let levels = strategy.get_levels_to_place(150.0);
-        
+
         for level in &levels {
             match level.order_type {
                 OrderSide::Buy => assert!(level.price < 150.0),

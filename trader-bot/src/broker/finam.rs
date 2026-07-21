@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use reqwest::Client;
@@ -173,11 +173,14 @@ fn parse_decimal(d: &Option<FinamDecimal>) -> Option<f64> {
 }
 
 fn parse_money(m: &Option<Vec<FinamMoney>>) -> f64 {
-    m.as_ref().and_then(|arr| arr.first()).map(|c| {
-        let units = c.units.unwrap_or(0) as f64;
-        let nanos = c.nanos.unwrap_or(0) as f64 / 1_000_000_000.0;
-        units + nanos
-    }).unwrap_or(0.0)
+    m.as_ref()
+        .and_then(|arr| arr.first())
+        .map(|c| {
+            let units = c.units.unwrap_or(0) as f64;
+            let nanos = c.nanos.unwrap_or(0) as f64 / 1_000_000_000.0;
+            units + nanos
+        })
+        .unwrap_or(0.0)
 }
 
 fn parse_timestamp(ts: &Option<FinamTimestamp>) -> Option<DateTime<Utc>> {
@@ -190,8 +193,11 @@ fn symbol_to_figi(symbol: &str) -> String {
 }
 
 fn figi_to_symbol(figi: &str) -> String {
-    if figi.contains('@') { figi.to_string() }
-    else { figi.replace('_', "@") }
+    if figi.contains('@') {
+        figi.to_string()
+    } else {
+        figi.replace('_', "@")
+    }
 }
 
 fn map_order_status(s: Option<&str>) -> OrderStatus {
@@ -217,9 +223,7 @@ pub struct FinamBroker {
 
 impl FinamBroker {
     pub async fn new(api_token: &str, account_id: String) -> Result<Self> {
-        let http = Client::builder()
-            .user_agent("ai-trade-bot/0.2")
-            .build()?;
+        let http = Client::builder().user_agent("ai-trade-bot/0.2").build()?;
 
         let base_url = "https://api.finam.ru".to_string();
 
@@ -267,7 +271,12 @@ impl Broker for FinamBroker {
         BrokerKind::Other("finam".to_string())
     }
 
-    async fn candles(&self, instrument: &str, interval: CandleInterval, days: u32) -> Result<Vec<Candle>> {
+    async fn candles(
+        &self,
+        instrument: &str,
+        interval: CandleInterval,
+        days: u32,
+    ) -> Result<Vec<Candle>> {
         let symbol = figi_to_symbol(instrument);
         let timeframe = match interval {
             CandleInterval::Min1 => "TIME_FRAME_M1",
@@ -284,12 +293,15 @@ impl Broker for FinamBroker {
 
         let url = format!(
             "{}/v1/instruments/{}/bars?timeframe={}&interval.start_time={}&interval.end_time={}",
-            self.base_url, symbol, timeframe,
+            self.base_url,
+            symbol,
+            timeframe,
             start.format("%Y-%m-%dT%H:%M:%SZ"),
             end.format("%Y-%m-%dT%H:%M:%SZ"),
         );
 
-        let resp: FinamBarsResponse = self.http
+        let resp: FinamBarsResponse = self
+            .http
             .get(&url)
             .headers(self.headers())
             .send()
@@ -302,8 +314,8 @@ impl Broker for FinamBroker {
         let mut candles = Vec::with_capacity(bars.len());
 
         for bar in bars {
-            let time = parse_timestamp(&bar.timestamp)
-                .ok_or_else(|| anyhow!("Invalid bar timestamp"))?;
+            let time =
+                parse_timestamp(&bar.timestamp).ok_or_else(|| anyhow!("Invalid bar timestamp"))?;
             candles.push(Candle {
                 open: parse_decimal(&bar.open).unwrap_or(0.0),
                 high: parse_decimal(&bar.high).unwrap_or(0.0),
@@ -322,7 +334,8 @@ impl Broker for FinamBroker {
         let symbol = figi_to_symbol(instrument);
         let url = format!("{}/v1/instruments/{}/lastquote", self.base_url, symbol);
 
-        let resp: FinamLastQuoteResponse = self.http
+        let resp: FinamLastQuoteResponse = self
+            .http
             .get(&url)
             .headers(self.headers())
             .send()
@@ -335,10 +348,14 @@ impl Broker for FinamBroker {
             return Ok(price);
         }
 
-        let bid = resp.bid.as_ref()
+        let bid = resp
+            .bid
+            .as_ref()
             .and_then(|v| v.as_str())
             .and_then(|s| s.parse::<f64>().ok());
-        let ask = resp.ask.as_ref()
+        let ask = resp
+            .ask
+            .as_ref()
             .and_then(|v| v.as_str())
             .and_then(|s| s.parse::<f64>().ok());
 
@@ -357,7 +374,8 @@ impl Broker for FinamBroker {
             self.base_url, symbol, depth
         );
 
-        let resp: FinamOrderBookResponse = self.http
+        let resp: FinamOrderBookResponse = self
+            .http
             .get(&url)
             .headers(self.headers())
             .send()
@@ -366,15 +384,25 @@ impl Broker for FinamBroker {
             .json()
             .await?;
 
-        let bids = resp.bids.unwrap_or_default().iter().map(|b| OrderBookLevel {
-            price: parse_decimal(&b.price).unwrap_or(0.0),
-            volume: parse_decimal(&b.volume).unwrap_or(0.0),
-        }).collect();
+        let bids = resp
+            .bids
+            .unwrap_or_default()
+            .iter()
+            .map(|b| OrderBookLevel {
+                price: parse_decimal(&b.price).unwrap_or(0.0),
+                volume: parse_decimal(&b.volume).unwrap_or(0.0),
+            })
+            .collect();
 
-        let asks = resp.asks.unwrap_or_default().iter().map(|a| OrderBookLevel {
-            price: parse_decimal(&a.price).unwrap_or(0.0),
-            volume: parse_decimal(&a.volume).unwrap_or(0.0),
-        }).collect();
+        let asks = resp
+            .asks
+            .unwrap_or_default()
+            .iter()
+            .map(|a| OrderBookLevel {
+                price: parse_decimal(&a.price).unwrap_or(0.0),
+                volume: parse_decimal(&a.volume).unwrap_or(0.0),
+            })
+            .collect();
 
         Ok(OrderBook {
             figi: instrument.to_string(),
@@ -393,7 +421,11 @@ impl Broker for FinamBroker {
         Ok(LiquidityInfo {
             total_bid_volume: total_bid,
             total_ask_volume: total_ask,
-            bid_ask_ratio: if total_ask > 0.0 { total_bid / total_ask } else { 1.0 },
+            bid_ask_ratio: if total_ask > 0.0 {
+                total_bid / total_ask
+            } else {
+                1.0
+            },
             spread: spread.max(0.0),
         })
     }
@@ -425,7 +457,8 @@ impl Broker for FinamBroker {
 
         let url = format!("{}/v1/accounts/{}/orders", self.base_url, self.account_id);
 
-        let resp: FinamPlaceOrderResponse = self.http
+        let resp: FinamPlaceOrderResponse = self
+            .http
             .post(&url)
             .headers(self.headers())
             .json(&req)
@@ -471,7 +504,8 @@ impl Broker for FinamBroker {
     async fn get_orders(&self, _instrument: Option<&str>) -> Result<Vec<OrderResponse>> {
         let url = format!("{}/v1/accounts/{}/orders", self.base_url, self.account_id);
 
-        let resp: FinamOrdersListResponse = self.http
+        let resp: FinamOrdersListResponse = self
+            .http
             .get(&url)
             .headers(self.headers())
             .send()
@@ -481,32 +515,36 @@ impl Broker for FinamBroker {
             .await?;
 
         let orders = resp.orders.unwrap_or_default();
-        Ok(orders.iter().map(|o| {
-            let action = match o.side.as_deref() {
-                Some("SIDE_BUY") => OrderAction::Buy,
-                _ => OrderAction::Sell,
-            };
-            let status = map_order_status(o.status.as_deref());
+        Ok(orders
+            .iter()
+            .map(|o| {
+                let action = match o.side.as_deref() {
+                    Some("SIDE_BUY") => OrderAction::Buy,
+                    _ => OrderAction::Sell,
+                };
+                let status = map_order_status(o.status.as_deref());
 
-            OrderResponse {
-                order_id: o.order_id.clone().unwrap_or_default(),
-                client_order_id: None,
-                instrument: symbol_to_figi(o.symbol.as_deref().unwrap_or("")),
-                action,
-                quantity: parse_decimal(&o.quantity).unwrap_or(0.0) as i32,
-                filled_quantity: 0,
-                price: parse_decimal(&o.limit_price),
-                avg_fill_price: None,
-                status,
-                created_at: Utc::now(),
-                message: "Fetched from Finam".to_string(),
-            }
-        }).collect())
+                OrderResponse {
+                    order_id: o.order_id.clone().unwrap_or_default(),
+                    client_order_id: None,
+                    instrument: symbol_to_figi(o.symbol.as_deref().unwrap_or("")),
+                    action,
+                    quantity: parse_decimal(&o.quantity).unwrap_or(0.0) as i32,
+                    filled_quantity: 0,
+                    price: parse_decimal(&o.limit_price),
+                    avg_fill_price: None,
+                    status,
+                    created_at: Utc::now(),
+                    message: "Fetched from Finam".to_string(),
+                }
+            })
+            .collect())
     }
 
     async fn get_order_status(&self, order_id: &str) -> Result<OrderStatus> {
         let orders = self.get_orders(None).await?;
-        Ok(orders.iter()
+        Ok(orders
+            .iter()
             .find(|o| o.order_id == order_id)
             .map(|o| o.status.clone())
             .unwrap_or(OrderStatus::Cancelled))
@@ -515,7 +553,8 @@ impl Broker for FinamBroker {
     async fn portfolio(&self) -> Result<PortfolioView> {
         let url = format!("{}/v1/accounts/{}", self.base_url, self.account_id);
 
-        let resp: FinamAccountResponse = self.http
+        let resp: FinamAccountResponse = self
+            .http
             .get(&url)
             .headers(self.headers())
             .send()
@@ -539,7 +578,11 @@ impl Broker for FinamBroker {
                 average_price: avg,
                 current_price: cur,
                 pnl: (cur - avg) * qty as f64,
-                pnl_pct: if avg > 0.0 { (cur - avg) / avg * 100.0 } else { 0.0 },
+                pnl_pct: if avg > 0.0 {
+                    (cur - avg) / avg * 100.0
+                } else {
+                    0.0
+                },
                 total_value: cur * qty as f64,
             });
         }
@@ -547,7 +590,8 @@ impl Broker for FinamBroker {
         let total_value: f64 = pos_views.iter().map(|p| p.total_value).sum();
         let total_pnl: f64 = pos_views.iter().map(|p| p.pnl).sum();
 
-        let available = resp.portfolio_mc
+        let available = resp
+            .portfolio_mc
             .as_ref()
             .and_then(|mc| parse_decimal(&mc.available_cash))
             .unwrap_or(cash);
@@ -569,7 +613,9 @@ impl Broker for FinamBroker {
 
     async fn position(&self, instrument: &str) -> Result<Option<PositionView>> {
         let portfolio = self.portfolio().await?;
-        Ok(portfolio.positions.into_iter()
+        Ok(portfolio
+            .positions
+            .into_iter()
             .find(|p| p.instrument == instrument))
     }
 
