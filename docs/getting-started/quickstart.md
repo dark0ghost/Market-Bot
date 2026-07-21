@@ -1,170 +1,168 @@
 # Быстрый старт
 
-Это руководство поможет вам запустить AI Trade Bot за 5 минут.
+Запуск полной платформы: Trading Core + LLM + Context + ML Training.
 
-## Шаг 1: Установка зависимостей
+## 1. Требования
 
-### Rust
+| Компонент     | Версия                   |
+|---------------|--------------------------|
+| Rust          | 1.70+                    |
+| Docker        | 24+                      |
+| Python        | 3.10+                    |
+| NVIDIA Driver | 525+ (для GPU-ускорения) |
 
-```bash
-# Linux/macOS
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-
-# Проверка установки
-rustc --version
-```
-
-### Docker (опционально, для Ollama)
+## 2. Запуск инфраструктуры (Layer 2)
 
 ```bash
-# Ubuntu/Debian
-curl -fsSL https://get.docker.com -o get-docker.sh
-sudo sh get-docker.sh
-
-# Проверка
-docker --version
+docker compose up -d
 ```
 
-## Шаг 2: Клонирование репозитория
+| Сервис | Порт | Назначение |
+|--------|------|------------|
+| Ollama | 11435 | LLM (fin-expert) для анализа |
+| Redis | 6379 | Кэш контекста, состояние |
+| Data Collector | — | Фоновый сбор новостей RSS |
+
+**Проверка:**
+```bash
+curl http://localhost:11435/api/tags
+# → {"models":[{"name":"fin-expert:latest",...}]}
+
+redis-cli ping
+# → PONG
+```
+
+## 3. Развёртывание Perplexica
 
 ```bash
-git clone https://gitlab.com/your-username/ai-trade-bot.git
-cd ai-trade-bot
+git clone https://github.com/ItzCrazyKns/Perplexica.git
+cd Perplexica
+cp sample.config.toml config.toml
+# отредактируйте config.toml: ollama endpoint = http://localhost:11435
+docker compose up -d
+# → порт 3000
 ```
 
-## Шаг 3: Получение Tinkoff Invest токена
+**Проверка:**
+```bash
+curl http://localhost:3000/api/search -d '{"query":"ключевая ставка ЦБ"}'
+```
 
-1. Войдите в [Tinkoff Invest](https://www.tbank.ru/invest/settings/)
-2. Перейдите в настройки
-3. Нажмите "Выпустить токен"
-4. Скопируйте токен
-
-## Шаг 4: Настройка конфигурации
-
-### Вариант A: Переменная окружения
+## 4. API токены
 
 ```bash
-export API_TOKEN="your_token_here"
+export TINKOFF_TOKEN="t.YOUR_TOKEN_HERE"
+export FINAM_TOKEN="YOUR_SECRET_HERE"
 ```
 
-### Вариант B: Файл конфигурации
-
-Отредактируйте `trader-bot/config/account.json`:
-
+Либо через файл `trader-bot/config/account.json`:
 ```json
 {
   "creditional": {
-    "token": "your_token_here"
-  },
-  "mode": "sandbox"
+    "token": "t.YOUR_TINKOFF_TOKEN",
+    "additional_keys": [{"broker": "finam", "api_key": "YOUR_FINAM_KEY"}]
+  }
 }
 ```
 
-## Шаг 5: Запуск Ollama (опционально)
-
-Для LLM-анализа новостей:
+## 5. Сбор данных для дообучения
 
 ```bash
-docker-compose up -d
+# Установка зависимостей
+pip install -r training/data_collection/requirements.txt
+
+# Разовый сбор + разметка через Ollama
+python training/data_collection/collect.py
+
+# Или фоновый режим (автоматически каждый час)
+python training/data_collection/collect.py --watch
+
+# Смержить в тренировочный набор
+python training/data_collection/collect.py --merge
 ```
 
-Проверка:
+## 6. Дообучение FinBERT (SFT)
 
 ```bash
-curl http://localhost:11435/api/tags
+pip install -r training/requirements.txt
+
+# Fine-tune на Financial PhraseBank + собранные данные
+python training/finbert_sft/train.py
+
+# Оценка
+python training/finbert_sft/evaluate.py
+
+# Экспорт в ONNX для инференса в Rust
+python training/finbert_sft/export_onnx.py
+# → models/finbert/model.onnx
 ```
 
-## Шаг 6: Запуск бота
-
-### Тестовый режим (рекомендуется)
+## 7. Запуск Trading Core
 
 ```bash
-cargo run -p trader-bot
-```
+# Сборка
+cargo build -p trader-bot
 
-### С логированием
-
-```bash
+# Запуск
 RUST_LOG=info cargo run -p trader-bot
 ```
 
-### Подробные логи
+**Что происходит:**
+- Загрузка FinBERT ONNX модели → инференс тональности новостей
+- Perplexica → макро-контекст → Redis → Fusion с микро-сигналами
+- Decision Engine → Risk Check → Execution
+
+**Дашборд:** http://localhost:8080
+
+## 8. Полный пайплайн (одной командой)
 
 ```bash
-RUST_LOG=debug cargo run -p trader-bot
+# Инфраструктура
+docker compose up -d
+
+# Сбор данных + обучение
+pip install -r training/requirements.txt
+pip install -r training/data_collection/requirements.txt
+python training/data_collection/collect.py
+python training/data_collection/collect.py --merge
+python training/finbert_sft/train.py
+python training/finbert_sft/export_onnx.py
+
+# Торговля
+RUST_LOG=info cargo run -p trader-bot
 ```
 
-## Проверка работы
+## Структура запущенных процессов
 
-Вы должны увидеть логи:
-
-```
-[INFO] Запуск AI Trading Bot...
-[INFO] Конфигурация загружена. Режим: Sandbox
-[INFO] LLM модель: fin-expert
-[INFO] Активных инструментов: 2
-[INFO] Анализ инструмента: Т-Технологии (TTECH)
-[INFO] Найден инструмент: FIGI=TQBR
-[INFO] Загрузка свечей за 30 дней...
-[INFO] Загружено 8640 свечей
-```
-
-## Первые сделки
-
-Бот начнет анализировать рынок и принимать решения:
-
-```
-[INFO] Технический анализ: тренд=Bullish, рекомендация=Buy
-[INFO] Новостной фон: Positive (score: 0.65)
-[INFO] Решение агента: Buy (confidence: 0.75, позиция: 5.0%)
-[INFO] Размещение BUY заявки: 10 лотов по цене 275.50
-[INFO] Заявка размещена: ID=12345, статус=New
+```mermaid
+flowchart LR
+    subgraph Docker
+        O[Ollama<br/>:11435]
+        R[Redis<br/>:6379]
+        DC[Data Collector]
+    end
+    subgraph Host
+        P[Perplexica<br/>:3000]
+        TB[Trading Bot<br/>Rust]
+        FT[FinBERT SFT<br/>Python]
+    end
+    P --> O
+    DC --> O
+    DC --> R
+    TB --> R
+    TB --> O
+    FT -->|model.onnx| TB
 ```
 
-## Остановка бота
-
-Нажмите `Ctrl+C` для остановки.
-
-## Следующие шаги
-
-- **[Конфигурация](../user-guide/configuration.md)** — Детальная настройка
-- **[Стратегии](../strategies/grid-bot.md)** — Выбор стратегии
-- **[Управление рисками](../user-guide/risk-management.md)** — Настройка рисков
-
-## Частые проблемы
-
-### Ошибка: "Connection refused"
+## Быстрая проверка
 
 ```bash
-# Проверьте подключение к интернету
-ping tinkoff.ru
+# 1) Redis
+redis-cli get "perplexica:macro:latest"
 
-# Проверьте токен
-echo $API_TOKEN
-```
+# 2) Трейдинг запущен
+curl http://localhost:8080/api/health
 
-### Ошибка: "Instrument not found"
-
-Проверьте FIGI в конфигурации:
-
-```json
-{
-  "instruments": [{
-    "figi": "TQBR",
-    "ticker": "TTECH",
-    "enabled": true
-  }]
-}
-```
-
-### Ошибка: "Недостаточно средств"
-
-Уменьшите размер позиции или пополните счет:
-
-```json
-{
-  "risk_management": {
-    "max_position_pct": 0.05
-  }
-}
+# 3) Модель загружена
+ls -lh models/finbert/model.onnx
 ```

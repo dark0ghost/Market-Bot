@@ -8,34 +8,42 @@
 
 ```
 ai-trade-bot/
-├── docs/                           # Директория документации
+├── core/                           # #![no_std]-compatible core types
+├── data-ingestion/                 # WS + REST data fetching
+├── perplexica-client/              # Perplexica API polling + cache
+├── ml-inference/                   # ONNX model inference (FinBERT, etc.)
+├── decision-engine/                # Signal fusion + risk management
+├── execution/                      # Order management
+├── trader-bot/                     # Binary — wiring, config, main loop
+│   ├── src/
+│   │   ├── main.rs                 # Точка входа
+│   │   ├── core/                   # Broker-agnostic types & traits
+│   │   ├── broker/                 # Broker impls (Tinkoff, Mock, Finam)
+│   │   ├── datasource/             # Data sources (Tinkoff, Finam)
+│   │   ├── ml_inference/           # ONNX inference (FinBERT NLP, TS)
+│   │   ├── strategy/               # Trading strategies
+│   │   ├── execution/              # Order execution
+│   │   ├── client/                 # API clients (market data, portfolio)
+│   │   ├── config/                 # Config loading
+│   │   └── api/                    # Dashboard (Axum)
+│   └── config/                     # Config files
+├── training/                       # ML training pipeline
+│   └── finbert_sft/                # FinBERT SFT (PyTorch → ONNX)
+├── models/                         # ONNX model artifacts
+│   └── finbert/                    # FinBERT model.onnx
+├── mcp-client/                     # MCP client for LLM (Ollama)
+├── ollama-mcp/                     # Docker container with Ollama
+├── docs/                           # Документация MkDocs
 │   ├── index.md                    # Главная страница
 │   ├── README.md                   # Инструкция по работе с docs
 │   ├── DEPLOYMENT.md               # Руководство по деплою
-│   ├── requirements.txt            # Python зависимости для MkDocs
-│   ├── getting-started/
-│   │   ├── what-is.md             # Что такое AI Trade Bot
-│   │   └── quickstart.md          # Быстрый старт
-│   ├── user-guide/
-│   │   └── configuration.md       # Конфигурация бота
-│   ├── strategies/
-│   │   └── grid-bot.md            # Grid стратегия
-│   ├── developer-guide/
-│   │   └── api.md                 # API документация
-│   ├── assets/                     # Изображения (логотип, favicon)
-│   ├── stylesheets/
-│   │   └── extra.css              # Кастомные стили
-│   ├── javascripts/                # Кастомные JS скрипты
-│   └── includes/                   # Include файлы для MkDocs
-│
+│   ├── requirements.txt            # Python зависимости
+│   │   ...
 ├── mkdocs.yml                      # Конфигурация MkDocs
 ├── .gitlab-ci.yml                  # CI/CD для GitLab Pages
-├── GRID_BOT.md                     # Отдельная документация Grid бота
 ├── README.md                       # Основная документация проекта
 ├── CHANGELOG.md                    # История изменений
-└── trader-bot/
-    └── config/
-        └── account.json            # Пример конфигурации
+└── GRID_BOT.md                     # Документация Grid бота
 ```
 
 ## 📄 Описание файлов

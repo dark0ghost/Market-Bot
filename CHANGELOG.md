@@ -2,6 +2,43 @@
 
 Все изменения в проекте AI Trade Bot.
 
+## [0.3.0] — 2026-07-21
+
+### Добавлено
+
+#### FinBERT SFT (Supervised Fine-Tuning)
+- **`training/finbert_sft/`** — Python-пайплайн для дообучения FinBERT
+  - `dataset.py` — загрузка Financial PhraseBank (3 класса sentiment)
+  - `model.py` — загрузка ProsusAI/finbert с classification head
+  - `train.py` — SFT: HuggingFace Trainer, FP16, early stopping, eval по F1
+  - `evaluate.py` — classification report, confusion matrix
+  - `export_onnx.py` — torch.onnx.export → model.onnx с dynamic axes
+  - `config.yaml` — все гиперпараметры обучения
+
+- **`trader-bot/src/ml_inference/`** — ONNX-инференс в Rust
+  - `session.rs` — `OrtSessionPool` с hot-reload через `notify`
+  - `nlp.rs` — FinBERT inference: tokenization → ONNX → softmax → sentiment
+
+- **`models/finbert/`** — директория для ONNX-артефактов (gitignored)
+
+#### Новые зависимости
+- `ort`, `ndarray`, `tokenizers` — ONNX Runtime для Rust
+- `arc-swap` — lock-free чтение модели (hot-reload)
+- `notify` — отслеживание изменений model.onnx
+
+### Изменено
+
+#### Архитектура проекта (3-слойная)
+- **Layer 1**: Real-Time Trading (Rust, Tokio, ORT)
+- **Layer 2**: Near-Real-Time Context (Perplexica → Redis)
+- **Layer 3**: Offline Training (Python, PyTorch → ONNX)
+
+#### Документация
+- **README.md** — обновлена архитектура, добавлен раздел FinBERT SFT
+- **docs/OVERVIEW.md** — обновлена структура проекта
+
+---
+
 ## [0.2.0] — 2026-02-22
 
 ### Добавлено

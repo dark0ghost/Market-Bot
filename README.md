@@ -45,19 +45,48 @@ AI-powered торговая система для торговли на Моск
 
 ```
 ai-trade-bot/
-├── trader-bot/          # Основной торговый бот (Rust)
+├── trader-bot/             # Основной торговый бот (Rust)
 │   ├── src/
-│   │   ├── main.rs      # Точка входа
-│   │   ├── agent/       # AI агент для принятия решений
-│   │   ├── analysis/    # Анализ (технический, новости, фундаментальный)
-│   │   ├── strategy/    # Торговые стратегии (Grid, Interval)
-│   │   ├── execution/   # Исполнение ордеров
-│   │   ├── client/      # Клиенты API (Market Data, Portfolio)
-│   │   └── config/      # Конфигурация
-│   └── config/          # Файлы конфигурации
-├── mcp-client/          # MCP клиент для LLM интеграции
-├── hft-ai-trader/       # HFT система с LSTM (Python)
-└── ollama-mcp/          # Docker контейнер с Ollama
+│   │   ├── main.rs         # Точка входа
+│   │   ├── core/           # Broker-agnostic types & traits
+│   │   ├── broker/         # Broker impls (Tinkoff, Mock, Finam)
+│   │   ├── datasource/     # Data sources (Tinkoff, Finam)
+│   │   ├── ml_inference/   # ONNX inference (FinBERT NLP, Time-Series)
+│   │   ├── strategy/       # Trading strategies (Grid, Interval, etc.)
+│   │   ├── execution/      # Order execution
+│   │   ├── client/         # API clients
+│   │   ├── config/         # Configuration
+│   │   └── api/            # Dashboard (Axum)
+│   └── config/             # Config files
+├── mcp-client/             # MCP client for LLM (Ollama)
+├── training/               # ML training pipeline
+│   └── finbert_sft/        # FinBERT SFT (Supervised Fine-Tuning)
+├── models/                 # ONNX model artifacts
+│   └── finbert/            # FinBERT ONNX model
+└── ollama-mcp/             # Docker container with Ollama
+```
+
+### Data Flow
+
+```mermaid
+flowchart TB
+    subgraph Layer1["Layer 1: Real-Time Trading (Rust)"]
+        RT[Trading Core<br/>Tokio + Ort]
+        WS[WebSocket OrderBook]
+        RT -->|features| ONNX[ONNX Inference<br/>FinBERT NLP]
+        RT --> REDIS[Redis<br/>State & Cache]
+    end
+    subgraph Layer2["Layer 2: Near-Real-Time Context"]
+        PERP[Perplexica API]
+        CS[Context Service]
+        PERP --> CS --> REDIS
+    end
+    subgraph Layer3["Layer 3: Offline Training"]
+        CT[Collect Trades<br/>Rust → Parquet]
+        FT[FinBERT SFT<br/>PyTorch → ONNX]
+        CT --> FT -->|model.onnx| MODELS[(models/)]
+    end
+    MODELS -->|hot-reload| ONNX
 ```
 
 ## ⚡ Быстрый старт
@@ -235,6 +264,38 @@ AI-поисковая система для глубокого анализа к
 - Порт: 3000
 
 📖 **Документация**: [docs/PERPLEXICA.md](./docs/PERPLEXICA.md)
+
+### FinBERT SFT (Supervised Fine-Tuning)
+
+[FinBERT](https://huggingface.co/ProsusAI/finbert) — BERT, дообученный на финансовых текстах (SEC filings, earnings reports). Используется для **анализа тональности** новостей и макро-контекста.
+
+**Pайплайн дообучения (`training/finbert_sft/`):**
+
+| Этап | Скрипт | Описание |
+|------|--------|----------|
+| Dataset | `dataset.py` | Financial PhraseBank (3 класса: positive/neutral/negative) |
+| Training | `train.py` | SFT с HuggingFace Trainer, early stopping, eval по F1 |
+| Evaluation | `evaluate.py` | Classification report, confusion matrix |
+| Export | `export_onnx.py` | Экспорт в ONNX с dynamic axes для batch/sequence |
+
+**Инференс в Rust (`trader-bot/src/ml_inference/`):**
+
+- `session.rs` — ORT session pool с hot-reload (notify)
+- `nlp.rs` — FinBERT tokenizer + inference + softmax
+
+```rust
+let nlp = FinBertInference::new("models/finbert")?;
+let result = nlp.predict("компания показала рост выручки на 30%")?;
+// NlpResult { label: "positive", confidence: 0.97, scores: [...] }
+```
+
+**Запуск дообучения:**
+```bash
+pip install -r training/requirements.txt
+python training/finbert_sft/train.py    # Fine-tune FinBERT
+python training/finbert_sft/evaluate.py # Оценка
+python training/finbert_sft/export_onnx.py  # → models/finbert/model.onnx
+```
 
 ### Анализ новостей
 

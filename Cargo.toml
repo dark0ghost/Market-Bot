@@ -2,8 +2,27 @@
 resolver = "2"
 members = ["mcp-client", "trader-bot"]
 
+[workspace.package]
+version = "0.2.0"
+authors = ["AI Trade Bot Contributors"]
+edition = "2024"
+description = "AI-powered algorithmic trading bot with multi-broker support, LLM integration, and strategy optimization"
+homepage = "https://github.com/AlexWan/ai-trade-bot"
+repository = "https://github.com/AlexWan/ai-trade-bot"
+license = "MIT"
+license-file = "LICENSE"
+keywords = ["trading", "algorithmic-trading", "finance", "llm", "moex"]
+
 [workspace.dependencies]
 mcp-client = { path = "mcp-client" }
+tokio = "1.47.1"
+anyhow = "1.0.99"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+reqwest = "0.12.15"
+schemars = { version = "0.8.22", features = ["preserve_order"] }
 
-[workspace.package]
-version = "0.1.0"
+# ─── docs.rs metadata ────────────────────────────────────────────────
+[workspace.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
