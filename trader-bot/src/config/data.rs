@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use anyhow::Result;
 
-/// Основная конфигурация торгового бота
+/// Основная конфигурация торгового бота (расширенная)
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct TradingConfig {
     #[serde(rename = "type")]
@@ -11,21 +11,46 @@ pub struct TradingConfig {
     pub accounts: Vec<AccountConfig>,
     pub mode: WorkingMode,
     pub llm_config: Option<LlmConfig>,
+    pub dashboard: Option<DashboardConfig>,
+
+    /// Список дополнительных источников данных
+    pub data_sources: Option<Vec<DataSourceConfig>>,
+
+    /// Настройки оптимизатора
+    pub optimizer: Option<OptimizerSection>,
 }
 
 /// Учетные данные API
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Credential {
     pub token: String,
+    /// Дополнительные ключи для других брокеров
+    #[serde(default)]
+    pub additional_keys: Option<Vec<BrokerCredential>>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct BrokerCredential {
+    pub broker: String,
+    pub api_key: String,
+    pub secret_key: Option<String>,
+    pub extra: Option<std::collections::HashMap<String, String>>,
 }
 
 /// Конфигурация счета
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct AccountConfig {
     pub account_id: String,
+    /// Брокер для этого счета (по умолчанию "tinkoff")
+    #[serde(default = "default_broker")]
+    pub broker: String,
     pub instruments: Vec<InstrumentConfig>,
     pub strategy: StrategyConfig,
     pub risk_management: Option<RiskManagementConfig>,
+}
+
+fn default_broker() -> String {
+    "tinkoff".to_string()
 }
 
 /// Конфигурация инструмента
@@ -65,6 +90,10 @@ pub enum StrategyType {
     Momentum,
     MeanReversion,
     Grid,
+    PairsTrading,
+    StatisticalArbitrage,
+    #[serde(other)]
+    Custom,
 }
 
 /// Параметры стратегии
@@ -74,29 +103,35 @@ pub struct StrategyParameters {
     pub days_back_to_consider: u32,
     pub quantity_limit: u32,
     pub check_interval: u32,
-    /// Параметры для Grid стратегии
     #[serde(default)]
     pub grid_config: Option<GridConfig>,
+    #[serde(default)]
+    pub pairs_config: Option<PairConfig>,
 }
 
 /// Конфигурация Grid стратегии
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct GridConfig {
-    /// Нижняя граница диапазона (цена)
     pub lower_price: f64,
-    /// Верхняя граница диапазона (цена)
     pub upper_price: f64,
-    /// Количество уровней сетки
     pub grid_levels: u32,
-    /// Размер ордера в лотах для каждого уровня
     pub order_size: u32,
-    /// Процент сетки для каждой стороны (0.5 = 50% на покупку, 50% на продажу)
     #[serde(default = "default_grid_ratio")]
     pub grid_ratio: f64,
 }
 
 fn default_grid_ratio() -> f64 {
     0.5
+}
+
+/// Конфигурация парной торговли
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct PairConfig {
+    pub pair_ticker: String,
+    pub pair_figi: String,
+    pub entry_zscore: f64,
+    pub exit_zscore: f64,
+    pub lookback_period: u32,
 }
 
 /// Управление рисками
@@ -127,20 +162,52 @@ pub struct LlmConfig {
     pub context_window: u32,
 }
 
+/// Конфигурация дашборда
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct DashboardConfig {
+    #[serde(default = "default_dashboard_port")]
+    pub port: u16,
+    #[serde(default = "default_dashboard_enabled")]
+    pub enabled: bool,
+}
+
+fn default_dashboard_port() -> u16 {
+    8080
+}
+
+fn default_dashboard_enabled() -> bool {
+    true
+}
+
+/// Конфигурация внешнего источника данных
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct DataSourceConfig {
+    pub name: String,
+    pub source_type: String,
+    pub api_key: Option<String>,
+    pub base_url: Option<String>,
+}
+
+/// Настройки оптимизатора
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct OptimizerSection {
+    pub enabled: bool,
+    pub method: String,
+    pub metric: String,
+    pub max_iterations: u32,
+}
+
 impl TradingConfig {
-    /// Загрузить конфигурацию из файла
     pub fn load(path: &str) -> Result<Self> {
         let content = fs::read_to_string(path)?;
         let config: TradingConfig = serde_json::from_str(&content)?;
         Ok(config)
     }
 
-    /// Загрузить конфигурацию из пути по умолчанию
     pub fn load_default() -> Result<Self> {
         Self::load("trader-bot/config/account.json")
     }
 
-    /// Получить активные инструменты
     pub fn get_enabled_instruments(&self) -> Vec<&InstrumentConfig> {
         self.accounts
             .iter()
@@ -149,7 +216,6 @@ impl TradingConfig {
             .collect()
     }
 
-    /// Получить инструмент по тикеру
     pub fn get_instrument_by_ticker(&self, ticker: &str) -> Option<&InstrumentConfig> {
         self.accounts
             .iter()

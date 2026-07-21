@@ -126,6 +126,66 @@ impl GridStrategy {
     }
 }
 
+// ─── Strategy trait implementation ────────────────────────────────
+use async_trait::async_trait;
+use anyhow::Result;
+use crate::core::*;
+
+#[async_trait]
+impl Strategy for GridStrategy {
+    fn name(&self) -> &str {
+        "grid"
+    }
+
+    fn kind(&self) -> StrategyKind {
+        StrategyKind::Grid
+    }
+
+    async fn on_start(&mut self, _broker: &dyn Broker) -> Result<()> {
+        log::info!("GridStrategy: starting with config: levels={}, range={}-{}",
+            self.config.grid_levels, self.config.lower_price, self.config.upper_price);
+        Ok(())
+    }
+
+    async fn analyze(&self, broker: &dyn Broker, instrument: &str) -> Result<Vec<Signal>> {
+        let price = broker.last_price(instrument).await?;
+        let levels = self.get_levels_to_place(price);
+        let mut signals = Vec::new();
+
+        for level in levels {
+            let action = match level.order_type {
+                OrderSide::Buy => crate::core::OrderAction::Buy,
+                OrderSide::Sell => crate::core::OrderAction::Sell,
+            };
+            signals.push(Signal {
+                ticker: instrument.to_string(),
+                timestamp: chrono::Utc::now(),
+                action,
+                confidence: 0.7,
+                price: level.price,
+                source: "grid".to_string(),
+                metadata: std::collections::HashMap::new(),
+            });
+        }
+
+        Ok(signals)
+    }
+
+    async fn on_tick(&mut self, _broker: &dyn Broker) -> Result<()> {
+        Ok(())
+    }
+
+    fn validate(&self) -> Result<()> {
+        if self.config.grid_levels < 2 {
+            anyhow::bail!("Grid must have at least 2 levels");
+        }
+        if self.config.upper_price <= self.config.lower_price {
+            anyhow::bail!("upper_price must be greater than lower_price");
+        }
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

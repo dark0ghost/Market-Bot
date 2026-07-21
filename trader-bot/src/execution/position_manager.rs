@@ -6,6 +6,7 @@ use t_invest_sdk::api::{
 use t_invest_sdk::TInvestSdk;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use crate::provider::ExecutionProvider;
 
 /// Тип заявки
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -166,15 +167,15 @@ impl PositionManager {
 }
 
 /// Расширенный менеджер для работы с решениями агента
-pub struct TradingExecutor {
-    position_manager: PositionManager,
+pub struct TradingExecutor<E: ExecutionProvider> {
+    executor: E,
     available_balance: f64,
 }
 
-impl TradingExecutor {
-    pub fn new(position_manager: PositionManager, available_balance: f64) -> Self {
+impl<E: ExecutionProvider> TradingExecutor<E> {
+    pub fn new(executor: E, available_balance: f64) -> Self {
         TradingExecutor {
-            position_manager,
+            executor,
             available_balance,
         }
     }
@@ -210,7 +211,7 @@ impl TradingExecutor {
                             quantity as f64 * entry_price
                         );
 
-                        let order_result = self.position_manager
+                        let order_result = self.executor
                             .place_limit_order(instrument_uid, OrderAction::Buy, quantity, entry_price)
                             .await?;
                         results.push(order_result);
@@ -245,7 +246,7 @@ impl TradingExecutor {
                             price
                         );
 
-                        let order_result = self.position_manager
+                        let order_result = self.executor
                             .place_limit_order(instrument_uid, OrderAction::Sell, quantity, price)
                             .await?;
                         results.push(order_result);
