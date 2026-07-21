@@ -1,3 +1,4 @@
+import torch
 import yaml
 import logging
 from transformers import (
@@ -49,7 +50,7 @@ def train():
         metric_for_best_model="f1",
         greater_is_better=True,
         report_to="none",
-        fp16=True,
+        fp16=torch.cuda.is_available(),
         dataloader_num_workers=4,
         remove_unused_columns=False,
         seed=CONFIG["training"]["seed"],

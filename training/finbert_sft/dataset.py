@@ -15,7 +15,24 @@ LABEL2ID = {l: i for i, l in enumerate(LABELS)}
 ID2LABEL = {i: l for i, l in enumerate(LABELS)}
 
 
+def load_local_parquet() -> DatasetDict | None:
+    data_dir = Path("training/finbert_sft/data")
+    train_path = data_dir / "train.parquet"
+    test_path = data_dir / "test.parquet"
+    if not train_path.exists() or not test_path.exists():
+        return None
+    train_df = pd.read_parquet(train_path)
+    test_df = pd.read_parquet(test_path)
+    train = Dataset.from_pandas(train_df.rename(columns={"text": "sentence"}), preserve_index=False)
+    test = Dataset.from_pandas(test_df.rename(columns={"text": "sentence"}), preserve_index=False)
+    print(f"Loaded local parquet data ({len(train)} train / {len(test)} test)")
+    return DatasetDict({"train": train, "test": test})
+
+
 def load_financial_phrasebank() -> DatasetDict:
+    local = load_local_parquet()
+    if local is not None:
+        return local
     dataset = load_dataset(
         CONFIG["training"]["dataset"],
         CONFIG["training"]["dataset_config"],
