@@ -74,5 +74,9 @@ def export_to_onnx():
     return str(ONNX_PATH)
 
 
-if __name__ == "__main__":
+def main():
     export_to_onnx()
+
+
+if __name__ == "__main__":
+    main()

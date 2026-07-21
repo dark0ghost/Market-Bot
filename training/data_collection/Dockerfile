@@ -2,9 +2,11 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-COPY training/data_collection/requirements.txt .
+COPY pyproject.toml requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY training/data_collection/ .
+COPY finbert_sft/ finbert_sft/
+COPY data_collection/ data_collection/
 
-CMD ["python", "collect.py", "--watch"]
+ENTRYPOINT ["python", "-m", "data_collection.collect"]
+CMD ["--watch"]

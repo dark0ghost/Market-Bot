@@ -78,5 +78,9 @@ def train():
     return eval_results
 
 
-if __name__ == "__main__":
+def main():
     train()
+
+
+if __name__ == "__main__":
+    main()

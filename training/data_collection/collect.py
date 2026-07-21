@@ -323,7 +323,7 @@ def watch_loop():
         time.sleep(interval * 60)
 
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--watch", action="store_true", help="Run in watch loop")
     parser.add_argument("--merge", action="store_true", help="Merge collected data into training set")
@@ -336,3 +336,7 @@ if __name__ == "__main__":
         watch_loop()
     else:
         run_collection(args.max_samples)
+
+
+if __name__ == "__main__":
+    main()

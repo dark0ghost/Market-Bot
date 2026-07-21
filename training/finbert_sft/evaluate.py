@@ -68,5 +68,9 @@ def evaluate():
     return {"accuracy": acc, "f1": f1, "precision": precision, "recall": recall}
 
 
-if __name__ == "__main__":
+def main():
     evaluate()
+
+
+if __name__ == "__main__":
+    main()
