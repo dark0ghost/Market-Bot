@@ -1,3 +1,42 @@
-**/target
-**/config
-.idea
+# ─── Rust ─────────────────────────────────────────────────────────────
+target/
+**/target/
+*.rs.bk
+
+# ─── Config (API keys, secrets) ───────────────────────────────────────
+trader-bot/config/
+!trader-bot/config/.gitkeep
+.env
+.env.*
+*.pem
+*.key
+credentials.yml
+credentials.json
+
+# ─── Data & Models (large binaries, datasets) ─────────────────────────
+models/
+*.onnx
+*.parquet
+*.arrow
+training/data_collected/
+
+# ─── AI Agent configs ────────────────────────────────────────────────
+.qwen/
+.claude/
+
+# ─── IDE / OS ─────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ─── Logs ─────────────────────────────────────────────────────────────
+*.log
+
+# ─── Temp ─────────────────────────────────────────────────────────────
+task.md
+tmp/
+temp/
