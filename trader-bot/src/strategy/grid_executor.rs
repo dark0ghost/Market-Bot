@@ -66,10 +66,7 @@ impl GridExecutor {
                     });
                 }
                 Err(e) => {
-                    warn!(
-                        "Error placing order at level {}: {}",
-                        level.level_index, e
-                    );
+                    warn!("Error placing order at level {}: {}", level.level_index, e);
                 }
             }
         }

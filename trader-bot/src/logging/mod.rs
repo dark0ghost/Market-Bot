@@ -45,10 +45,7 @@ pub struct FileDestination {
 
 impl FileDestination {
     pub fn new(path: &str) -> Result<Self> {
-        let file = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(path)?;
+        let file = OpenOptions::new().create(true).append(true).open(path)?;
         Ok(FileDestination {
             file: Mutex::new(file),
             path: path.to_string(),
@@ -180,15 +177,15 @@ impl LoggerBuilder {
     }
 
     pub fn network(mut self, url: &str, threshold: Level) -> Self {
-        self.router.add(Box::new(NetworkDestination::new(url, threshold)));
+        self.router
+            .add(Box::new(NetworkDestination::new(url, threshold)));
         self
     }
 
     /// Register as the global logger (panics if already set)
     pub fn init(self) -> Result<()> {
         let max_level = log::LevelFilter::Debug;
-        log::set_boxed_logger(Box::new(self.router))
-            .map(|()| log::set_max_level(max_level))?;
+        log::set_boxed_logger(Box::new(self.router)).map(|()| log::set_max_level(max_level))?;
         Ok(())
     }
 }

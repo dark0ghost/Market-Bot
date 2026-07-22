@@ -172,10 +172,7 @@ mod tests {
         let strategy = AiStrategy::new("test".to_string(), config, agent);
         assert_eq!(strategy.config().min_confidence, 0.7);
         assert!(strategy.config().use_llm);
-        assert_eq!(
-            strategy.config().force_regime.as_deref(),
-            Some("trending")
-        );
+        assert_eq!(strategy.config().force_regime.as_deref(), Some("trending"));
     }
 
     // ─── TradingAgent rule-based decision tests ─────────────────────
@@ -532,9 +529,21 @@ mod tests {
             .expect("Rule-based decision failed");
         assert_eq!(decision.action, Action::Buy);
         let (sl, tp) = (decision.stop_loss.unwrap(), decision.take_profit.unwrap());
-        assert!(sl < 100.0, "Stop loss {:.2} should be below entry 100.0", sl);
-        assert!(tp > 100.0, "Take profit {:.2} should be above entry 100.0", tp);
-        assert!((sl - 97.0).abs() < 0.1, "Stop loss should be ~97 (3% below 100), got {:.2}", sl);
+        assert!(
+            sl < 100.0,
+            "Stop loss {:.2} should be below entry 100.0",
+            sl
+        );
+        assert!(
+            tp > 100.0,
+            "Take profit {:.2} should be above entry 100.0",
+            tp
+        );
+        assert!(
+            (sl - 97.0).abs() < 0.1,
+            "Stop loss should be ~97 (3% below 100), got {:.2}",
+            sl
+        );
     }
 
     #[test]

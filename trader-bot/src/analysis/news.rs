@@ -194,8 +194,7 @@ impl NewsAnalyzer {
             if title_lower.contains("dividend") {
                 events.push("Dividend payments".to_string());
             }
-            if title_lower.contains("report") || title_lower.contains("financial result")
-            {
+            if title_lower.contains("report") || title_lower.contains("financial result") {
                 events.push("Financial reporting".to_string());
             }
             if title_lower.contains("sanction") || title_lower.contains("restrict") {

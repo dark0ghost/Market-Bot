@@ -286,7 +286,13 @@ impl<E: ExecutionProvider> TradingExecutor<E> {
         }
 
         let quantity = (current_position as f64 * position_pct) as i32;
-        if quantity < 1 { 1 } else if quantity > current_position { current_position } else { quantity }
+        if quantity < 1 {
+            1
+        } else if quantity > current_position {
+            current_position
+        } else {
+            quantity
+        }
     }
 }
 

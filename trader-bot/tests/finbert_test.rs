@@ -22,8 +22,16 @@ fn test_finbert_predict_returns_valid_result() {
     ];
     for text in &texts {
         let result = nlp.predict(text).expect("Prediction failed");
-        assert!(!result.label.is_empty(), "Label should not be empty for '{}'", text);
-        assert!(result.confidence > 0.0, "Confidence should be positive for '{}'", text);
+        assert!(
+            !result.label.is_empty(),
+            "Label should not be empty for '{}'",
+            text
+        );
+        assert!(
+            result.confidence > 0.0,
+            "Confidence should be positive for '{}'",
+            text
+        );
         assert_eq!(result.scores.len(), 3, "Should have 3 class scores");
     }
 }
@@ -32,7 +40,9 @@ fn test_finbert_predict_returns_valid_result() {
 fn test_finbert_long_text() {
     let nlp = new_nlp();
     let long_text = "компания показала рост прибыли. ".repeat(100);
-    let result = nlp.predict(&long_text).expect("Long text prediction failed");
+    let result = nlp
+        .predict(&long_text)
+        .expect("Long text prediction failed");
     assert!(!result.label.is_empty());
     assert!(result.confidence > 0.0);
 }
@@ -57,7 +67,11 @@ fn test_finbert_sentiment_score_neutral() {
 #[test]
 fn test_finbert_special_characters() {
     let nlp = new_nlp();
-    let texts = ["прибыль +30% !!!", "убыток -50% ?", "рост / падение / нейтрально"];
+    let texts = [
+        "прибыль +30% !!!",
+        "убыток -50% ?",
+        "рост / падение / нейтрально",
+    ];
     for text in &texts {
         let result = nlp.predict(text).expect("Prediction failed");
         assert!(!result.label.is_empty());

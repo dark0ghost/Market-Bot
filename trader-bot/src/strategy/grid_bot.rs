@@ -72,10 +72,7 @@ impl GridBot {
         // Initialize grid
         match executor.initialize_grid(current_price).await {
             Ok(results) => {
-                info!(
-                    "Grid initialized, orders placed: {}",
-                    results.len()
-                );
+                info!("Grid initialized, orders placed: {}", results.len());
             }
             Err(e) => {
                 error!("Grid initialization error: {}", e);

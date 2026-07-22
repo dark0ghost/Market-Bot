@@ -55,7 +55,7 @@ pub struct BollingerValues {
     pub bandwidth: f64,
 }
 
-    /// Volume analysis
+/// Volume analysis
 #[derive(Debug, Clone)]
 pub struct VolumeAnalysis {
     pub current_volume: f64,
@@ -261,7 +261,7 @@ impl TechnicalAnalyzer {
         }
     }
 
-/// Volume analysis
+    /// Volume analysis
     fn analyze_volume(&self, volumes: &[f64]) -> VolumeAnalysis {
         if volumes.is_empty() {
             return VolumeAnalysis {

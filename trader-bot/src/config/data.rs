@@ -202,8 +202,12 @@ pub struct SandboxConfig {
     pub pay_in_amount: f64,
 }
 
-fn default_sandbox_open_account() -> bool { true }
-fn default_sandbox_pay_in() -> f64 { 30_000_000.0 }
+fn default_sandbox_open_account() -> bool {
+    true
+}
+fn default_sandbox_pay_in() -> f64 {
+    30_000_000.0
+}
 
 /// LLM configuration
 #[derive(Debug, Clone, Deserialize, Serialize)]

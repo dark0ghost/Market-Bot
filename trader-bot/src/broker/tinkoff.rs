@@ -1,7 +1,10 @@
 use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use t_invest_sdk::{TInvestSdk, api::{MoneyValue, OpenSandboxAccountRequest, SandboxPayInRequest}};
+use t_invest_sdk::{
+    TInvestSdk,
+    api::{MoneyValue, OpenSandboxAccountRequest, SandboxPayInRequest},
+};
 
 use crate::client::{MarketDataService, OrderBookService, PortfolioService};
 use crate::core::*;
@@ -23,35 +26,53 @@ impl TinkoffBroker {
         pay_in_amount: f64,
     ) -> Result<Self> {
         use t_invest_sdk::Environment;
-        let env = if sandbox { Environment::Sandbox } else { Environment::Production };
+        let env = if sandbox {
+            Environment::Sandbox
+        } else {
+            Environment::Production
+        };
         let sdk = TInvestSdk::new(token, env).await?;
 
-        let account_id = if sandbox && open_account && account_id.as_deref().map_or(true, |s| s.is_empty()) {
-            let mut sc = sdk.sandbox();
-            let resp = sc.open_sandbox_account(OpenSandboxAccountRequest { name: None })
-                .await
-                .map_err(|e| anyhow!("Sandbox OpenSandboxAccount failed: {}", e))?;
-            let id = resp.into_inner().account_id;
-            log::info!("Sandbox: opened account {}", id);
-
-            if pay_in_amount > 0.0 {
-                let units = pay_in_amount as i64;
-                let nano = (pay_in_amount.fract() * 1_000_000_000.0) as i32;
-                let pay_req = SandboxPayInRequest {
-                    account_id: id.clone(),
-                    amount: Some(MoneyValue { currency: "RUB".to_string(), units, nano }),
-                };
-                sc.sandbox_pay_in(pay_req)
+        let account_id =
+            if sandbox && open_account && account_id.as_deref().map_or(true, |s| s.is_empty()) {
+                let mut sc = sdk.sandbox();
+                let resp = sc
+                    .open_sandbox_account(OpenSandboxAccountRequest { name: None })
                     .await
-                    .map_err(|e| anyhow!("Sandbox PayIn failed: {}", e))?;
-                log::info!("Sandbox: deposited {:.2} RUB into account {}", pay_in_amount, id);
-            }
-            id
-        } else {
-            account_id.unwrap_or_default()
-        };
+                    .map_err(|e| anyhow!("Sandbox OpenSandboxAccount failed: {}", e))?;
+                let id = resp.into_inner().account_id;
+                log::info!("Sandbox: opened account {}", id);
 
-        Ok(TinkoffBroker { sdk, account_id: account_id.clone(), name: format!("tinkoff_{}", account_id) })
+                if pay_in_amount > 0.0 {
+                    let units = pay_in_amount as i64;
+                    let nano = (pay_in_amount.fract() * 1_000_000_000.0) as i32;
+                    let pay_req = SandboxPayInRequest {
+                        account_id: id.clone(),
+                        amount: Some(MoneyValue {
+                            currency: "RUB".to_string(),
+                            units,
+                            nano,
+                        }),
+                    };
+                    sc.sandbox_pay_in(pay_req)
+                        .await
+                        .map_err(|e| anyhow!("Sandbox PayIn failed: {}", e))?;
+                    log::info!(
+                        "Sandbox: deposited {:.2} RUB into account {}",
+                        pay_in_amount,
+                        id
+                    );
+                }
+                id
+            } else {
+                account_id.unwrap_or_default()
+            };
+
+        Ok(TinkoffBroker {
+            sdk,
+            account_id: account_id.clone(),
+            name: format!("tinkoff_{}", account_id),
+        })
     }
 
     pub fn from_sdk(sdk: TInvestSdk, account_id: String) -> Self {
