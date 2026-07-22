@@ -58,7 +58,9 @@ def evaluate():
     report = classification_report(
         all_labels, all_preds,
         target_names=LABELS,
+        labels=list(range(len(LABELS))),
         digits=4,
+        zero_division=0,
     )
     logger.info(f"\nClassification Report:\n{report}")
 

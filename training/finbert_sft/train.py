@@ -36,7 +36,7 @@ def train():
 
     training_args = TrainingArguments(
         output_dir=CONFIG["training"]["output_dir"],
-        evaluation_strategy="steps",
+        eval_strategy="steps",
         eval_steps=CONFIG["training"]["eval_steps"],
         save_steps=CONFIG["training"]["save_steps"],
         logging_steps=CONFIG["training"]["logging_steps"],
@@ -51,7 +51,7 @@ def train():
         greater_is_better=True,
         report_to="none",
         fp16=torch.cuda.is_available(),
-        dataloader_num_workers=4,
+        dataloader_num_workers=0,
         remove_unused_columns=False,
         seed=CONFIG["training"]["seed"],
     )
@@ -61,7 +61,7 @@ def train():
         args=training_args,
         train_dataset=dataset["train"],
         eval_dataset=dataset["test"],
-        tokenizer=tokenizer,
+        processing_class=tokenizer,
         compute_metrics=compute_metrics,
         callbacks=[EarlyStoppingCallback(early_stopping_patience=3)],
     )

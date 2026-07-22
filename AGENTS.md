@@ -1,6 +1,6 @@
 # AI Trade Bot — Agents & Skills
 
-## Agent System Overview
+## Architecture Overview
 
 ```mermaid
 flowchart TB
@@ -39,6 +39,150 @@ flowchart TB
     SA --> RA
 ```
 
+The system is structured as a multi-agent architecture with three layers:
+
+- **IDE AI Agent** (Claude Code / Cursor / Codex) orchestrates development tasks via skill plugins
+- **Trading Sub-Agents** (in-process Rust) form the runtime decision pipeline: AnalystAgent collects signals, SupervisorAgent validates risk, TradingAgent executes decisions
+- **ML Inference** runs ONNX models (FinBERT for sentiment, time-series for price prediction) loaded in-process with hot-reload support
+
+Data flow: `WS OrderBook -> features -> ONNX FinBERT -> Decision Engine -> Risk -> Execution`
+
+```
+ai-trade-bot/
+├── trader-bot/                  # Rust — trading core
+│   ├── src/
+│   │   ├── main.rs              # Entry point, wires everything
+│   │   ├── core/                # Broker-agnostic types & traits
+│   │   ├── agent/               # TradingAgent, SupervisorAgent, AnalystAgent, RiskAgent
+│   │   ├── broker/              # Tinkoff, Mock, Finam implementations
+│   │   ├── datasource/          # Tinkoff, Finam data sources
+│   │   ├── ml_inference/        # ONNX (FinBERT NLP) with hot-reload
+│   │   ├── strategy/            # Grid, Interval, Momentum, etc.
+│   │   ├── execution/           # Order management
+│   │   ├── config/              # Config loading
+│   │   └── api/                 # Axum dashboard
+│   └── config/account.json
+├── mcp-client/                  # LLM integration (Ollama)
+├── training/
+│   ├── finbert_sft/             # FinBERT SFT pipeline (PyTorch -> ONNX)
+│   ├── data_collection/         # RSS + Perplexica -> Ollama labeling
+│   └── pipeline.sh              # Full end-to-end training pipeline
+├── models/finbert/              # ONNX artifacts (model.onnx, tokenizer.json)
+├── scripts/download_model.sh    # Download pre-trained model from HF Hub
+└── skills/trade-api/            # IDE skill: analyze, scan, backtest, train
+```
+
+## Project Setup
+
+### Prerequisites
+
+- **Rust** (edition 2024): install via `rustup`
+- **Python 3.10+** for the training pipeline
+- **Docker** (optional) for GPU-accelerated training or Ollama
+- **Ollama** running locally (default: `http://localhost:11434`) for LLM-based analysis
+
+### Clone and Build
+
+```bash
+git clone https://github.com/AlexWan/ai-trade-bot
+cd ai-trade-bot
+
+# Build the Rust workspace
+cargo build -p trader-bot
+cargo build -p mcp-client
+```
+
+### Python Dependencies (Training)
+
+```bash
+pip install -r training/requirements.txt
+# Or editable install:
+pip install -e training/
+```
+
+### Download the Pre-trained FinBERT Model
+
+```bash
+# Requires huggingface-cli (pip install huggingface_hub)
+bash scripts/download_model.sh
+```
+
+This downloads the ONNX model + tokenizer from HuggingFace Hub to `models/finbert/`.
+
+### Configure
+
+Edit `trader-bot/config/account.json` with your broker credentials (Tinkoff API token, Finam credentials, etc.).
+
+### Run
+
+```bash
+# Start the trading bot
+RUST_LOG=info cargo run -p trader-bot
+
+# Or with a specific config
+RUST_LOG=debug cargo run -p trader-bot -- --config trader-bot/config/account.json
+```
+
+## Daily Workflow
+
+### Build
+
+```bash
+# Build entire workspace
+cargo build
+
+# Build specific crate
+cargo build -p trader-bot
+cargo build -p mcp-client
+```
+
+### Test
+
+```bash
+# Run all tests
+cargo test
+
+# Run tests for a specific crate
+cargo test -p trader-bot
+
+# Run with output
+cargo test -p trader-bot -- --nocapture
+```
+
+### Lint and Type Check
+
+```bash
+# Clippy (Rust linter)
+cargo clippy -p trader-bot
+
+# Python linting (training)
+ruff check training/
+```
+
+### Run the Bot
+
+```bash
+# Development mode with verbose logging
+RUST_LOG=info cargo run -p trader-bot
+
+# Release build for production
+cargo build --release -p trader-bot
+./target/release/trader-bot
+```
+
+### Common Development Tasks
+
+| Task | Command / Location |
+|------|--------------------|
+| Add a broker | Implement `Broker` trait in `trader-bot/src/broker/`, register in mod.rs |
+| Add a strategy | Implement `Strategy` trait, register in `trader-bot/src/strategy/registry.rs` |
+| Add a data source | Implement `DataSource` trait in `trader-bot/src/datasource/` |
+| Update ONNX model | Replace `models/finbert/model.onnx` (auto hot-reload) |
+| Add dashboard route | Add handler in `trader-bot/src/api/routes/` |
+| Run data collection | `python training/data_collection/collect.py --merge` |
+| Run training | `python training/finbert_sft/train.py` |
+| Export ONNX | `python training/finbert_sft/export_onnx.py` |
+
 ## Available Skills
 
 ### trade-api (built-in)
@@ -55,13 +199,13 @@ Commands available to IDE agents:
 | `train` | Run FinBERT SFT training pipeline |
 
 ```bash
-# В Claude Code:
+# In Claude Code:
 /ai-trade-bot:scan
-# Найти акции Мосбиржи с объёмом >500млн и ростом >5% за неделю
+# Find MOEX stocks with volume >500M and growth >5% over the last week
 
-# В Cursor:
+# In Cursor:
 /ai-trade-bot:analyze
-# Проанализируй портфель, покажи риски
+# Analyze portfolio, show risks
 ```
 
 ### finam-skill (external)
@@ -69,20 +213,21 @@ Commands available to IDE agents:
 **Repo:** https://github.com/FinamWeb/finam-skill
 
 ```bash
-# Установка в Claude Code
+# Install in Claude Code
 claude plugin marketplace add FinamWeb/finam-skill
 claude plugin install finam@finam-skill --scope user
 
-# Установка в Cursor
+# Install in Cursor
 /add-plugin https://github.com/FinamWeb/finam-skill
 ```
 
-**Что даёт:** прямой доступ к Finam Trade API из IDE — котировки, стакан, портфель, ордера, поиск инструментов, скрипты для алготорговли.
+**What it provides:** direct access to Finam Trade API from the IDE — quotes, order book, portfolio, orders, instrument search, and algorithmic trading scripts.
 
 ## Sub-Agents (Rust, in-process)
 
 ### TradingAgent
-Главный агент принятия решений. Собирает сигналы от AnalystAgent, проверяет через SupervisorAgent, исполняет через Execution.
+
+Main decision-making agent. Collects signals from AnalystAgent, validates through SupervisorAgent, and executes through the Execution layer.
 
 ```rust
 // trader-bot/src/agent/trading_agent.rs
@@ -100,28 +245,84 @@ impl TradingAgent {
 }
 ```
 
+Two decision modes:
+- **LLM-based** (`make_decision`): builds a prompt from context (news sentiment, technical analysis, fundamentals, portfolio state), queries Ollama, and parses the JSON response into a `TradingDecision`
+- **Rule-based** (`make_rule_based_decision`): applies deterministic rules without an LLM call — suitable for fast, low-latency decisions
+
 ### AnalystAgent
-Собирает и анализирует:
-- Технические индикаторы (RSI, MACD, Bollinger)
-- Новостной сентимент (FinBERT ONNX + Ollama)
-- Фундаментальные метрики (P/E, ROE, рост)
-- Режим рынка (MarketRegime)
+
+Collects and analyzes multiple signal sources:
+
+```rust
+pub struct AnalystAgent {
+    ensemble: EnsemblePredictor,
+    memory: DecisionMemory,
+}
+```
+
+Uses an ensemble of predictors:
+- **TechnicalPredictor** — RSI, MACD, Bollinger Bands, volume analysis
+- **LLMPredictor** — Ollama-based fundamental/news reasoning
+- **StatArbPredictor** — statistical arbitrage signals
+- **FundamentalPredictor** — P/E, ROE, D/E, revenue growth
+
+The ensemble produces a weighted `AnalystProposal` with action, confidence, and conviction score.
+
+### SupervisorAgent
+
+Combines analysis with risk validation:
+
+```rust
+pub struct SupervisorAgent {
+    analyst: AnalystAgent,
+    risk: RiskAgent,
+}
+```
+
+Flow: `AnalystAgent.analyze(ctx) -> proposal` then `RiskAgent.assess(proposal, ctx) -> risk_assessment`. If risk score exceeds threshold, action is overridden to `Hold`.
 
 ### RiskAgent
-Проверяет сигналы перед исполнением:
+
+Validates signals before execution:
+
 - Max loss / drawdown limits
-- Position sizing от баланса
-- Correlation risk между инструментами
+- Position sizing relative to available balance
+- Market regime awareness (volatile/trending/quiet)
+- RSI-based volatility assessment
+- Historical win-rate weighting
 - Open positions limit
 
 ### MemoryAgent
-Сохраняет все решения и их результаты в DecisionMemory. Используется для:
-- Few-shot примеров в LLM-промптах
-- Калибровки уверенности (CalibrationAgent)
-- Анализа исторических ошибок
+
+Persists all decisions and their outcomes in `DecisionMemory`. Used for:
+
+- Few-shot examples in LLM prompts
+- Confidence calibration (CalibrationAgent)
+- Historical error analysis
+- Win-rate tracking per provider
+
+```rust
+pub struct DecisionMemory {
+    records: VecDeque<DecisionRecord>,
+    max_records: usize,
+}
+```
+
+Tracks for each record: ticker, action, conviction, entry/exit price, PnL, provider name, success flag.
 
 ### CalibrationAgent
-Калибровка confidence-скорогов на исторических данных. Исправляет смещение (overconfidence/underconfidence) через Platt scaling.
+
+Confidence score calibration on historical data. Corrects overconfidence/underconfidence bias via Platt scaling.
+
+```rust
+pub struct PredictionTracker {
+    provider_results: HashMap<String, ProviderStats>,
+    calibration_bins: Vec<CalibrationBin>,  // 10 bins from 0.0 to 1.0
+    recent_predictions: Vec<PredictionRecord>,
+}
+```
+
+Computes Expected Calibration Error (ECE) to measure and correct miscalibration.
 
 ## ML Pipeline (Agent-integrated)
 
@@ -129,7 +330,7 @@ impl TradingAgent {
 flowchart LR
     subgraph Offline["Offline Training"]
         DC[Data Collection<br/>RSS + Perplexica]
-        SFT[FinBERT SFT<br/>PyTorch → ONNX]
+        SFT[FinBERT SFT<br/>PyTorch -> ONNX]
         DC --> SFT
     end
 
@@ -149,35 +350,124 @@ flowchart LR
 ```rust
 // trader-bot/src/ml_inference/nlp.rs
 let nlp = FinBertInference::new("models/finbert")?;
-let result: NlpResult = nlp.predict("компания показала рост выручки 30%")?;
+let result: NlpResult = nlp.predict("company reported 30% revenue growth")?;
 // { label: "positive", confidence: 0.97, scores: [-2.3, 0.1, 4.2] }
 
 // TradingAgent uses:
 let sentiment = result.sentiment_score(); // 0.97
 ```
 
-### Training Pipeline
+**Hot-reload:** the ONNX session watches `model.onnx` for changes via `notify` and reloads automatically — no process restart needed.
+
+**Thread safety:** ONNX inference runs on `spawn_blocking` to avoid blocking the tokio runtime.
+
+## Model Fine-Tuning Pipeline
+
+The complete pipeline for collecting financial news, labeling via LLM, fine-tuning FinBERT, and exporting to ONNX.
+
+### Step 1: Data Collection
+
+Collect financial news from RSS feeds and Perplexica context search, then label via Ollama LLM.
 
 ```bash
-# 1. Сбор данных
+# Collect and label data (RSS + Perplexica -> Ollama labeling)
+python training/data_collection/collect.py
+
+# Merge collected data into a training dataset
 python training/data_collection/collect.py --merge
+```
 
-# 2. SFT дообучение
+Configuration in `training/data_collection/config.yaml`:
+- RSS feeds: Interfax, CBR, Vedomosti, TASS, Prime, Banki, SmartLab, Finmarket, RBC
+- Perplexica topics for context search (market news, sector-specific queries)
+- Ollama model for labeling (default: `fin-expert`)
+- Output directory: `training/data_collected/`
+
+For Sberbank-specific collection (included in the full pipeline):
+
+```bash
+python training/data_collection/sber_collect.py --days 7
+python training/data_collection/sber_collect.py --merge
+```
+
+### Step 2: Train FinBERT SFT
+
+Fine-tune the `ProsusAI/finbert` model on the collected financial dataset.
+
+```bash
 python training/finbert_sft/train.py
+```
 
-# 3. Экспорт в ONNX (авто-релоад в Rust)
+Training configuration in `training/finbert_sft/config.yaml`:
+
+| Parameter | Value |
+|-----------|-------|
+| Base model | `ProsusAI/finbert` |
+| Labels | `negative`, `neutral`, `positive` |
+| Sequence length | 128 tokens |
+| Batch size | 16 |
+| Epochs | 4 |
+| Learning rate | 2e-5 |
+| Weight decay | 0.01 |
+| Output dir | `models/finbert/` |
+
+### Step 3: Evaluate
+
+```bash
+python training/finbert_sft/evaluate.py
+```
+
+### Step 4: Export to ONNX
+
+Export the fine-tuned PyTorch model to ONNX format for in-process inference in Rust.
+
+```bash
 python training/finbert_sft/export_onnx.py
 ```
+
+Output: `models/finbert/model.onnx`
+
+### Step 5: Test Inference
+
+Run the Rust binary to verify the exported model loads and produces correct inference:
+
+```bash
+RUST_LOG=info cargo run -p trader-bot
+```
+
+The ONNX model is hot-reloaded automatically — just replace `models/finbert/model.onnx` and the bot picks it up without restart.
+
+### Full Pipeline (Docker GPU)
+
+For end-to-end automated pipeline with GPU acceleration:
+
+```bash
+# Build the Docker image
+docker build -t finbert-sft:latest -f training/finbert_sft/Dockerfile .
+
+# Run the full pipeline
+HF_TOKEN=hf_xxx bash training/pipeline.sh --days 30
+```
+
+The pipeline script (`training/pipeline.sh`) runs:
+1. `sber_collect.py --days N` — collect Sberbank news
+2. `sber_collect.py --merge` — merge into training set
+3. `train.py` — FinBERT SFT fine-tuning
+4. `evaluate.py` — model evaluation
+5. `export_onnx.py` — export to ONNX
 
 ## Agent Conventions
 
 | Convention | Rule |
 |-----------|------|
-| **Naming** | `PascalCase` для агентов, `snake_case` для методов |
-| **Async** | Все методы агентов — `async fn` |
-| **Errors** | `anyhow::Result` |
-| **State** | `Arc<RwLock<...>>` для shared state |
-| **ML** | `spawn_blocking` для ONNX (не блокировать tokio) |
+| **Naming** | `PascalCase` for agents and types, `snake_case` for methods and variables |
+| **Async** | All agent methods are `async fn` using tokio |
+| **Errors** | `anyhow::Result` everywhere |
+| **State** | `Arc<RwLock<...>>` for shared mutable state |
+| **ML inference** | `spawn_blocking` for ONNX (do not block tokio runtime) |
+| **Edition** | Rust edition 2024 |
+| **Broker trait** | `crate::core::traits::Broker` |
+| **Config** | `trader-bot/config/account.json` loaded via serde JSON |
 
 ## Plugin Manifests
 

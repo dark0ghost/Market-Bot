@@ -1,16 +1,35 @@
 # ─── Data Collection Config for FinBERT SFT ───────────────────────────
 
 rss_feeds:
-  - name: "rbc_macro"
-    url: "https://www.rbc.ru/v8/rss?category=news&tag=macro"
-  - name: "rbc_finance"
-    url: "https://www.rbc.ru/v8/rss?category=news&tag=finance"
   - name: "interfax"
     url: "https://www.interfax.ru/rss.asp"
-  - name: "banki_ru"
-    url: "https://www.banki.ru/news/rss/"
-  - name: "cbr"
-    url: "https://www.cbr.ru/rss/"
+  - name: "cbr_news"
+    url: "https://www.cbr.ru/rss/RssNews"
+  - name: "cbr_events"
+    url: "https://www.cbr.ru/rss/eventrss"
+  - name: "cbr_press"
+    url: "https://www.cbr.ru/rss/RssPress"
+  - name: "vedomosti_finance"
+    url: "https://www.vedomosti.ru/rss/rubric/finance"
+  - name: "vedomosti_banks"
+    url: "https://www.vedomosti.ru/rss/rubric/finance/banks"
+  - name: "tass"
+    url: "https://tass.ru/rss/v2.xml"
+  - name: "prime"
+    url: "https://1prime.ru/export/rss2/index.xml"
+  - name: "banki"
+    url: "https://www.banki.ru/xml/news.rss"
+  - name: "smartlab"
+    url: "https://smart-lab.ru/exchange/rss/"
+  - name: "finmarket"
+    url: "https://www.finmarket.ru/rss/"
+  - name: "rbc"
+    url: "https://www.rbc.ru/rss/"
+
+searxng:
+  base_url: "http://localhost:8080"
+  language: "ru"
+  max_results: 20
 
 perplexica:
   base_url: "http://localhost:3000"
@@ -23,6 +42,20 @@ perplexica:
     - "IPO и размещения акций РФ"
     - "дивиденды российских компаний"
     - "инфляция и макроэкономика РФ"
+
+  ticker_topics:
+    T:
+      - "Т-Технологии акции новости 2026"
+      - "Тинькофф банк новости 2026"
+      - "TCSG TCS группа T-Технологии финансы"
+      - "T-Technologies MOEX тикер T новости"
+      - "Т-Технологии отчетность прибыль дивиденды"
+      - "тинькофф страхование инвестиции 2026"
+    SBER:
+      - "Сбербанк акции новости 2026"
+      - "Сбер финансовые результаты отчетность 2026"
+      - "Sberbank Russia stock news 2026"
+      - "Сбербанк дивиденды стратегия 2026"
 
 ollama:
   base_url: "http://localhost:11434"
@@ -39,5 +72,5 @@ output:
 collection:
   interval_minutes: 60
   max_days_back: 7
-  request_timeout: 15
+  request_timeout: 20
   user_agent: "Mozilla/5.0"
