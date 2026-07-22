@@ -13,7 +13,7 @@ hide:
 
 ```bash
 # 1. Клонируйте репозиторий
-git clone https://gitlab.com/your-username/ai-trade-bot.git
+git clone https://github.com/dark0ghost/ai-trader-bot.git
 cd ai-trade-bot
 
 # 2. Настройте токен
@@ -32,27 +32,18 @@ cargo run -p trader-bot
 
 - **[Что такое AI Trade Bot?](getting-started/what-is.md)** — Обзор возможностей
 - **[Быстрый старт](getting-started/quickstart.md)** — Установка и запуск
-- **[Первые шаги](getting-started/first-steps.md)** — Настройка конфигурации
 
 ### Для пользователей
 
-- **[Руководство пользователя](user-guide/introduction.md)** — Полное руководство
 - **[Конфигурация](user-guide/configuration.md)** — Настройка бота
-- **[Торговые стратегии](user-guide/strategies.md)** — Описание стратегий
-- **[Управление рисками](user-guide/risk-management.md)** — Настройка рисков
 
 ### Для разработчиков
 
-- **[Архитектура](developer-guide/architecture.md)** — Архитектура проекта
 - **[API документация](developer-guide/api.md)** — API референс
-- **[Вклад в проект](developer-guide/contributing.md)** — Как внести вклад
 
 ### Стратегии
 
 - **[Grid Bot](strategies/grid-bot.md)** — Сеточная торговля
-- **[Interval Strategy](strategies/interval.md)** — Интервальная торговля
-- **[Momentum](strategies/momentum.md)** — Торговля по тренду
-- **[Mean Reversion](strategies/mean-reversion.md)** — Возврат к среднему
 
 ## 📊 Возможности
 
@@ -67,9 +58,7 @@ cargo run -p trader-bot
 
 ## 🆘 Поддержка
 
-- [FAQ](faq.md) — Часто задаваемые вопросы
-- [Troubleshooting](troubleshooting.md) — Решение проблем
-- [GitHub Issues](https://github.com/your-username/ai-trade-bot/issues) — Сообщить об ошибке
+- [GitHub Issues](https://github.com/dark0ghost/ai-trader-bot/issues) — Сообщить об ошибке
 
 ## 📝 Лицензия
 

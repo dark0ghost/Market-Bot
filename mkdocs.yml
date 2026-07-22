@@ -1,16 +1,13 @@
 site_name: AI Trade Bot
-site_description: Документация AI Trade Bot — комплексной торговой системы с ИИ
+site_description: AI Trade Bot — AI-powered trading system documentation
 site_author: AI Trade Bot Team
 site_url: https://your-username.gitlab.io/ai-trade-bot/
 
-# Репозиторий
 repo_name: ai-trade-bot
 repo_url: https://gitlab.com/your-username/ai-trade-bot
 
-# Тема
 theme:
   name: material
-  language: ru
   features:
     - navigation.tabs
     - navigation.tabs.sticky
@@ -43,35 +40,31 @@ theme:
   favicon: assets/favicon.ico
   logo: assets/logo.svg
 
-# Навигация
-nav:
-  - Главная: index.md
-  - Быстрый старт:
-    - Что такое AI Trade Bot?: getting-started/what-is.md
-    - Быстрый старт: getting-started/quickstart.md
-    - Первые шаги: getting-started/first-steps.md
-  - Руководство пользователя:
-    - Введение: user-guide/introduction.md
-    - Конфигурация: user-guide/configuration.md
-    - Стратегии: user-guide/strategies.md
-    - Управление рисками: user-guide/risk-management.md
-    - Мониторинг: user-guide/monitoring.md
-  - Стратегии:
-    - Grid Bot: strategies/grid-bot.md
-    - Interval: strategies/interval.md
-    - Momentum: strategies/momentum.md
-    - Mean Reversion: strategies/mean-reversion.md
-  - Разработчикам:
-    - Архитектура: developer-guide/architecture.md
-    - API документация: developer-guide/api.md
-    - Вклад в проект: developer-guide/contributing.md
-    - Changelog: developer-guide/changelog.md
-  - Поддержка:
-    - FAQ: faq.md
-    - Troubleshooting: troubleshooting.md
-
-# Плагины
 plugins:
+  - i18n:
+      docs_structure: folder
+      fallback_to_default: true
+      reconfigure_material: true
+      reconfigure_search: true
+      languages:
+        - locale: en
+          default: true
+          name: English
+          build: true
+        - locale: ru
+          name: Русский
+          build: true
+          nav_translations:
+            Home: Главная
+            "Quick Start": "Быстрый старт"
+            "What is AI Trade Bot?": "Что такое AI Trade Bot?"
+            "User Guide": "Руководство пользователя"
+            Configuration: Конфигурация
+            "Broker Setup": "Настройка брокеров"
+            Strategies: Стратегии
+            "Grid Bot": Grid Bot
+            "Developer Guide": Разработчикам
+            "API Documentation": "API документация"
   - search:
       lang:
         - ru
@@ -84,7 +77,19 @@ plugins:
   - mermaid2:
       version: 9.4.3
 
-# Расширения Markdown
+nav:
+  - Home: index.md
+  - Quick Start:
+    - "What is AI Trade Bot?": getting-started/what-is.md
+    - "Quick Start": getting-started/quickstart.md
+  - User Guide:
+    - Configuration: user-guide/configuration.md
+    - "Broker Setup": user-guide/broker-setup.md
+  - Strategies:
+    - "Grid Bot": strategies/grid-bot.md
+  - Developer Guide:
+    - "API Documentation": developer-guide/api.md
+
 markdown_extensions:
   - admonition
   - attr_list
@@ -134,7 +139,6 @@ markdown_extensions:
       custom_checkbox: true
   - pymdownx.tilde
 
-# Дополнительные CSS/JS
 extra_css:
   - stylesheets/extra.css
 
@@ -143,15 +147,11 @@ extra_javascript:
   - https://polyfill.io/v3/polyfill.min.js?features=es6
   - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
 
-# Переменные
 extra:
   version:
     provider: mike
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/your-username/ai-trade-bot
+      link: https://github.com/dark0ghost/ai-trade-bot
     - icon: fontawesome/brands/telegram
-      link: https://t.me/your-channel
-  analytics:
-    provider: google
-    property: G-XXXXXXXXXX
+      link: https://t.me/ai_trade_bot

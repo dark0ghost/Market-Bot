@@ -305,5 +305,3 @@ reserve = total_buy_capital * 1.5
 ## Следующие шаги
 
 - **[API документация](../developer-guide/api.md)** — API референс
-- **[Управление рисками](../user-guide/risk-management.md)** — Настройка рисков
-- **[Troubleshooting](../troubleshooting.md)** — Решение проблем

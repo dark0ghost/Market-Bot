@@ -120,7 +120,7 @@ git commit -m "Add documentation"
 git push origin main
 
 # Документация автоматически задеплоится через CI/CD
-# URL: https://your-username.gitlab.io/ai-trade-bot/
+# URL: https://dark0ghost.gitlab.io/ai-trader-bot/
 ```
 
 ## ⚙️ Настройка GitLab Pages
@@ -135,7 +135,7 @@ git push origin main
 ### URL документации
 
 ```
-https://your-username.gitlab.io/ai-trade-bot/
+https://dark0ghost.gitlab.io/ai-trader-bot/
 ```
 
 ### Версионирование (опционально)

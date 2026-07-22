@@ -40,7 +40,7 @@ git push origin main
 2. Job `pages` соберет документацию
 3. Документация будет доступна по адресу:
    ```
-   https://your-username.gitlab.io/ai-trade-bot/
+   https://dark0ghost.gitlab.io/ai-trader-bot/
    ```
 
 ### Мониторинг деплоя
@@ -182,10 +182,10 @@ mike deploy --push 0.2.0
 ### Custom Domain
 
 1. В GitLab UI: **Settings → Pages**
-2. Введите домен: `docs.your-domain.com`
+2. Введите домен: `docs.example.com`
 3. Добавьте CNAME запись в DNS:
    ```
-   docs.your-domain.com. CNAME your-username.gitlab.io.
+   docs.example.com. CNAME dark0ghost.gitlab.io.
    ```
 
 ### HTTPS

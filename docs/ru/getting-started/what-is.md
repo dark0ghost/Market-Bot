@@ -114,4 +114,3 @@ graph TD
 
 - **[Быстрый старт](quickstart.md)** — Установка и запуск
 - **[Конфигурация](../user-guide/configuration.md)** — Настройка бота
-- **[Стратегии](../strategies/grid-bot.md)** — Выбор стратегии
