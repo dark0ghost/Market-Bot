@@ -1,48 +1,23 @@
 services:
-  # ─── Layer 2: LLM & Context ────────────────────────────────────────────
-  ollama:
-    build: ollama-mcp/
-    ports:
-      - "11435:11434"
-    container_name: ollama
-    volumes:
-      - ollama_data:/root/.ollama
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
-    environment:
-      - NVIDIA_VISIBLE_DEVICES=all
-    restart: unless-stopped
-
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-    container_name: trade-redis
-    volumes:
-      - redis_data:/data
-    restart: unless-stopped
-
-  # ─── Layer 3: Data Collection ──────────────────────────────────────────
-  data-collector:
+  train:
     build:
       context: .
-      dockerfile: training/data_collection/Dockerfile
-    container_name: trade-collector
-    volumes:
-      - ./training/data_collected:/app/data_collected
+      dockerfile: training/finbert_sft/Dockerfile
+    runtime: nvidia
     environment:
-      - OLLAMA_BASE_URL=http://ollama:11434
-      - REDIS_URL=redis://redis:6379
-    depends_on:
-      - ollama
-      - redis
-    restart: unless-stopped
+      - NVIDIA_VISIBLE_DEVICES=all
+      - CUDA_VISIBLE_DEVICES=${CUDA_DEVICE:-0}
+    volumes:
+      - .:/workspace
+      - huggingface_cache:/root/.cache/huggingface
+    working_dir: /workspace
+    shm_size: 8g
+    deploy:
+      resources:
+        limits:
+          memory: 16g
+        reservations:
+          memory: 4g
 
 volumes:
-  ollama_data:
-  redis_data:
+  huggingface_cache:
