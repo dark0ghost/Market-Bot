@@ -7,5 +7,6 @@ pub use calibration::PredictionTracker;
 pub use memory::DecisionMemory;
 pub use multi_agent::{AnalystAgent, RiskAgent, SupervisorAgent};
 pub use trading_agent::{
-    Action, CurrentPosition, DecisionContext, TimeHorizon, TradingAgent, TradingDecision,
+    Action, CurrentPosition, DecisionContext, LlmQuery, OllamaQuery, TimeHorizon, TradingAgent,
+    TradingDecision,
 };

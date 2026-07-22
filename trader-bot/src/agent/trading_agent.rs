@@ -4,9 +4,36 @@ use crate::analysis::{
 };
 use crate::config::RiskManagementConfig;
 use anyhow::Result;
+use async_trait::async_trait;
 use mcp_client::llm_provider::LLMProvider;
 use mcp_client::ollama::OllamaProvider;
 use serde::{Deserialize, Serialize};
+
+/// Trait abstracting the LLM query interface.
+/// Returns the raw text response from an LLM given a prompt.
+#[async_trait]
+pub trait LlmQuery: Send + Sync {
+    async fn query(&self, prompt: String) -> Result<String>;
+}
+
+/// Wraps the real OllamaProvider into LlmQuery.
+pub struct OllamaQuery {
+    inner: OllamaProvider,
+}
+
+impl OllamaQuery {
+    pub fn new(provider: OllamaProvider) -> Self {
+        Self { inner: provider }
+    }
+}
+
+#[async_trait]
+impl LlmQuery for OllamaQuery {
+    async fn query(&self, prompt: String) -> Result<String> {
+        let resp = self.inner.send_message(prompt).await?;
+        Ok(resp.message.content)
+    }
+}
 
 /// Trading agent decision
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -68,14 +95,14 @@ pub struct CurrentPosition {
 
 /// LLM-based trading agent
 pub struct TradingAgent {
-    llm_provider: OllamaProvider,
+    llm_query: Box<dyn LlmQuery>,
     model_name: String,
 }
 
 impl TradingAgent {
-    pub fn new(llm_provider: OllamaProvider, model_name: String) -> Self {
+    pub fn new(llm_query: Box<dyn LlmQuery>, model_name: String) -> Self {
         TradingAgent {
-            llm_provider,
+            llm_query,
             model_name,
         }
     }
@@ -86,10 +113,10 @@ impl TradingAgent {
         let prompt = self.build_decision_prompt(&context);
 
         // Request to LLM
-        let llm_response = self.llm_provider.send_message(prompt).await?;
+        let llm_response = self.llm_query.query(prompt).await?;
 
         // Parse LLM response
-        let decision = self.parse_llm_response(&llm_response.message.content, &context)?;
+        let decision = self.parse_llm_response(&llm_response, &context)?;
 
         Ok(decision)
     }
@@ -567,39 +594,39 @@ impl TradingAgent {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use async_trait::async_trait;
 
-    #[test]
-    fn test_rule_based_decision_buy() {
-        let context = DecisionContext {
-            ticker: "TTECH".to_string(),
-            company_name: "T-Technologies".to_string(),
-            current_price: 100.0,
-            news_sentiment: Some(NewsSentiment {
-                ticker: "TTECH".to_string(),
-                overall_sentiment: Sentiment::Positive,
-                sentiment_score: 0.5,
-                articles_count: 5,
-                articles: vec![],
-                key_events: vec!["Positive news".to_string()],
-            }),
-            technical_analysis: Some(TechnicalAnalysis {
-                ticker: "TTECH".to_string(),
-                timestamp: chrono::Utc::now(),
-                current_price: 100.0,
-                trend: Trend::Bullish,
-                rsi: Some(45.0),
-                macd: None,
-                bollinger: None,
-                volume_analysis: crate::analysis::VolumeAnalysis {
-                    current_volume: 1000.0,
-                    avg_volume: 500.0,
-                    volume_ratio: 2.0,
-                    is_unusual: true,
-                },
-                support_levels: vec![95.0],
-                resistance_levels: vec![110.0],
-                recommendation: Recommendation::Buy,
-            }),
+    /// Mock LLM provider that returns a predefined JSON response.
+    pub struct MockLlmQuery {
+        response: String,
+    }
+
+    impl MockLlmQuery {
+        pub fn new(response: impl Into<String>) -> Self {
+            Self {
+                response: response.into(),
+            }
+        }
+    }
+
+    #[async_trait]
+    impl LlmQuery for MockLlmQuery {
+        async fn query(&self, _prompt: String) -> Result<String> {
+            Ok(self.response.clone())
+        }
+    }
+
+    fn make_mock_agent(response: &str) -> TradingAgent {
+        TradingAgent::new(Box::new(MockLlmQuery::new(response)), "test".to_string())
+    }
+
+    fn context_basic(ticker: &str, price: f64) -> DecisionContext {
+        DecisionContext {
+            ticker: ticker.to_string(),
+            company_name: "Test Co".to_string(),
+            current_price: price,
+            news_sentiment: None,
+            technical_analysis: None,
             fundamental_analysis: None,
             available_balance: 100000.0,
             current_position: None,
@@ -607,15 +634,199 @@ mod tests {
             max_position_pct: 0.15,
             market_regime: MarketRegime::Quiet,
             candles: vec![],
+        }
+    }
+
+    // ─── LLM decision tests with mock provider ─────────────────────────
+
+    #[tokio::test]
+    async fn test_make_decision_buy() {
+        let json = r#"{
+            "action": "BUY",
+            "confidence": 0.85,
+            "entry_price": 150.0,
+            "position_size_pct": 0.12,
+            "stop_loss": 145.0,
+            "take_profit": 165.0,
+            "rationale": "Strong technical breakout",
+            "risks": ["Market volatility"],
+            "time_horizon": "SHORT"
+        }"#;
+        let agent = make_mock_agent(json);
+        let ctx = context_basic("SBER", 150.0);
+
+        let decision = agent.make_decision(ctx).await.unwrap();
+        assert_eq!(decision.action, Action::Buy);
+        assert!((decision.confidence - 0.85).abs() < 1e-6);
+        assert_eq!(decision.entry_price, Some(150.0));
+        assert!((decision.position_size_pct - 0.12).abs() < 1e-6);
+        assert_eq!(decision.stop_loss, Some(145.0));
+        assert_eq!(decision.take_profit, Some(165.0));
+        assert_eq!(decision.rationale, "Strong technical breakout");
+        assert_eq!(decision.risks, vec!["Market volatility"]);
+        assert_eq!(decision.time_horizon as i32, TimeHorizon::Short as i32);
+        assert_eq!(decision.ticker, "SBER");
+    }
+
+    #[tokio::test]
+    async fn test_make_decision_sell() {
+        let json = r#"{
+            "action": "SELL",
+            "confidence": 0.72,
+            "entry_price": null,
+            "position_size_pct": 0.0,
+            "stop_loss": 260.0,
+            "take_profit": 230.0,
+            "rationale": "Bearish divergence on RSI",
+            "risks": ["Unexpected earnings beat"],
+            "time_horizon": "MEDIUM"
+        }"#;
+        let agent = make_mock_agent(json);
+        let ctx = context_basic("GAZP", 250.0);
+
+        let decision = agent.make_decision(ctx).await.unwrap();
+        assert_eq!(decision.action, Action::Sell);
+        assert!((decision.confidence - 0.72).abs() < 1e-6);
+        assert_eq!(decision.entry_price, None);
+        assert_eq!(decision.rationale, "Bearish divergence on RSI");
+        assert_eq!(decision.time_horizon as i32, TimeHorizon::Medium as i32);
+    }
+
+    #[tokio::test]
+    async fn test_make_decision_hold() {
+        let json = r#"{
+            "action": "HOLD",
+            "confidence": 0.35,
+            "entry_price": null,
+            "position_size_pct": 0.0,
+            "stop_loss": null,
+            "take_profit": null,
+            "rationale": "Unclear market conditions",
+            "risks": [],
+            "time_horizon": "MEDIUM"
+        }"#;
+        let agent = make_mock_agent(json);
+        let ctx = context_basic("VTBR", 50.0);
+
+        let decision = agent.make_decision(ctx).await.unwrap();
+        assert_eq!(decision.action, Action::Hold);
+        assert!(decision.confidence < 0.5);
+        assert_eq!(decision.stop_loss, None);
+        assert_eq!(decision.take_profit, None);
+        assert_eq!(decision.position_size_pct, 0.0);
+    }
+
+    #[tokio::test]
+    async fn test_make_decision_long_time_horizon() {
+        let json = r#"{
+            "action": "BUY",
+            "confidence": 0.9,
+            "entry_price": 2000.0,
+            "position_size_pct": 0.2,
+            "stop_loss": 1800.0,
+            "take_profit": 2500.0,
+            "rationale": "Strong fundamentals, long-term growth",
+            "risks": ["Regulatory risk"],
+            "time_horizon": "LONG"
+        }"#;
+        let agent = make_mock_agent(json);
+        let ctx = context_basic("YNDX", 2000.0);
+
+        let decision = agent.make_decision(ctx).await.unwrap();
+        assert_eq!(decision.action, Action::Buy);
+        assert_eq!(decision.time_horizon as i32, TimeHorizon::Long as i32);
+        assert_eq!(decision.ticker, "YNDX");
+    }
+
+    #[tokio::test]
+    async fn test_make_decision_malformed_json() {
+        let agent = make_mock_agent("This is not JSON at all");
+        let ctx = context_basic("SBER", 100.0);
+
+        let result = agent.make_decision(ctx).await;
+        assert!(result.is_err());
+        assert!(
+            result.unwrap_err().to_string().contains("No JSON found"),
+            "Expected JSON parse error"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_make_decision_partial_json_still_works() {
+        // JSON is embedded in markdown text — common LLM output
+        let md = r#"Here is my analysis:
+
+```json
+{
+    "action": "BUY",
+    "confidence": 0.78,
+    "entry_price": 95.0,
+    "position_size_pct": 0.1,
+    "stop_loss": 90.0,
+    "take_profit": 110.0,
+    "rationale": "Support level bounce",
+    "risks": ["Break below support"],
+    "time_horizon": "SHORT"
+}
+```"#;
+        let agent = make_mock_agent(md);
+        let ctx = context_basic("AFLT", 95.0);
+
+        let decision = agent.make_decision(ctx).await.unwrap();
+        assert_eq!(decision.action, Action::Buy);
+        assert!((decision.confidence - 0.78).abs() < 1e-6);
+        assert_eq!(decision.rationale, "Support level bounce");
+    }
+
+    #[tokio::test]
+    async fn test_make_decision_unknown_action_defaults_to_hold() {
+        let json = r#"{
+            "action": "HODL",
+            "confidence": 1.0,
+            "entry_price": null,
+            "position_size_pct": 0.0,
+            "stop_loss": null,
+            "take_profit": null,
+            "rationale": "To the moon!",
+            "risks": [],
+            "time_horizon": "SHORT"
+        }"#;
+        let agent = make_mock_agent(json);
+        let ctx = context_basic("MEME", 1.0);
+
+        let decision = agent.make_decision(ctx).await.unwrap();
+        assert_eq!(decision.action, Action::Hold);
+    }
+
+    #[tokio::test]
+    async fn test_make_decision_missing_fields_use_defaults() {
+        let json = r#"{"action":"SELL"}"#;
+        let agent = make_mock_agent(json);
+        let ctx = context_basic("T", 50.0);
+
+        let decision = agent.make_decision(ctx).await.unwrap();
+        assert_eq!(decision.action, Action::Sell);
+        assert!((decision.confidence - 0.5).abs() < 1e-6);
+        assert_eq!(decision.entry_price, None);
+        assert_eq!(decision.rationale, "No rationale provided");
+        assert!(decision.risks.is_empty());
+        assert_eq!(decision.time_horizon as i32, TimeHorizon::Medium as i32);
+    }
+
+    #[tokio::test]
+    async fn test_make_decision_current_position_preserved() {
+        let json = r#"{"action":"SELL","confidence":0.6,"entry_price":null,"position_size_pct":0.0,"stop_loss":null,"take_profit":null,"rationale":"Take profit","risks":[],"time_horizon":"SHORT"}"#;
+        let agent = make_mock_agent(json);
+        let ctx = DecisionContext {
+            current_position: Some(CurrentPosition {
+                quantity: 42,
+                average_price: 90.0,
+                current_value: 4200.0,
+            }),
+            ..context_basic("T", 100.0)
         };
 
-        // For the test, a real LLM provider is needed, so skip LLM test
-        // let agent = TradingAgent::new(OllamaProvider::default(), "fin-expert".to_string());
-        // let decision = agent.make_rule_based_decision(context).await.unwrap();
-
-        // Check context structure
-        assert_eq!(context.ticker, "TTECH");
-        assert!(context.news_sentiment.is_some());
-        assert!(context.technical_analysis.is_some());
+        let decision = agent.make_decision(ctx).await.unwrap();
+        assert_eq!(decision.current_position, Some(42));
     }
 }

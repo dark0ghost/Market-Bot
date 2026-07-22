@@ -102,7 +102,7 @@ impl Strategy for AiStrategy {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::agent::{Action, CurrentPosition, DecisionContext, TimeHorizon, TradingDecision};
+    use crate::agent::{Action, CurrentPosition, DecisionContext, OllamaQuery, TimeHorizon, TradingDecision};
     use crate::analysis::{
         BollingerValues, CompanyRating, DividendMetrics, FinancialHealthMetrics,
         FundamentalAnalysis, GrowthMetrics, MacdValues, MarketRegime, ProfitabilityMetrics,
@@ -115,7 +115,7 @@ mod tests {
     #[test]
     fn test_ai_strategy_name_and_kind() {
         let agent = Arc::new(TradingAgent::new(
-            mcp_client::ollama::OllamaProvider::default(),
+            Box::new(OllamaQuery::new(mcp_client::ollama::OllamaProvider::default())),
             "test".to_string(),
         ));
         let config = AiConfig {
@@ -131,7 +131,7 @@ mod tests {
     #[test]
     fn test_ai_strategy_validate() {
         let agent = Arc::new(TradingAgent::new(
-            mcp_client::ollama::OllamaProvider::default(),
+            Box::new(OllamaQuery::new(mcp_client::ollama::OllamaProvider::default())),
             "test".to_string(),
         ));
         let config = AiConfig {
@@ -146,7 +146,7 @@ mod tests {
     #[test]
     fn test_ai_strategy_validate_invalid() {
         let agent = Arc::new(TradingAgent::new(
-            mcp_client::ollama::OllamaProvider::default(),
+            Box::new(OllamaQuery::new(mcp_client::ollama::OllamaProvider::default())),
             "test".to_string(),
         ));
         let config = AiConfig {
@@ -161,7 +161,7 @@ mod tests {
     #[test]
     fn test_ai_strategy_config_access() {
         let agent = Arc::new(TradingAgent::new(
-            mcp_client::ollama::OllamaProvider::default(),
+            Box::new(OllamaQuery::new(mcp_client::ollama::OllamaProvider::default())),
             "test".to_string(),
         ));
         let config = AiConfig {
@@ -179,7 +179,7 @@ mod tests {
 
     fn make_agent() -> TradingAgent {
         TradingAgent::new(
-            mcp_client::ollama::OllamaProvider::default(),
+            Box::new(OllamaQuery::new(mcp_client::ollama::OllamaProvider::default())),
             "test".to_string(),
         )
     }

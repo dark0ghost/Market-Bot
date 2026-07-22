@@ -31,7 +31,7 @@ use t_invest_sdk::api::{FindInstrumentRequest, InstrumentType};
 use t_invest_sdk::{Environment, TInvestSdk};
 use tokio::sync::Mutex;
 
-use agent::{DecisionContext, TradingAgent};
+use agent::{DecisionContext, OllamaQuery, TradingAgent};
 use analysis::{
     FundamentalDataService, NewsAnalyzer, NewsItem, NewsLLMService, NewsSentiment, RegimeDetector,
     TechnicalAnalyzer,
@@ -240,7 +240,10 @@ async fn main() -> Result<()> {
     // ── 6. Strategies ─────────────────────────────────────────────────
     let mut strategy_registry = StrategyRegistry::new();
     for (account, _) in &account_brokers {
-        let agent = Arc::new(TradingAgent::new(ollama.clone(), model_name.clone()));
+        let agent = Arc::new(TradingAgent::new(
+            Box::new(OllamaQuery::new(ollama.clone())),
+            model_name.clone(),
+        ));
         let strategy = create_strategy(account, agent);
         let aid = account.account_id.as_deref().unwrap_or("");
         log::info!("Strategy for {}: {}", aid, strategy.name());
@@ -419,7 +422,10 @@ async fn run_ai_account(
             current_value: p.current_price * p.quantity as f64,
         });
 
-        let agent = TradingAgent::new(ollama.clone(), model_name.to_string());
+        let agent = TradingAgent::new(
+            Box::new(OllamaQuery::new(ollama.clone())),
+            model_name.to_string(),
+        );
         let ctx = DecisionContext {
             ticker: instrument.ticker.clone(),
             company_name: instrument.name.clone(),
