@@ -3,10 +3,9 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
-/// Базовый URL Perplexica по умолчанию
 const DEFAULT_PERPLEXICA_URL: &str = "http://localhost:3000";
 
-/// Провайдер для работы с Perplexica API
+/// Provider for working with the Perplexica API
 pub struct PerplexicaProvider {
     client: Client,
     base_url: String,
@@ -14,22 +13,21 @@ pub struct PerplexicaProvider {
     embedding_model: ModelConfig,
 }
 
-/// Конфигурация модели
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModelConfig {
     pub provider_id: String,
     pub key: String,
 }
 
-/// Режим оптимизации поиска
+/// Search optimization mode
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum OptimizationMode {
-    /// Самая быстрая выдача, меньшее качество
+    /// Fastest results, lower quality
     Speed,
-    /// Баланс между скоростью и качеством
+    /// Balance between speed and quality
     Balanced,
-    /// Лучшее качество, медленнее
+    /// Best quality, slower
     Quality,
 }
 
@@ -39,35 +37,31 @@ impl Default for OptimizationMode {
     }
 }
 
-/// Источник поиска
+/// Search source
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum SearchSource {
-    /// Обычный веб-поиск
+    /// General web search
     Web,
-    /// Академические источники (arxiv, scholar, pubmed)
+    /// Academic sources (arxiv, scholar, pubmed)
     Academic,
-    /// Форумы и обсуждения (reddit и др.)
+    /// Forums and discussions (reddit, etc.)
     Discussions,
 }
 
-/// Режим фокусировки (для /api/chat)
+/// Focus mode (for /api/chat)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum FocusMode {
-    /// Веб-поиск
     WebSearch,
-    /// Академический поиск
     AcademicSearch,
-    /// Поиск на YouTube
     YoutubeSearch,
-    /// Поиск на Reddit
     RedditSearch,
-    /// Помощник в написании (без поиска)
+    /// Writing assistant (no search)
     WritingAssistant,
 }
 
-/// Запрос к Perplexica API
+/// Request to the Perplexica API
 #[derive(Debug, Clone, Serialize)]
 pub struct SearchRequest {
     pub chat_model: ModelConfig,
@@ -84,21 +78,21 @@ pub struct SearchRequest {
     pub stream: Option<bool>,
 }
 
-/// Метаданные источника
+/// Source metadata
 #[derive(Debug, Clone, Deserialize)]
 pub struct SourceMetadata {
     pub title: Option<String>,
     pub url: Option<String>,
 }
 
-/// Источник в ответе
+/// Source in the response
 #[derive(Debug, Clone, Deserialize)]
 pub struct Source {
     pub content: Option<String>,
     pub metadata: Option<SourceMetadata>,
 }
 
-/// Ответ от Perplexica API
+/// Response from the Perplexica API
 #[derive(Debug, Clone, Deserialize)]
 pub struct SearchResponse {
     pub message: Option<String>,
@@ -106,14 +100,14 @@ pub struct SearchResponse {
     pub sources: Vec<Source>,
 }
 
-/// Результат поиска для LLM
+/// Search result for LLM consumption
 #[derive(Debug, Clone)]
 pub struct SearchResult {
     pub answer: String,
     pub sources: Vec<SourceInfo>,
 }
 
-/// Информация об источнике
+/// Source information
 #[derive(Debug, Clone)]
 pub struct SourceInfo {
     pub title: String,
@@ -122,12 +116,12 @@ pub struct SourceInfo {
 }
 
 impl PerplexicaProvider {
-    /// Создать новый PerplexicaProvider с URL по умолчанию
+    /// Create a new PerplexicaProvider with the default URL
     pub fn new(chat_model: ModelConfig, embedding_model: ModelConfig) -> Self {
         Self::with_url(DEFAULT_PERPLEXICA_URL, chat_model, embedding_model)
     }
 
-    /// Создать PerplexicaProvider с кастомным URL
+    /// Create a PerplexicaProvider with a custom URL
     pub fn with_url(base_url: &str, chat_model: ModelConfig, embedding_model: ModelConfig) -> Self {
         let client = Client::builder()
             .timeout(Duration::from_secs(30))
@@ -143,13 +137,13 @@ impl PerplexicaProvider {
         }
     }
 
-    /// Выполнить поисковый запрос
+    /// Run a search query
     pub async fn search(&self, query: &str) -> Result<SearchResult> {
         self.search_with_options(query, None, None, None, Some(OptimizationMode::Balanced))
             .await
     }
 
-    /// Выполнить поисковый запрос с опциями
+    /// Run a search query with optional parameters
     pub async fn search_with_options(
         &self,
         query: &str,
@@ -158,7 +152,7 @@ impl PerplexicaProvider {
         history: Option<Vec<(String, String)>>,
         optimization_mode: Option<OptimizationMode>,
     ) -> Result<SearchResult> {
-        let sources_list = sources
+        let sources_list: Vec<String> = sources
             .unwrap_or(vec![SearchSource::Web])
             .iter()
             .map(|s| match s {
@@ -204,9 +198,8 @@ impl PerplexicaProvider {
             .await
             .context("Failed to parse Perplexica API response")?;
 
-        // Преобразуем ответ в SearchResult
         let answer = api_response.message.unwrap_or_default();
-        let sources_info = api_response
+        let sources_info: Vec<SourceInfo> = api_response
             .sources
             .into_iter()
             .filter_map(|source| {
@@ -229,52 +222,52 @@ impl PerplexicaProvider {
         })
     }
 
-    /// Поиск информации о компании
+    /// Search for company information
     pub async fn search_company(&self, ticker: &str, company_name: &str) -> Result<SearchResult> {
         let query = format!(
-            "{} ({}) акции новости финансовое состояние аналитика",
+            "{} ({}) stocks news financial analysis",
             company_name, ticker
         );
 
         self.search_with_options(
             &query,
             Some(vec![SearchSource::Web, SearchSource::Academic]),
-            Some("Предоставь подробную информацию о компании: финансовые показатели, последние новости, аналитические отчеты, прогнозы."),
+            Some("Provide detailed company information: financial metrics, latest news, analyst reports, forecasts."),
             None,
             Some(OptimizationMode::Quality),
         )
         .await
     }
 
-    /// Поиск новостей по тикеру
+    /// Search for news by ticker
     pub async fn search_news(&self, ticker: &str) -> Result<SearchResult> {
-        let query = format!("{} акции последние новости", ticker);
+        let query = format!("{} stock latest news", ticker);
 
         self.search_with_options(
             &query,
             Some(vec![SearchSource::Web]),
-            Some("Найди последние новости о компании. Укажи дату публикации и источник."),
+            Some("Find the latest news about the company. Include publication date and source."),
             None,
             Some(OptimizationMode::Speed),
         )
         .await
     }
 
-    /// Поиск аналитики по компании
+    /// Search for analyst ratings
     pub async fn search_analyst_ratings(
         &self,
         ticker: &str,
         company_name: &str,
     ) -> Result<SearchResult> {
         let query = format!(
-            "{} {} аналитика рейтинг целевая цена прогноз",
+            "{} {} analyst rating target price forecast",
             ticker, company_name
         );
 
         self.search_with_options(
             &query,
             Some(vec![SearchSource::Web, SearchSource::Academic]),
-            Some("Найди аналитические отчеты, рейтинги и целевые цены от инвестиционных банков и аналитических агентств."),
+            Some("Find analyst reports, ratings, and target prices from investment banks and research agencies."),
             None,
             Some(OptimizationMode::Quality),
         )
@@ -324,7 +317,6 @@ mod tests {
 
     #[test]
     fn test_optimization_mode_default() {
-        // По умолчанию используется Speed (согласно документации Perplexica)
         assert!(matches!(
             OptimizationMode::default(),
             OptimizationMode::Quality
@@ -395,28 +387,28 @@ mod tests {
     }
 }
 
-/// Инструмент для поиска через Perplexica
-/// Используется с LLM для автоматического поиска информации
+/// Search tool using Perplexica
+/// Used with LLM for automatic information retrieval
 pub struct PerplexicaSearcher {
     provider: PerplexicaProvider,
 }
 
 impl PerplexicaSearcher {
-    /// Создать новый поисковой инструмент
+    /// Create a new search tool
     pub fn new(chat_model: ModelConfig, embedding_model: ModelConfig) -> Self {
         PerplexicaSearcher {
             provider: PerplexicaProvider::new(chat_model, embedding_model),
         }
     }
 
-    /// Создать с кастомным URL
+    /// Create with a custom URL
     pub fn with_url(base_url: &str, chat_model: ModelConfig, embedding_model: ModelConfig) -> Self {
         PerplexicaSearcher {
             provider: PerplexicaProvider::with_url(base_url, chat_model, embedding_model),
         }
     }
 
-    /// Поиск информации о компании по тикеру и названию
+    /// Search for company information by ticker and name
     pub async fn search_company_info(
         &self,
         ticker: String,
@@ -425,11 +417,11 @@ impl PerplexicaSearcher {
         let result = self.provider.search_company(&ticker, &company_name).await?;
 
         let mut output = format!(
-            "=== Информация о компании {} ({}) ===\n\n",
+            "=== Company Info: {} ({}) ===\n\n",
             company_name, ticker
         );
         output.push_str(&result.answer);
-        output.push_str("\n\n=== Источники ===\n");
+        output.push_str("\n\n=== Sources ===\n");
 
         for (i, source) in result.sources.iter().enumerate() {
             output.push_str(&format!("{}. {} - {}\n", i + 1, source.title, source.url));
@@ -438,13 +430,13 @@ impl PerplexicaSearcher {
         Ok(output)
     }
 
-    /// Поиск последних новостей
+    /// Search for latest news
     pub async fn search_latest_news(&self, ticker: String) -> Result<String> {
         let result = self.provider.search_news(&ticker).await?;
 
-        let mut output = format!("=== Последние новости по {} ===\n\n", ticker);
+        let mut output = format!("=== Latest News: {} ===\n\n", ticker);
         output.push_str(&result.answer);
-        output.push_str("\n\n=== Источники ===\n");
+        output.push_str("\n\n=== Sources ===\n");
 
         for (i, source) in result.sources.iter().enumerate() {
             output.push_str(&format!("{}. {} - {}\n", i + 1, source.title, source.url));
@@ -453,7 +445,7 @@ impl PerplexicaSearcher {
         Ok(output)
     }
 
-    /// Поиск аналитических рейтингов
+    /// Search for analyst ratings
     pub async fn search_analyst_ratings(
         &self,
         ticker: String,
@@ -465,11 +457,11 @@ impl PerplexicaSearcher {
             .await?;
 
         let mut output = format!(
-            "=== Аналитические рейтинги {} ({}) ===\n\n",
+            "=== Analyst Ratings: {} ({}) ===\n\n",
             company_name, ticker
         );
         output.push_str(&result.answer);
-        output.push_str("\n\n=== Источники ===\n");
+        output.push_str("\n\n=== Sources ===\n");
 
         for (i, source) in result.sources.iter().enumerate() {
             output.push_str(&format!("{}. {} - {}\n", i + 1, source.title, source.url));
@@ -478,12 +470,12 @@ impl PerplexicaSearcher {
         Ok(output)
     }
 
-    /// Общий поисковой запрос
+    /// General search query
     pub async fn search(&self, query: String) -> Result<String> {
         let result = self.provider.search(&query).await?;
 
         let mut output = format!(
-            "=== Результаты поиска ===\n\n{}\n\n=== Источники ===\n",
+            "=== Search Results ===\n\n{}\n\n=== Sources ===\n",
             result.answer
         );
 
