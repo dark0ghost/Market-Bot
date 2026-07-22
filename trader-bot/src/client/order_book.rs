@@ -87,19 +87,19 @@ impl OrderBookService {
         })
     }
 
-    /// Получить только спред (быстрый запрос с depth=1)
+    /// Get only the spread (quick request with depth=1)
     pub async fn get_spread(&self, figi: &str) -> Result<f64> {
         let book = self.get_order_book(figi, 1).await?;
         Ok(book.spread)
     }
 
-    /// Получить среднюю цену (mid-price)
+    /// Get the mid-price
     pub async fn get_mid_price(&self, figi: &str) -> Result<f64> {
         let book = self.get_order_book(figi, 1).await?;
         Ok(book.mid_price)
     }
 
-    /// Получить ликвидность на N уровней
+    /// Get liquidity at N levels
     pub async fn get_liquidity(&self, figi: &str, depth: i32) -> Result<LiquidityInfo> {
         let book = self.get_order_book(figi, depth).await?;
 

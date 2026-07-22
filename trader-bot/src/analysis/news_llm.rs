@@ -4,7 +4,7 @@ use mcp_client::llm_provider::LLMProvider;
 use mcp_client::ollama::OllamaProvider;
 use std::sync::Arc;
 
-/// Сервис для LLM-анализа новостей
+/// Service for LLM news analysis
 pub struct NewsLLMService {
     llm_provider: Arc<OllamaProvider>,
 }
@@ -16,7 +16,7 @@ impl NewsLLMService {
         }
     }
 
-    /// Анализ тональности новости
+    /// Analyze news sentiment
     pub async fn analyze_sentiment(
         &self,
         title: &str,
@@ -30,7 +30,7 @@ impl NewsLLMService {
         Ok(result)
     }
 
-    /// Анализ набора новостей для инструмента
+    /// Analyze a batch of news for an instrument
     pub async fn analyze_news_batch(
         &self,
         ticker: &str,
@@ -45,34 +45,34 @@ impl NewsLLMService {
         Ok(result)
     }
 
-    /// Построение промпта для анализа одной новости
+    /// Build prompt for analyzing a single news item
     fn build_sentiment_prompt(&self, title: &str, content: &str) -> String {
         format!(
-            r#"Ты - финансовый аналитик. Проанализируй новость и определи её тональность для инвесторов.
+            r#"You are a financial analyst. Analyze the news and determine its sentiment for investors.
 
-Заголовок: {}
-Содержание: {}
+Title: {}
+Content: {}
 
-Оцени тональность по шкале от -1.0 до 1.0:
-- -1.0 = крайне негативно для акций компании
-- 0.0 = нейтрально
-- 1.0 = крайне позитивно для акций компании
+Rate the sentiment on a scale from -1.0 to 1.0:
+- -1.0 = extremely negative for the company's stock
+- 0.0 = neutral
+- 1.0 = extremely positive for the company's stock
 
-Также выдели ключевые события из новости.
+Also extract key events from the news.
 
-Ответь в формате JSON:
+Respond in JSON format:
 {{
-    "sentiment_score": число от -1.0 до 1.0,
+    "sentiment_score": number from -1.0 to 1.0,
     "sentiment": "Positive" | "Negative" | "Neutral",
-    "key_events": ["событие 1", "событие 2"],
-    "confidence": число от 0.0 до 1.0,
-    "explanation": "краткое объяснение"
+    "key_events": ["event 1", "event 2"],
+    "confidence": number from 0.0 to 1.0,
+    "explanation": "brief explanation"
 }}"#,
             title, content
         )
     }
 
-    /// Построение промпта для анализа набора новостей
+    /// Build prompt for analyzing a batch of news items
     fn build_batch_prompt(
         &self,
         ticker: &str,
@@ -85,33 +85,33 @@ impl NewsLLMService {
         }
 
         format!(
-            r#"Ты - профессиональный торговый аналитик. Проанализируй новостной фон по компании {} (тикер: {}).
+            r#"You are a professional trading analyst. Analyze the news background for company {} (ticker: {}).
 
-Список последних новостей:
+Latest news:
 {}
 
-Задачи:
-1. Определи общий сентимент новостей для акций компании
-2. Выдели ключевые события, которые могут повлиять на цену акций
-3. Оцени степень влияния новостей на инвестиционную привлекательность
+Tasks:
+1. Determine the overall news sentiment for the company's stock
+2. Identify key events that may affect the stock price
+3. Assess the degree of news impact on investment attractiveness
 
-Ответь в формате JSON:
+Respond in JSON format:
 {{
     "overall_sentiment": "Positive" | "Negative" | "Neutral",
-    "sentiment_score": число от -1.0 до 1.0,
-    "key_events": ["событие 1", "событие 2"],
-    "risks": ["риск 1", "риск 2"],
-    "opportunities": ["возможность 1", "возможность 2"],
-    "summary": "краткое резюме новостного фона",
-    "confidence": число от 0.0 до 1.0
+    "sentiment_score": number from -1.0 to 1.0,
+    "key_events": ["event 1", "event 2"],
+    "risks": ["risk 1", "risk 2"],
+    "opportunities": ["opportunity 1", "opportunity 2"],
+    "summary": "brief summary of the news background",
+    "confidence": number from 0.0 to 1.0
 }}"#,
             company_name, ticker, news_text
         )
     }
 
-    /// Парсинг ответа для одной новости
+    /// Parse response for a single news item
     fn parse_sentiment_response(&self, content: &str) -> Result<NewsSentimentResult> {
-        // Поиск JSON в ответе
+        // Find JSON in response
         let json_start = content.find('{').unwrap_or(0);
         let json_end = content.rfind('}').unwrap_or(content.len());
         let json_str = &content[json_start..=json_end];
@@ -148,9 +148,9 @@ impl NewsLLMService {
         })
     }
 
-    /// Парсинг ответа для набора новостей
+    /// Parse response for a batch of news items
     fn parse_batch_response(&self, content: &str) -> Result<BatchSentimentResult> {
-        // Поиск JSON в ответе
+        // Find JSON in response
         let json_start = content.find('{').unwrap_or(0);
         let json_end = content.rfind('}').unwrap_or(content.len());
         let json_str = &content[json_start..=json_end];
@@ -208,7 +208,7 @@ impl NewsLLMService {
     }
 }
 
-/// Результат анализа одной новости
+/// Result of analyzing a single news item
 #[derive(Debug, Clone)]
 pub struct NewsSentimentResult {
     pub sentiment: Sentiment,
@@ -218,7 +218,7 @@ pub struct NewsSentimentResult {
     pub explanation: String,
 }
 
-/// Результат анализа набора новостей
+/// Result of analyzing a batch of news items
 #[derive(Debug, Clone)]
 pub struct BatchSentimentResult {
     pub overall_sentiment: Sentiment,
@@ -230,7 +230,7 @@ pub struct BatchSentimentResult {
     pub summary: String,
 }
 
-/// Элемент новости для анализа
+/// News item for analysis
 #[derive(Debug, Clone)]
 pub struct NewsItem {
     pub title: String,

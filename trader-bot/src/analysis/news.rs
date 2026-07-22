@@ -3,7 +3,7 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
-/// Результат поиска новостей
+/// News search result
 #[derive(Debug, Clone)]
 pub struct NewsArticle {
     pub title: String,
@@ -14,7 +14,7 @@ pub struct NewsArticle {
     pub sentiment: Option<Sentiment>,
 }
 
-/// Тональность новости
+/// News sentiment
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Sentiment {
     Positive,
@@ -23,8 +23,8 @@ pub enum Sentiment {
 }
 
 impl Sentiment {
-    /// Конвертация в числовое значение
-    pub fn to_score(&self) -> f64 {
+    /// Convert to numeric value
+    pub const fn to_score(&self) -> f64 {
         match self {
             Sentiment::Positive => 1.0,
             Sentiment::Negative => -1.0,
@@ -32,8 +32,8 @@ impl Sentiment {
         }
     }
 
-    /// Конвертация из числового значения
-    pub fn from_score(score: f64) -> Self {
+    /// Convert from numeric value
+    pub const fn from_score(score: f64) -> Self {
         if score > 0.2 {
             Sentiment::Positive
         } else if score < -0.2 {
@@ -54,18 +54,18 @@ impl std::fmt::Display for Sentiment {
     }
 }
 
-/// Агрегированный новостной фон по инструменту
+/// Aggregated news sentiment by instrument
 #[derive(Debug, Clone)]
 pub struct NewsSentiment {
     pub ticker: String,
     pub overall_sentiment: Sentiment,
-    pub sentiment_score: f64, // от -1.0 до 1.0
+    pub sentiment_score: f64, // from -1.0 to 1.0
     pub articles_count: usize,
     pub articles: Vec<NewsArticle>,
     pub key_events: Vec<String>,
 }
 
-/// Сервис для анализа новостей
+/// News analysis service
 pub struct NewsAnalyzer {
     client: Client,
     sources: Vec<String>,
@@ -82,11 +82,11 @@ impl NewsAnalyzer {
         NewsAnalyzer { client, sources }
     }
 
-    /// Анализ новостей по инструменту
+    /// Analyze news by instrument
     pub async fn analyze(&self, ticker: &str, company_name: &str) -> Result<NewsSentiment> {
         let mut articles = Vec::new();
 
-        // Поиск новостей по источникам
+        // Search news by sources
         for source in &self.sources {
             match source.as_str() {
                 "tinkoff" => {
@@ -107,7 +107,7 @@ impl NewsAnalyzer {
             }
         }
 
-        // Анализ тональности
+        // Sentiment analysis
         let sentiment_score = self.calculate_sentiment_score(&articles).await?;
         let overall_sentiment = self.score_to_sentiment(sentiment_score);
         let key_events = self.extract_key_events(&articles).await?;
@@ -122,45 +122,45 @@ impl NewsAnalyzer {
         })
     }
 
-    /// Поиск новостей в источнике Tinkoff
+    /// Search news in Tinkoff source
     async fn search_tinkoff_news(&self, ticker: &str) -> Result<Vec<NewsArticle>> {
-        // Используем DuckDuckGo для поиска новостей Tinkoff Invest
-        let query = format!("{} акции новости site:tinkoff.ru", ticker);
+        // Use DuckDuckGo to search Tinkoff Invest news
+        let query = format!("{} stock news site:tinkoff.ru", ticker);
         let articles = self.duckduckgo_search(&query).await?;
         Ok(articles)
     }
 
-    /// Поиск новостей в Investing.com
+    /// Search news on Investing.com
     async fn search_investing_news(&self, ticker: &str) -> Result<Vec<NewsArticle>> {
-        let query = format!("{} акции новости сайт:investing.com", ticker);
+        let query = format!("{} stock news site:investing.com", ticker);
         let articles = self.duckduckgo_search(&query).await?;
         Ok(articles)
     }
 
-    /// Поиск новостей в Bloomberg
+    /// Search news on Bloomberg
     async fn search_bloomberg_news(&self, company_name: &str) -> Result<Vec<NewsArticle>> {
         let query = format!("{} stock news site:bloomberg.com", company_name);
         let articles = self.duckduckgo_search(&query).await?;
         Ok(articles)
     }
 
-    /// Поиск через DuckDuckGo
+    /// Search via DuckDuckGo
     async fn duckduckgo_search(&self, query: &str) -> Result<Vec<NewsArticle>> {
-        // Примечание: Это упрощенная реализация
-        // В продакшене нужно использовать полноценный API или парсинг
+        // Note: This is a simplified implementation
+        // In production, use a full API or parsing
         let url = format!("https://html.duckduckgo.com/html/?q={}", query);
 
         match self.client.get(&url).send().await {
             Ok(response) => {
                 let text = response.text().await?;
-                // Упрощенный парсинг - в реальности нужно использовать HTML парсер
-                Ok(vec![]) // Заглушка - реальная реализация через task agent
+                // Simplified parsing - in reality, use an HTML parser
+                Ok(vec![]) // Placeholder - real implementation via task agent
             }
             Err(_) => Ok(vec![]),
         }
     }
 
-    /// Расчет общего sentiment score
+    /// Calculate overall sentiment score
     async fn calculate_sentiment_score(&self, articles: &[NewsArticle]) -> Result<f64> {
         if articles.is_empty() {
             return Ok(0.0);
@@ -174,32 +174,32 @@ impl NewsAnalyzer {
         Ok(total_score / articles.len() as f64)
     }
 
-    /// Конвертация score в Sentiment
+    /// Convert score to Sentiment
     fn score_to_sentiment(&self, score: f64) -> Sentiment {
         Sentiment::from_score(score)
     }
 
-    /// Извлечение ключевых событий из новостей
+    /// Extract key events from news
     async fn extract_key_events(&self, articles: &[NewsArticle]) -> Result<Vec<String>> {
-        // Здесь будет LLM анализ для извлечения ключевых событий
-        // Например: "расконвертация", "дивиденды", "отчетность"
+        // LLM analysis will be here for extracting key events
+        // For example: "reconversion", "dividends", "financial reports"
         let mut events = Vec::new();
 
         for article in articles {
             let title_lower = article.title.to_lowercase();
 
-            if title_lower.contains("расконверт") {
-                events.push("Расконвертация акций".to_string());
+            if title_lower.contains("reconversion") || title_lower.contains("conversion") {
+                events.push("Stock reconversion".to_string());
             }
-            if title_lower.contains("дивиденд") {
-                events.push("Дивидендные выплаты".to_string());
+            if title_lower.contains("dividend") {
+                events.push("Dividend payments".to_string());
             }
-            if title_lower.contains("отчет") || title_lower.contains("финансовый результат")
+            if title_lower.contains("report") || title_lower.contains("financial result")
             {
-                events.push("Финансовая отчетность".to_string());
+                events.push("Financial reporting".to_string());
             }
-            if title_lower.contains("санкц") || title_lower.contains("ограничен") {
-                events.push("Санкционное давление".to_string());
+            if title_lower.contains("sanction") || title_lower.contains("restrict") {
+                events.push("Sanctions pressure".to_string());
             }
         }
 
@@ -242,7 +242,7 @@ mod tests {
 
     #[test]
     fn test_sentiment_roundtrip() {
-        // Проверяем, что from_score(to_score(x)) == x
+        // Check that from_score(to_score(x)) == x
         assert_eq!(
             Sentiment::from_score(Sentiment::Positive.to_score()),
             Sentiment::Positive

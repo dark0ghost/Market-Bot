@@ -1,10 +1,10 @@
 use std::env;
 use std::ffi::OsStr;
 
-/// Получить переменную окружения
+/// Get environment variable
 ///
 /// # Errors
-/// Возвращает ошибку, если переменная окружения не установлена
+/// Returns an error if the environment variable is not set
 pub fn from_env<K: AsRef<OsStr>>(name: K) -> Result<String, std::env::VarError> {
     env::var(name)
 }

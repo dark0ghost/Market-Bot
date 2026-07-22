@@ -9,7 +9,7 @@ pub enum MarketRegime {
 }
 
 impl MarketRegime {
-    pub fn weight_adjustment(&self) -> f64 {
+    pub const fn weight_adjustment(&self) -> f64 {
         match self {
             MarketRegime::Trending => 1.2,
             MarketRegime::Ranging => 1.0,

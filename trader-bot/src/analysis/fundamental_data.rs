@@ -6,7 +6,7 @@ use anyhow::Result;
 use reqwest::Client;
 use std::time::Duration;
 
-/// Сервис для сбора фундаментальных данных
+/// Service for collecting fundamental data
 pub struct FundamentalDataService {
     client: Client,
 }
@@ -22,29 +22,29 @@ impl FundamentalDataService {
         FundamentalDataService { client }
     }
 
-    /// Получение фундаментальных данных по тикеру
+    /// Get fundamental data by ticker
     ///
-    /// В продакшене здесь будет интеграция с:
-    /// - Tinkoff API (финансовые показатели компаний)
+    /// In production, this will integrate with:
+    /// - Tinkoff API (company financial metrics)
     /// - Finviz API
     /// - Bloomberg API
-    /// - Открытые источники ( Мосбиржа, сайт компании)
+    /// - Open sources (MOEX, company website)
     pub async fn get_fundamental_data(
         &self,
         ticker: &str,
         company_name: &str,
     ) -> Result<Option<FundamentalAnalysis>> {
-        // Заглушка - в реальности здесь будет загрузка из API
-        // Для примера возвращаем None, чтобы использовать rule-based решение
+        // Placeholder - in reality, load from API
+        // For example, return None to use rule-based decision
 
         log::info!(
-            "Загрузка фундаментальных данных для {} ({})...",
+            "Loading fundamental data for {} ({})...",
             ticker,
             company_name
         );
 
-        // Пример данных для Т-Технологии (искусственные данные для демонстрации)
-        if ticker == "TTECH" {
+        // Example data for T-Technologies (synthetic data for demonstration)
+        if ticker == "T" {
             let analyzer = FundamentalAnalyzer::default();
 
             let valuation = ValuationMetrics {
@@ -103,13 +103,13 @@ impl FundamentalDataService {
             return Ok(Some(analysis));
         }
 
-        // Для остальных компаний - None (нет данных)
+        // For other companies - None (no data)
         Ok(None)
     }
 
-    /// Получение отраслевых средних значений
+    /// Get industry average values
     pub async fn get_industry_averages(&self, sector: &str) -> Result<Option<IndustryAverages>> {
-        // Заглушка - в реальности загрузка из внешних источников
+        // Placeholder - in reality, load from external sources
         match sector {
             "technology" => Ok(Some(IndustryAverages {
                 pe_ratio: Some(25.0),

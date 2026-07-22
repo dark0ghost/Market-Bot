@@ -36,6 +36,9 @@ pub mod api;
 /// ONNX-based ML inference (FinBERT, etc.)
 pub mod ml_inference;
 
+/// Polymorphic logging infrastructure
+pub mod logging;
+
 // ─── Re-exports for backward compatibility ───────────────────────────
 
 pub use analysis::{NewsArticle, NewsSentiment, Sentiment};

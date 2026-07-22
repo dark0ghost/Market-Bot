@@ -3,7 +3,7 @@ use anyhow::Result;
 use t_invest_sdk::TInvestSdk;
 use t_invest_sdk::api::{GetAccountsRequest, PortfolioPosition, PortfolioRequest};
 
-/// Сервис для работы с портфелем и счетами
+/// Service for working with portfolio and accounts
 pub struct PortfolioService {
     sdk: TInvestSdk,
     account_id: String,
@@ -14,10 +14,10 @@ impl PortfolioService {
         PortfolioService { sdk, account_id }
     }
 
-    /// Получение списка счетов
+    /// Get account list
     pub async fn get_accounts(&self) -> Result<Vec<AccountInfo>> {
         let request = GetAccountsRequest {
-            status: None, // Все счета
+            status: None, // All accounts
         };
         let response = self.sdk.users().get_accounts(request).await?;
         let accounts_response = response.into_inner();
@@ -36,7 +36,7 @@ impl PortfolioService {
         Ok(accounts)
     }
 
-    /// Получение текущего портфеля
+    /// Get current portfolio
     pub async fn get_portfolio(&self) -> Result<PortfolioInfo> {
         let request = PortfolioRequest {
             account_id: self.account_id.clone(),
@@ -68,11 +68,11 @@ impl PortfolioService {
         })
     }
 
-    /// Получение доступного баланса (свободные деньги)
+    /// Get available balance (free cash)
     pub async fn get_available_balance(&self) -> Result<f64> {
         let portfolio = self.get_portfolio().await?;
 
-        // Получаем баланс в рублях - ищем денежные позиции
+        // Get balance in rubles - look for cash positions
         let rub_balance = portfolio
             .positions
             .iter()
@@ -83,7 +83,7 @@ impl PortfolioService {
         Ok(rub_balance)
     }
 
-    /// Получение текущей позиции по инструменту
+    /// Get current position by instrument
     pub async fn get_position(&self, instrument_uid: &str) -> Result<Option<CurrentPosition>> {
         let portfolio = self.get_portfolio().await?;
 
@@ -100,14 +100,14 @@ impl PortfolioService {
         Ok(None)
     }
 
-    /// Получение всех открытых позиций
+    /// Get all open positions
     pub async fn get_all_positions(&self) -> Result<Vec<PositionInfo>> {
         let portfolio = self.get_portfolio().await?;
         Ok(portfolio.positions)
     }
 }
 
-/// Информация о счете
+/// Account information
 #[derive(Debug, Clone)]
 pub struct AccountInfo {
     pub id: String,
@@ -116,7 +116,7 @@ pub struct AccountInfo {
     pub access_level: i32,
 }
 
-/// Информация о портфеле
+/// Portfolio information
 #[derive(Debug, Clone)]
 pub struct PortfolioInfo {
     pub total_amount: f64,
@@ -124,7 +124,7 @@ pub struct PortfolioInfo {
     pub virtual_positions: Vec<PositionInfo>,
 }
 
-/// Информация о позиции
+/// Position information
 #[derive(Debug, Clone)]
 pub struct PositionInfo {
     pub uid: String,

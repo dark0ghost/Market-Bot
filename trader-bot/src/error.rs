@@ -1,129 +1,129 @@
-//! Типы ошибок для торгового бота
+//! Error types for the trading bot
 
 use thiserror::Error;
 
-/// Ошибки торгового бота
+/// Trading bot errors
 #[derive(Error, Debug)]
 pub enum BotError {
-    /// Ошибка при работе с позициями
-    #[error("Ошибка позиции: {0}")]
+    /// Position error
+    #[error("Position error: {0}")]
     Position(String),
 
-    /// Ошибка при исполнении ордера
-    #[error("Ошибка исполнения ордера: {0}")]
+    /// Order execution error
+    #[error("Order execution error: {0}")]
     OrderExecution(String),
 
-    /// Ошибка стратегии
-    #[error("Ошибка стратегии: {0}")]
+    /// Strategy error
+    #[error("Strategy error: {0}")]
     Strategy(String),
 
-    /// Ошибка анализа рынка
-    #[error("Ошибка анализа рынка: {0}")]
+    /// Market analysis error
+    #[error("Market analysis error: {0}")]
     MarketAnalysis(String),
 
-    /// Ошибка LLM
-    #[error("Ошибка LLM: {0}")]
+    /// LLM error
+    #[error("LLM error: {0}")]
     LLM(String),
 
-    /// Ошибка конфигурации
-    #[error("Ошибка конфигурации: {0}")]
+    /// Configuration error
+    #[error("Configuration error: {0}")]
     Configuration(String),
 
-    /// Ошибка сети
-    #[error("Ошибка сети: {0}")]
+    /// Network error
+    #[error("Network error: {0}")]
     Network(#[from] reqwest::Error),
 
-    /// Ошибка SDK
-    #[error("Ошибка SDK: {0}")]
+    /// SDK error
+    #[error("SDK error: {0}")]
     SDK(String),
 
-    /// Grid не инициализирован
-    #[error("Grid стратегия не инициализирована")]
+    /// Grid not initialized
+    #[error("Grid strategy not initialized")]
     GridNotInitialized,
 
-    /// Недостаточно средств
-    #[error("Недостаточно средств: требуется {required}, доступно {available}")]
+    /// Insufficient funds
+    #[error("Insufficient funds: required {required}, available {available}")]
     InsufficientFunds { required: f64, available: f64 },
 
-    /// Некорректное количество
-    #[error("Некорректное количество: {0}")]
+    /// Invalid quantity
+    #[error("Invalid quantity: {0}")]
     InvalidQuantity(String),
 
-    /// Некорректная цена
-    #[error("Некорректная цена: {0}")]
+    /// Invalid price
+    #[error("Invalid price: {0}")]
     InvalidPrice(String),
 }
 
-/// Ошибки исполнения ордера
+/// Order execution errors
 #[derive(Error, Debug)]
 pub enum OrderError {
-    /// Ордер отклонён
-    #[error("Ордер отклонён: {0}")]
+    /// Order rejected
+    #[error("Order rejected: {0}")]
     Rejected(String),
 
-    /// Ордер не найден
-    #[error("Ордер не найден: {order_id}")]
+    /// Order not found
+    #[error("Order not found: {order_id}")]
     NotFound { order_id: String },
 
-    /// Недостаточно ликвидности
-    #[error("Недостаточно ликвидности для исполнения ордера")]
+    /// Insufficient liquidity
+    #[error("Insufficient liquidity to execute order")]
     InsufficientLiquidity,
 
-    /// Превышен лимит цены
-    #[error("Цена вышла за допустимые пределы: {price}")]
+    /// Price limit exceeded
+    #[error("Price exceeded allowed limits: {price}")]
     PriceLimitExceeded { price: f64 },
 
-    /// Ошибка валидации ордера
-    #[error("Валидация ордера не пройдена: {0}")]
+    /// Order validation error
+    #[error("Order validation failed: {0}")]
     ValidationError(String),
 }
 
-/// Ошибки стратегии
+/// Strategy errors
 #[derive(Error, Debug)]
 pub enum StrategyError {
-    /// Стратегия не инициализирована
-    #[error("Стратегия не инициализирована")]
+    /// Strategy not initialized
+    #[error("Strategy not initialized")]
     NotInitialized,
 
-    /// Некорректная конфигурация
-    #[error("Некорректная конфигурация: {0}")]
+    /// Invalid configuration
+    #[error("Invalid configuration: {0}")]
     InvalidConfig(String),
 
-    /// Ошибка расчёта
-    #[error("Ошибка расчёта: {0}")]
+    /// Calculation error
+    #[error("Calculation error: {0}")]
     Calculation(String),
 }
 
-/// Ошибки анализа новостей
+/// News analysis errors
 #[derive(Error, Debug)]
 pub enum NewsAnalysisError {
-    /// Не удалось получить новости
-    #[error("Не удалось получить новости: {0}")]
+    /// Failed to fetch news
+    #[error("Failed to fetch news: {0}")]
     FetchError(String),
 
-    /// Ошибка парсинга
-    #[error("Ошибка парсинга новостей: {0}")]
+    /// Parse error
+    #[error("News parse error: {0}")]
     ParseError(String),
 
-    /// Ошибка LLM анализа
-    #[error("Ошибка LLM анализа: {0}")]
+    /// LLM analysis error
+    #[error("LLM analysis error: {0}")]
     LLMError(String),
 
-    /// Нет данных для анализа
-    #[error("Нет данных для анализа")]
+    /// No data for analysis
+    #[error("No data for analysis")]
     NoData,
 }
 
-/// Результат с ошибкой бота
+/// Result with bot error
 pub type BotResult<T> = Result<T, BotError>;
 
-/// Результат с ошибкой ордера
+/// Result with order error
 pub type OrderResult<T> = Result<T, OrderError>;
 
-/// Результат с ошибкой стратегии
+/// Result with strategy error
 pub type StrategyResult<T> = Result<T, StrategyError>;
 
-/// Результат с ошибкой анализа новостей
+/// Result with news analysis error
 pub type NewsAnalysisResult<T> = Result<T, NewsAnalysisError>;
 
 #[cfg(test)]
@@ -133,14 +133,14 @@ mod tests {
     #[test]
     fn test_bot_error_display() {
         let err = BotError::Position("test error".to_string());
-        assert!(err.to_string().contains("Ошибка позиции"));
+        assert!(err.to_string().contains("Position error"));
         assert!(err.to_string().contains("test error"));
 
         let err = BotError::OrderExecution("order failed".to_string());
-        assert!(err.to_string().contains("Ошибка исполнения ордера"));
+        assert!(err.to_string().contains("Order execution error"));
 
         let err = BotError::Strategy("invalid config".to_string());
-        assert!(err.to_string().contains("Ошибка стратегии"));
+        assert!(err.to_string().contains("Strategy error"));
 
         let err = BotError::InsufficientFunds {
             required: 100.0,
@@ -167,7 +167,7 @@ mod tests {
     #[test]
     fn test_strategy_error_display() {
         let err = StrategyError::NotInitialized;
-        assert!(err.to_string().contains("инициализирована"));
+        assert!(err.to_string().contains("not initialized"));
 
         let err = StrategyError::InvalidConfig("missing field".to_string());
         assert!(err.to_string().contains("missing field"));
@@ -176,9 +176,9 @@ mod tests {
     #[test]
     fn test_news_analysis_error_display() {
         let err = NewsAnalysisError::FetchError("network timeout".to_string());
-        assert!(err.to_string().contains("Не удалось получить новости"));
+        assert!(err.to_string().contains("Failed to fetch news"));
 
         let err = NewsAnalysisError::NoData;
-        assert!(err.to_string().contains("Нет данных"));
+        assert!(err.to_string().contains("No data"));
     }
 }

@@ -68,7 +68,7 @@ impl CronScheduler {
         Ok(())
     }
 
-    pub fn task_count(&self) -> usize {
+    pub const fn task_count(&self) -> usize {
         self.tasks.len()
     }
 }

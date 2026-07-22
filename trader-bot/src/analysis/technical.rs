@@ -6,7 +6,7 @@ use ta::{
     indicators::{BollingerBands, MovingAverageConvergenceDivergence, RelativeStrengthIndex},
 };
 
-/// Извлечение цены из Quotation
+/// Extract price from Quotation
 fn extract_price(quotation: &Option<Quotation>) -> Result<f64> {
     match quotation {
         Some(q) => Ok(q.units as f64 + (q.nano as f64 / 1_000_000_000.0)),
@@ -14,7 +14,7 @@ fn extract_price(quotation: &Option<Quotation>) -> Result<f64> {
     }
 }
 
-/// Результат технического анализа
+/// Technical analysis result
 #[derive(Debug, Clone)]
 pub struct TechnicalAnalysis {
     pub ticker: String,
@@ -30,7 +30,7 @@ pub struct TechnicalAnalysis {
     pub recommendation: Recommendation,
 }
 
-/// Направление тренда
+/// Trend direction
 #[derive(Debug, Clone, PartialEq)]
 pub enum Trend {
     Bullish,
@@ -38,7 +38,7 @@ pub enum Trend {
     Sideways,
 }
 
-/// Значения MACD
+/// MACD values
 #[derive(Debug, Clone)]
 pub struct MacdValues {
     pub macd_line: f64,
@@ -46,7 +46,7 @@ pub struct MacdValues {
     pub histogram: f64,
 }
 
-/// Полосы Боллинджера
+/// Bollinger Bands
 #[derive(Debug, Clone)]
 pub struct BollingerValues {
     pub upper: f64,
@@ -55,7 +55,7 @@ pub struct BollingerValues {
     pub bandwidth: f64,
 }
 
-/// Анализ объема
+    /// Volume analysis
 #[derive(Debug, Clone)]
 pub struct VolumeAnalysis {
     pub current_volume: f64,
@@ -64,7 +64,7 @@ pub struct VolumeAnalysis {
     pub is_unusual: bool,
 }
 
-/// Рекомендация по действию
+/// Action recommendation
 #[derive(Debug, Clone, PartialEq)]
 pub enum Recommendation {
     StrongBuy,
@@ -74,7 +74,7 @@ pub enum Recommendation {
     StrongSell,
 }
 
-/// Сервис технического анализа
+/// Technical analysis service
 pub struct TechnicalAnalyzer {
     rsi_period: usize,
     macd_fast: usize,
@@ -96,14 +96,14 @@ impl TechnicalAnalyzer {
         }
     }
 
-    /// Анализ свечных данных
+    /// Analyze candlestick data
     pub fn analyze(
         &self,
         ticker: &str,
         candles: &[t_invest_sdk::api::HistoricCandle],
     ) -> Result<TechnicalAnalysis> {
         if candles.is_empty() {
-            // Возвращаем дефолтный анализ если нет данных
+            // Return default analysis if no data
             return Ok(TechnicalAnalysis {
                 ticker: ticker.to_string(),
                 timestamp: chrono::Utc::now(),
@@ -128,13 +128,13 @@ impl TechnicalAnalyzer {
         let current_price = extract_price(&current_candle.close)?;
         let current_time = current_candle.time.clone().unwrap_or_default();
 
-        // Извлечение цен закрытия
+        // Extract closing prices
         let closes: Vec<f64> = candles
             .iter()
             .filter_map(|c| extract_price(&c.close).ok())
             .collect();
 
-        // Извлечение объемов - HistoricCandle.volume это i64
+        // Extract volumes - HistoricCandle.volume is i64
         let volumes: Vec<f64> = candles.iter().map(|c| c.volume as f64).collect();
 
         // RSI
@@ -146,16 +146,16 @@ impl TechnicalAnalyzer {
         // Bollinger Bands
         let bollinger = self.calculate_bollinger(&closes);
 
-        // Анализ объема
+        // Volume analysis
         let volume_analysis = self.analyze_volume(&volumes);
 
-        // Определение тренда
+        // Determine trend
         let trend = self.determine_trend(&closes, rsi.as_ref(), macd.as_ref());
 
-        // Уровни поддержки и сопротивления
+        // Support and resistance levels
         let (support, resistance) = self.find_support_resistance(&closes);
 
-        // Итоговая рекомендация
+        // Final recommendation
         let recommendation = self.generate_recommendation(
             &trend,
             rsi.as_ref(),
@@ -181,7 +181,7 @@ impl TechnicalAnalyzer {
         })
     }
 
-    /// Расчет RSI
+    /// Calculate RSI
     fn calculate_rsi(&self, prices: &[f64]) -> Option<f64> {
         if prices.len() < self.rsi_period {
             return None;
@@ -197,7 +197,7 @@ impl TechnicalAnalyzer {
         result
     }
 
-    /// Расчет MACD
+    /// Calculate MACD
     fn calculate_macd(&self, prices: &[f64]) -> Option<MacdValues> {
         if prices.len() < self.macd_slow {
             return None;
@@ -226,7 +226,7 @@ impl TechnicalAnalyzer {
         })
     }
 
-    /// Расчет полос Боллинджера
+    /// Calculate Bollinger Bands
     fn calculate_bollinger(&self, prices: &[f64]) -> BollingerValues {
         let period = if prices.len() >= self.bollinger_period {
             self.bollinger_period
@@ -261,7 +261,7 @@ impl TechnicalAnalyzer {
         }
     }
 
-    /// Анализ объема
+/// Volume analysis
     fn analyze_volume(&self, volumes: &[f64]) -> VolumeAnalysis {
         if volumes.is_empty() {
             return VolumeAnalysis {
@@ -280,7 +280,7 @@ impl TechnicalAnalyzer {
             0.0
         };
 
-        // Необычный объем - если в 2 раза выше среднего
+        // Unusual volume - if 2x above average
         let is_unusual = volume_ratio > 2.0;
 
         VolumeAnalysis {
@@ -291,14 +291,14 @@ impl TechnicalAnalyzer {
         }
     }
 
-    /// Определение тренда
+    /// Determine trend
     fn determine_trend(
         &self,
         prices: &[f64],
         rsi: Option<&f64>,
         macd: Option<&MacdValues>,
     ) -> Trend {
-        // Анализ по ценам
+        // Price analysis
         let price_trend = if prices.len() >= 10 {
             let recent_avg: f64 = prices.iter().rev().take(5).sum::<f64>() / 5.0;
             let older_avg: f64 = prices.iter().rev().skip(5).take(5).sum::<f64>() / 5.0;
@@ -314,7 +314,7 @@ impl TechnicalAnalyzer {
             Trend::Sideways
         };
 
-        // Подтверждение по RSI
+        // RSI confirmation
         let rsi_confirmation = rsi.map_or(0, |&v| {
             if v > 50.0 {
                 1
@@ -325,7 +325,7 @@ impl TechnicalAnalyzer {
             }
         });
 
-        // Подтверждение по MACD
+        // MACD confirmation
         let macd_confirmation = macd.map_or(0, |m| {
             if m.histogram > 0.0 {
                 1
@@ -336,7 +336,7 @@ impl TechnicalAnalyzer {
             }
         });
 
-        // Комбинированный сигнал
+        // Combined signal
         let combined = match price_trend {
             Trend::Bullish => 1,
             Trend::Bearish => -1,
@@ -353,7 +353,7 @@ impl TechnicalAnalyzer {
         }
     }
 
-    /// Поиск уровней поддержки и сопротивления
+    /// Find support and resistance levels
     fn find_support_resistance(&self, prices: &[f64]) -> (Vec<f64>, Vec<f64>) {
         if prices.is_empty() {
             return (vec![], vec![]);
@@ -363,11 +363,11 @@ impl TechnicalAnalyzer {
         let max_price = prices.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
         let current_price = *prices.last().unwrap();
 
-        // Простые уровни на основе экстремумов
+        // Simple levels based on extremes
         let mut supports = vec![min_price];
         let mut resistances = vec![max_price];
 
-        // Добавляем промежуточные уровни
+        // Add intermediate levels
         let range = max_price - min_price;
         if range > 0.0 {
             let step = range / 5.0;
@@ -387,7 +387,7 @@ impl TechnicalAnalyzer {
         (supports, resistances)
     }
 
-    /// Генерация рекомендации
+    /// Generate recommendation
     fn generate_recommendation(
         &self,
         trend: &Trend,
@@ -399,7 +399,7 @@ impl TechnicalAnalyzer {
     ) -> Recommendation {
         let mut score = 0;
 
-        // Тренд
+        // Trend
         match trend {
             Trend::Bullish => score += 2,
             Trend::Bearish => score -= 2,
@@ -409,9 +409,9 @@ impl TechnicalAnalyzer {
         // RSI
         if let Some(&rsi_value) = rsi {
             if rsi_value < 30.0 {
-                score += 2; // Перепроданность
+                score += 2; // Oversold
             } else if rsi_value > 70.0 {
-                score -= 2; // Перекупленность
+                score -= 2; // Overbought
             } else if rsi_value < 40.0 {
                 score += 1;
             } else if rsi_value > 60.0 {
@@ -430,17 +430,17 @@ impl TechnicalAnalyzer {
 
         // Bollinger Bands
         if current_price < bollinger.lower {
-            score += 1; // Цена у нижней границы
+            score += 1; // Price at lower band
         } else if current_price > bollinger.upper {
-            score -= 1; // Цена у верхней границы
+            score -= 1; // Price at upper band
         }
 
-        // Объем
+        // Volume
         if volume.is_unusual && *trend == Trend::Bullish {
-            score += 1; // Подтверждение тренда объемом
+            score += 1; // Volume confirmation of trend
         }
 
-        // Конвертация в рекомендацию
+        // Convert to recommendation
         match score {
             s if s >= 4 => Recommendation::StrongBuy,
             s if s >= 2 => Recommendation::Buy,
@@ -465,7 +465,7 @@ mod tests {
     fn test_recommendation_from_score() {
         let analyzer = TechnicalAnalyzer::new();
 
-        // Тестовые данные
+        // Test data
         let trend = Trend::Bullish;
         let rsi = Some(35.0);
         let macd = Some(MacdValues {

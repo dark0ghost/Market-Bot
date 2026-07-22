@@ -3,7 +3,7 @@ use chrono::{DateTime, Duration, Utc};
 use t_invest_sdk::TInvestSdk;
 use t_invest_sdk::api::{CandleInterval, GetCandlesRequest, GetCandlesResponse, HistoricCandle};
 
-/// Сервис для работы с рыночными данными
+/// Service for working with market data
 pub struct MarketDataService {
     sdk: TInvestSdk,
 }
@@ -13,20 +13,20 @@ impl MarketDataService {
         MarketDataService { sdk }
     }
 
-    /// Получение клона SDK
+    /// Get SDK clone
     pub fn sdk_clone(&self) -> TInvestSdk {
         self.sdk.clone()
     }
 
-    /// Получение исторических свечей
+    /// Get historical candles
     ///
     /// # Arguments
-    /// * `instrument_id` - ID инструмента
-    /// * `interval` - Интервал свечей
-    /// * `days` - Количество дней для загрузки
+    /// * `instrument_id` - Instrument ID
+    /// * `interval` - Candle interval
+    /// * `days` - Number of days to load
     ///
     /// # Returns
-    /// Вектор свечей, отсортированный по времени (от старых к новым)
+    /// Vector of candles sorted by time (oldest to newest)
     pub async fn get_historical_candles(
         &self,
         instrument_id: &str,
@@ -59,7 +59,7 @@ impl MarketDataService {
         Ok(candles_response.candles)
     }
 
-    /// Получение последних свечей за N дней с интервалом 1 минута
+    /// Get last candles for N days with 1 minute interval
     pub async fn get_minute_candles(
         &self,
         instrument_id: &str,
@@ -69,7 +69,7 @@ impl MarketDataService {
             .await
     }
 
-    /// Получение последних свечей за N дней с интервалом 5 минут
+    /// Get last candles for N days with 5 minute interval
     pub async fn get_5min_candles(
         &self,
         instrument_id: &str,
@@ -79,7 +79,7 @@ impl MarketDataService {
             .await
     }
 
-    /// Получение последней цены по инструменту
+    /// Get last price by instrument
     pub async fn get_last_price(&self, instrument_id: &str) -> Result<f64> {
         let candles = self.get_minute_candles(instrument_id, 1).await?;
 
@@ -87,11 +87,11 @@ impl MarketDataService {
             return extract_price(&last_candle.close);
         }
 
-        anyhow::bail!("Нет данных о цене для инструмента: {}", instrument_id)
+        anyhow::bail!("No price data for instrument: {}", instrument_id)
     }
 }
 
-/// Извлечение цены из Quotation
+/// Extract price from Quotation
 pub fn extract_price(quotation: &Option<t_invest_sdk::api::Quotation>) -> Result<f64> {
     match quotation {
         Some(q) => {

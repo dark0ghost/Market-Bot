@@ -21,14 +21,14 @@ impl CalibrationBin {
         }
     }
 
-    pub fn accuracy(&self) -> f64 {
+    pub const fn accuracy(&self) -> f64 {
         if self.total == 0 {
             return 0.0;
         }
         self.correct as f64 / self.total as f64
     }
 
-    pub fn mean_confidence(&self) -> f64 {
+    pub const fn mean_confidence(&self) -> f64 {
         (self.lower + self.upper) / 2.0
     }
 

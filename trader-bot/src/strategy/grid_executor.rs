@@ -4,22 +4,22 @@ use anyhow::Result;
 use log::{error, info, warn};
 use t_invest_sdk::TInvestSdk;
 
-/// Результат размещения ордера в Grid
+/// Grid order placement result
 #[derive(Debug, Clone)]
 pub struct GridOrderResult {
     pub level_index: u32,
     pub order_result: OrderResult,
 }
 
-/// Менеджер Grid стратегии
+/// Grid strategy manager
 pub struct GridExecutor {
     position_manager: PositionManager,
     grid_strategy: GridStrategy,
-    /// Текущее состояние сетки
+    /// Current grid state
     grid_state: Option<GridState>,
-    /// FIGI инструмента
+    /// Instrument FIGI
     figi: String,
-    /// Размер ордера в лотах
+    /// Order size in lots
     order_size: u32,
 }
 
@@ -41,14 +41,13 @@ impl GridExecutor {
         }
     }
 
-    /// Инициализация сетки ордеров
+    /// Initialize order grid
     pub async fn initialize_grid(&mut self, current_price: f64) -> Result<Vec<GridOrderResult>> {
-        info!("Инициализация Grid сетки для {}", self.figi);
-        info!("Текущая цена: {:.2}", current_price);
+        info!("Initializing grid for {}", self.figi);
+        info!("Current price: {:.2}", current_price);
 
-        // Получаем уровни для размещения
         let levels_to_place = self.grid_strategy.get_levels_to_place(current_price);
-        info!("Уровней для размещения: {}", levels_to_place.len());
+        info!("Levels to place: {}", levels_to_place.len());
 
         let mut results = Vec::new();
         let mut active_orders = Vec::new();
@@ -57,7 +56,7 @@ impl GridExecutor {
             match self.place_grid_order(&level).await {
                 Ok(order_result) => {
                     info!(
-                        "Ордер размещен: уровень={}, цена={:.2}, сторона={:?}",
+                        "Order placed: level={}, price={:.2}, side={:?}",
                         level.level_index, level.price, level.order_type
                     );
                     active_orders.push(level.level_index);
@@ -68,14 +67,14 @@ impl GridExecutor {
                 }
                 Err(e) => {
                     warn!(
-                        "Ошибка размещения ордера на уровне {}: {}",
+                        "Error placing order at level {}: {}",
                         level.level_index, e
                     );
                 }
             }
         }
 
-        // Сохраняем состояние
+        // Save state
         self.grid_state = Some(GridState {
             ticker: self.figi.clone(),
             figi: self.figi.clone(),
@@ -88,7 +87,7 @@ impl GridExecutor {
         Ok(results)
     }
 
-    /// Размещение ордера на уровне
+    /// Place order at level
     async fn place_grid_order(&self, level: &GridLevel) -> Result<OrderResult> {
         let action = match level.order_type {
             OrderSide::Buy => OrderAction::Buy,
@@ -100,17 +99,17 @@ impl GridExecutor {
             .await
     }
 
-    /// Проверка исполнения ордеров и перевыставление
+    /// Check order execution and re-place
     pub async fn rebalance_grid(&mut self, current_price: f64) -> Result<RebalanceResult> {
         let state = match &self.grid_state {
             Some(s) => s.clone(),
-            None => return Err(anyhow::anyhow!("Grid состояние не инициализировано")),
+            None => return Err(anyhow::anyhow!("Grid state not initialized")),
         };
 
-        // Проверяем, нужно ли перебалансировать
+        // Check if rebalance is needed
         let needs_rebalance = self
             .grid_strategy
-            .needs_rebalance(&state, current_price, 0.02); // 2% порог
+            .needs_rebalance(&state, current_price, 0.02); // 2% threshold
 
         if !needs_rebalance {
             return Ok(RebalanceResult {
@@ -119,32 +118,32 @@ impl GridExecutor {
             });
         }
 
-        info!("Перебалансировка Grid сетки...");
+        info!("Rebalancing grid...");
         info!(
-            "Старая цена: {:.2}, новая цена: {:.2}",
+            "Old price: {:.2}, new price: {:.2}",
             state.current_price, current_price
         );
 
         let mut cancelled = 0;
         let mut placed = 0;
 
-        // Получаем новые уровни для размещения
+        // Get new levels to place
         let new_levels = self.grid_strategy.get_levels_to_place(current_price);
         let new_level_indices: Vec<u32> = new_levels.iter().map(|l| l.level_index).collect();
 
-        // Отменяем ордера, которые больше не нужны
+        // Cancel orders that are no longer needed
         for &active_index in &state.active_orders {
             if !new_level_indices.contains(&active_index) {
-                // Нужно отменить ордер
+                // Need to cancel order
                 if let Err(e) = self.cancel_order_by_level(active_index).await {
-                    warn!("Ошибка отмены ордера уровня {}: {}", active_index, e);
+                    warn!("Error cancelling order at level {}: {}", active_index, e);
                 } else {
                     cancelled += 1;
                 }
             }
         }
 
-        // Размещаем новые ордера
+        // Place new orders
         for level in new_levels {
             if !state.active_orders.contains(&level.level_index)
                 && !state.filled_orders.contains(&level.level_index)
@@ -154,20 +153,20 @@ impl GridExecutor {
                         placed += 1;
                     }
                     Err(e) => {
-                        warn!("Ошибка размещения ордера: {}", e);
+                        warn!("Error placing order: {}", e);
                     }
                 }
             }
         }
 
-        // Обновляем состояние
+        // Update state
         if let Some(ref mut state) = self.grid_state {
             state.active_orders = new_level_indices;
             state.current_price = current_price;
         }
 
         info!(
-            "Перебалансировка завершена: отменено={}, размещено={}",
+            "Rebalance complete: cancelled={}, placed={}",
             cancelled, placed
         );
 
@@ -177,22 +176,22 @@ impl GridExecutor {
         })
     }
 
-    /// Отмена ордера по индексу уровня
+    /// Cancel order by level index
     async fn cancel_order_by_level(&self, _level_index: u32) -> Result<()> {
-        // TODO: Нужно хранить mapping level_index -> order_id
-        // Пока заглушка
+        // TODO: Need to store mapping level_index -> order_id
+        // Placeholder for now
         Ok(())
     }
 
-    /// Обработка исполнения ордера
+    /// Handle order fill
     pub async fn on_order_filled(&mut self, level_index: u32) -> Result<()> {
         if let Some(ref mut state) = self.grid_state {
-            // Удаляем из активных
+            // Remove from active
             state.active_orders.retain(|&i| i != level_index);
-            // Добавляем в исполненные
+            // Add to filled
             state.filled_orders.push(level_index);
 
-            // Размещаем противоположный ордер
+            // Place opposite order
             let levels = self.grid_strategy.calculate_grid_levels();
             if let Some(level) = self.grid_strategy.get_level_by_index(&levels, level_index) {
                 let opposite_side = match level.order_type {
@@ -201,20 +200,20 @@ impl GridExecutor {
                 };
 
                 let opposite_level = GridLevel {
-                    price: level.price, // Цена та же
+                    price: level.price, // Same price
                     order_type: opposite_side.clone(),
-                    level_index: level.level_index + 1000, // Уникальный индекс
+                    level_index: level.level_index + 1000, // Unique index
                 };
 
                 match self.place_grid_order(&opposite_level).await {
                     Ok(_) => {
                         info!(
-                            "Ордер исполнен (уровень {:?}), размещен противоположный {:?}",
+                            "Order filled (level {:?}), placed opposite {:?}",
                             level.order_type, opposite_side
                         );
                     }
                     Err(e) => {
-                        error!("Ошибка размещения противоположного ордера: {}", e);
+                        error!("Error placing opposite order: {}", e);
                     }
                 }
             }
@@ -223,16 +222,16 @@ impl GridExecutor {
         Ok(())
     }
 
-    /// Получение текущего состояния
+    /// Get current state
     pub fn get_state(&self) -> Option<&GridState> {
         self.grid_state.as_ref()
     }
 
-    /// Остановка Grid бота - отмена всех ордеров
+    /// Stop Grid bot - cancel all orders
     pub async fn stop_grid(&mut self) -> Result<()> {
-        info!("Остановка Grid бота, отмена всех ордеров...");
+        info!("Stopping Grid bot, cancelling all orders...");
 
-        // TODO: Отмена всех активных ордеров
+        // TODO: Cancel all active orders
 
         self.grid_state = None;
 
@@ -240,7 +239,7 @@ impl GridExecutor {
     }
 }
 
-/// Результат перебалансировки
+/// Rebalance result
 #[derive(Debug, Clone)]
 pub struct RebalanceResult {
     pub cancelled_orders: u32,
@@ -277,8 +276,8 @@ mod tests {
 
     #[test]
     fn test_grid_order_result_debug() {
-        // Тестируем Debug реализацию для GridOrderResult
-        // Поскольку OrderResult не реализует Debug полностью, тестируем структуру
+        // Test Debug implementation for GridOrderResult
+        // Since OrderResult does not fully implement Debug, test the structure
         let order_result = OrderResult {
             order_id: "test_123".to_string(),
             figi: "BBG000B9XRY4".to_string(),
@@ -302,7 +301,7 @@ mod tests {
 
     #[test]
     fn test_grid_state_structure() {
-        // Тестируем структуру GridState
+        // Test GridState structure
         let state = GridState {
             ticker: "TINK".to_string(),
             figi: "BBG000B9XRY4".to_string(),
@@ -320,7 +319,7 @@ mod tests {
 
     #[test]
     fn test_needs_rebalance_threshold() {
-        // Тестируем логику rebalance через GridStrategy
+        // Test rebalance logic through GridStrategy
         let config = GridConfig {
             lower_price: 100.0,
             upper_price: 200.0,
@@ -340,13 +339,13 @@ mod tests {
             current_price: 150.0,
         };
 
-        // Изменение цены 1% - меньше порога 2%
+        // Price change 1% - less than 2% threshold
         assert!(!strategy.needs_rebalance(&state, 151.5, 0.02));
 
-        // Изменение цены 3% - больше порога 2%
+        // Price change 3% - more than 2% threshold
         assert!(strategy.needs_rebalance(&state, 154.5, 0.02));
 
-        // Изменение цены вниз 3%
+        // Price change down 3%
         assert!(strategy.needs_rebalance(&state, 145.5, 0.02));
     }
 
@@ -362,7 +361,7 @@ mod tests {
 
         let strategy = GridStrategy::new(config);
 
-        // Цена 150 - buy уровни < 150, sell уровни > 150
+        // Price 150 - buy levels < 150, sell levels > 150
         let levels = strategy.get_levels_to_place(150.0);
 
         let buy_count = levels
@@ -374,11 +373,11 @@ mod tests {
             .filter(|l| l.order_type == OrderSide::Sell)
             .count();
 
-        // При grid_ratio 0.5 и 11 уровнях: 5 buy, 5 sell (средний уровень пропускается)
+        // With grid_ratio 0.5 and 11 levels: 5 buy, 5 sell (middle level skipped)
         assert!(buy_count > 0);
         assert!(sell_count > 0);
 
-        // Все buy уровни должны быть < 150
+        // All buy levels must be < 150
         for level in &levels {
             if level.order_type == OrderSide::Buy {
                 assert!(level.price < 150.0);
@@ -390,9 +389,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_stop_grid_clears_state() {
-        // Тестируем, что stop_grid очищает состояние
-        // Для полноценного теста нужен моковый SDK
-        // Проверяем только логику метода
+        // Test that stop_grid clears state
+        // A mock SDK is needed for a full test
+        // Only test the method logic
 
         let mut state: Option<GridState> = Some(GridState {
             ticker: "TINK".to_string(),
@@ -403,7 +402,7 @@ mod tests {
             current_price: 150.0,
         });
 
-        // Имитация stop_grid
+        // Simulate stop_grid
         state = None;
 
         assert!(state.is_none());
@@ -411,7 +410,7 @@ mod tests {
 
     #[test]
     fn test_on_order_filled_logic() {
-        // Тестируем логику обработки исполнения ордера
+        // Test order fill handling logic
         let mut state = GridState {
             ticker: "TINK".to_string(),
             figi: "BBG000B9XRY4".to_string(),
@@ -421,7 +420,7 @@ mod tests {
             current_price: 150.0,
         };
 
-        // Имитация on_order_filled для уровня 2
+        // Simulate on_order_filled for level 2
         let level_index = 2;
         state.active_orders.retain(|&i| i != level_index);
         state.filled_orders.push(level_index);
@@ -434,7 +433,7 @@ mod tests {
 
     #[test]
     fn test_opposite_order_side() {
-        // Тестируем логику определения противоположной стороны
+        // Test opposite side determination logic
         let buy_side = OrderSide::Buy;
         let sell_side = OrderSide::Sell;
 

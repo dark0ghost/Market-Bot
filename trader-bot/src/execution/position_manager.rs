@@ -5,14 +5,14 @@ use serde::{Deserialize, Serialize};
 use t_invest_sdk::TInvestSdk;
 use t_invest_sdk::api::{GetOrdersRequest, OrderDirection, OrderType, PostOrderRequest};
 
-/// Тип заявки
+/// Order action
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum OrderAction {
     Buy,
     Sell,
 }
 
-/// Результат размещения заявки
+/// Order placement result
 #[derive(Debug, Clone)]
 pub struct OrderResult {
     pub order_id: String,
@@ -25,7 +25,7 @@ pub struct OrderResult {
     pub message: String,
 }
 
-/// Статус заявки
+/// Order status
 #[derive(Debug, Clone, PartialEq)]
 pub enum OrderStatus {
     New,
@@ -35,7 +35,7 @@ pub enum OrderStatus {
     Rejected,
 }
 
-/// Менеджер позиций и заявок
+/// Position and order manager
 pub struct PositionManager {
     sdk: TInvestSdk,
     account_id: String,
@@ -46,7 +46,7 @@ impl PositionManager {
         PositionManager { sdk, account_id }
     }
 
-    /// Размещение лимитной заявки
+    /// Place limit order
     pub async fn place_limit_order(
         &self,
         figi: &str,
@@ -91,7 +91,7 @@ impl PositionManager {
         })
     }
 
-    /// Размещение рыночной заявки
+    /// Place market order
     pub async fn place_market_order(
         &self,
         figi: &str,
@@ -132,7 +132,7 @@ impl PositionManager {
         })
     }
 
-    /// Получение списка заявок
+    /// Get order list
     pub async fn get_orders(&self) -> Result<Vec<OrderResult>> {
         let request = GetOrdersRequest {
             account_id: self.account_id.clone(),
@@ -160,7 +160,7 @@ impl PositionManager {
     }
 }
 
-/// Расширенный менеджер для работы с решениями агента
+/// Extended manager for working with agent decisions
 pub struct TradingExecutor<E: ExecutionProvider> {
     executor: E,
     available_balance: f64,
@@ -174,12 +174,12 @@ impl<E: ExecutionProvider> TradingExecutor<E> {
         }
     }
 
-    /// Обновление доступного баланса
-    pub fn update_balance(&mut self, balance: f64) {
+    /// Update available balance
+    pub const fn update_balance(&mut self, balance: f64) {
         self.available_balance = balance;
     }
 
-    /// Исполнение торгового решения
+    /// Execute trading decision
     pub async fn execute_decision(
         &self,
         decision: &crate::agent::TradingDecision,
@@ -196,7 +196,7 @@ impl<E: ExecutionProvider> TradingExecutor<E> {
 
                     if quantity > 0 {
                         log::info!(
-                            "Размещение BUY заявки: {} лотов по цене {:.2} (сумма: {:.2})",
+                            "Placing BUY order: {} lots at price {:.2} (total: {:.2})",
                             quantity,
                             entry_price,
                             quantity as f64 * entry_price
@@ -215,28 +215,28 @@ impl<E: ExecutionProvider> TradingExecutor<E> {
 
                         if let Some(sl_price) = decision.stop_loss {
                             log::info!(
-                                "Размещение Stop Loss: {} лотов по цене {:.2}",
+                                "Placing Stop Loss: {} lots at price {:.2}",
                                 quantity,
                                 sl_price
                             );
-                            // Stop loss через отдельную заявку
+                            // Stop loss via separate order
                         }
                     } else {
-                        log::warn!("Расчетное количество лотов равно 0");
+                        log::warn!("Calculated lot count is 0");
                     }
                 }
             }
             Action::Sell => {
                 if let Some(current_position) = decision.current_position {
-                    // Для продажи используем текущую позицию
+                    // For selling, use current position
                     let quantity =
                         self.calculate_sell_quantity(current_position, decision.position_size_pct);
 
                     if quantity > 0 {
-                        // Используем текущую цену для заявки
+                        // Use current price for order
                         let price = decision.current_price;
                         log::info!(
-                            "Размещение SELL заявки: {} лотов по цене {:.2}",
+                            "Placing SELL order: {} lots at price {:.2}",
                             quantity,
                             price
                         );
@@ -248,7 +248,7 @@ impl<E: ExecutionProvider> TradingExecutor<E> {
                         results.push(order_result);
                     }
                 } else {
-                    log::warn!("Невозможно продать: текущая позиция не указана");
+                    log::warn!("Cannot sell: current position not specified");
                 }
             }
             Action::Hold => {
@@ -259,38 +259,34 @@ impl<E: ExecutionProvider> TradingExecutor<E> {
         Ok(results)
     }
 
-    /// Расчет количества лотов для покупки
-    fn calculate_quantity(&self, price: f64, position_pct: f64) -> i32 {
+    /// Calculate number of lots to buy
+    const fn calculate_quantity(&self, price: f64, position_pct: f64) -> i32 {
         if price <= 0.0 || position_pct <= 0.0 {
             return 0;
         }
 
-        // Используем реальный доступный баланс
+        // Use actual available balance
         let position_value = self.available_balance * position_pct;
         let quantity = (position_value / price) as i32;
 
-        // Округляем вниз до целого лота
-        quantity.max(0)
+        if quantity < 0 { 0 } else { quantity }
     }
 
-    /// Расчет количества лотов для продажи
+    /// Calculate number of lots to sell
     ///
     /// # Arguments
-    /// * `current_position` - Текущая позиция в лотах
-    /// * `position_pct` - Процент позиции для продажи (0.0-1.0)
+    /// * `current_position` - Current position in lots
+    /// * `position_pct` - Position percentage to sell (0.0-1.0)
     ///
     /// # Returns
-    /// Количество лотов для продажи
-    fn calculate_sell_quantity(&self, current_position: i32, position_pct: f64) -> i32 {
+    /// Number of lots to sell
+    const fn calculate_sell_quantity(&self, current_position: i32, position_pct: f64) -> i32 {
         if position_pct <= 0.0 || current_position <= 0 {
             return 0;
         }
 
-        // Рассчитываем количество лотов для продажи на основе процента
         let quantity = (current_position as f64 * position_pct) as i32;
-
-        // Округляем до целого лота, минимум 1 если есть позиция
-        quantity.max(1).min(current_position)
+        if quantity < 1 { 1 } else if quantity > current_position { current_position } else { quantity }
     }
 }
 
@@ -334,17 +330,17 @@ mod tests {
     }
 }
 
-/// Тесты для TradingExecutor
+/// Tests for TradingExecutor
 #[cfg(test)]
 mod executor_tests {
     use super::*;
 
     #[test]
     fn test_calculate_quantity_basic() {
-        // Тестируем логику расчета количества через closure
+        // Test quantity calculation logic via closure
         let balance = 10000.0;
 
-        // Closure для тестирования логики
+        // Closure for testing logic
         let calc_qty = |price: f64, position_pct: f64| -> i32 {
             if price <= 0.0 || position_pct <= 0.0 {
                 return 0;
@@ -354,14 +350,14 @@ mod executor_tests {
             quantity.max(0)
         };
 
-        // При балансе 10000 и 10% позиции = 1000
-        // При цене 100 = 10 лотов
+        // With balance 10000 and 10% position = 1000
+        // At price 100 = 10 lots
         assert_eq!(calc_qty(100.0, 0.1), 10);
 
-        // При цене 50 = 20 лотов
+        // At price 50 = 20 lots
         assert_eq!(calc_qty(50.0, 0.1), 20);
 
-        // При 50% позиции = 5000, цена 100 = 50 лотов
+        // At 50% position = 5000, price 100 = 50 lots
         assert_eq!(calc_qty(100.0, 0.5), 50);
     }
 
@@ -378,22 +374,22 @@ mod executor_tests {
             quantity.max(0)
         };
 
-        // Нулевая цена
+        // Zero price
         assert_eq!(calc_qty(0.0, 0.1), 0);
 
-        // Отрицательная цена
+        // Negative price
         assert_eq!(calc_qty(-100.0, 0.1), 0);
 
-        // Нулевой процент позиции
+        // Zero position percentage
         assert_eq!(calc_qty(100.0, 0.0), 0);
 
-        // Отрицательный процент
+        // Negative percentage
         assert_eq!(calc_qty(100.0, -0.1), 0);
     }
 
     #[test]
     fn test_calculate_sell_quantity_basic() {
-        // Closure для тестирования логики расчета продажи
+        // Closure for testing sell quantity calculation logic
         let calc_sell = |position: i32, pct: f64| -> i32 {
             if pct <= 0.0 || position <= 0 {
                 return 0;
@@ -402,13 +398,13 @@ mod executor_tests {
             quantity.max(1).min(position)
         };
 
-        // Продажа 50% от 100 лотов = 50 лотов
+        // Selling 50% of 100 lots = 50 lots
         assert_eq!(calc_sell(100, 0.5), 50);
 
-        // Продажа 25% от 100 лотов = 25 лотов
+        // Selling 25% of 100 lots = 25 lots
         assert_eq!(calc_sell(100, 0.25), 25);
 
-        // Продажа 100% от 100 лотов = 100 лотов
+        // Selling 100% of 100 lots = 100 lots
         assert_eq!(calc_sell(100, 1.0), 100);
     }
 
@@ -422,10 +418,10 @@ mod executor_tests {
             quantity.max(1).min(position)
         };
 
-        // Продажа 1% от 100 лотов = 1 лот (минимум 1)
+        // Selling 1% of 100 lots = 1 lot (minimum 1)
         assert_eq!(calc_sell(100, 0.01), 1);
 
-        // Продажа 0.1% от 100 лотов = 1 лот (минимум 1)
+        // Selling 0.1% of 100 lots = 1 lot (minimum 1)
         assert_eq!(calc_sell(100, 0.001), 1);
     }
 
@@ -439,26 +435,26 @@ mod executor_tests {
             quantity.max(1).min(position)
         };
 
-        // Нулевая позиция
+        // Zero position
         assert_eq!(calc_sell(0, 0.5), 0);
 
-        // Отрицательная позиция
+        // Negative position
         assert_eq!(calc_sell(-10, 0.5), 0);
 
-        // Нулевой процент
+        // Zero percentage
         assert_eq!(calc_sell(100, 0.0), 0);
 
-        // Отрицательный процент
+        // Negative percentage
         assert_eq!(calc_sell(100, -0.5), 0);
     }
 
     #[test]
     fn test_update_balance() {
-        // Тестируем, что метод update_balance вызывается без ошибок
-        // Для полноценного тестирования нужен моковый SDK
+        // Test that update_balance method is called without errors
+        // A mock SDK is needed for proper testing
         let balance = 10000.0;
         let new_balance = 20000.0;
-        // Логика обновления баланса протестирована через создание с новым балансом
+        // Balance update logic tested by creating with new balance
         assert!(new_balance > balance);
     }
 }

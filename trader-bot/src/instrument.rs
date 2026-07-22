@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-/// Торговый инструмент
+/// Trading instrument
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Instrument {
     pub figi: String,

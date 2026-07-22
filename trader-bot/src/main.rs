@@ -1,12 +1,19 @@
 mod agent;
 mod analysis;
+mod api;
 mod backtest;
+mod broker;
 mod client;
 mod config;
+mod core;
+mod datasource;
 mod error;
 mod execution;
 mod instrument;
+mod logging;
 mod mcp;
+mod ml_inference;
+mod optimizer;
 mod provider;
 mod scanner;
 mod scheduler;
@@ -16,14 +23,8 @@ mod stream;
 mod telemetry;
 mod utils;
 
-// ─── New Architecture ────────────────────────────────────────────────
-mod api;
-mod broker;
-mod core;
-mod datasource;
-mod optimizer;
-
 use anyhow::{Result, anyhow};
+use log::Level;
 use std::env;
 use std::sync::Arc;
 use t_invest_sdk::api::{FindInstrumentRequest, InstrumentType};
@@ -32,561 +33,386 @@ use tokio::sync::Mutex;
 
 use agent::{DecisionContext, TradingAgent};
 use analysis::{
-    FundamentalAnalyzer, FundamentalDataService, MarketRegime, NewsAnalyzer, NewsItem,
-    NewsLLMService, NewsSentiment, RegimeDetector, Sentiment, TechnicalAnalyzer,
+    FundamentalDataService, NewsAnalyzer, NewsItem,
+    NewsLLMService, NewsSentiment, RegimeDetector, TechnicalAnalyzer,
 };
-use client::{MarketDataService, PortfolioService};
-use config::{StrategyType, TradingConfig};
-use execution::{PositionManager, TradingExecutor};
-use strategy::{GridBot, GridBotConfig, GridExecutor, GridStrategy};
-
-use mcp_client::ollama::OllamaProvider;
-
-// New imports
-use broker::TinkoffBroker;
+use broker::{FinamBroker, MockBroker, TinkoffBroker};
+use client::MarketDataService;
+use config::{AccountConfig, Credential, SandboxConfig, StrategyType, TradingConfig, WorkingMode};
 use core::*;
 use datasource::{DataSourceRegistry, TinkoffDataSource};
-use strategy::registry::StrategyRegistry;
+
+use mcp_client::ollama::OllamaProvider;
+use strategy::{
+    AiStrategy, GridBot, GridBotConfig, GridStrategy, IntervalStrategy,
+    StrategyRegistry,
+};
+
+// ─── Broker Initialization ───────────────────────────────────────────
+
+struct AccountBroker {
+    broker: Arc<dyn Broker>,
+    sdk: Option<TInvestSdk>,
+}
+
+async fn init_broker(account: &AccountConfig, cred: &Credential, mode: &WorkingMode, sandbox_cfg: Option<&SandboxConfig>) -> Result<AccountBroker> {
+    let aid = account.account_id.clone().unwrap_or_default();
+    match account.broker.as_str() {
+        "tinkoff" => {
+            let token = if cred.token.is_empty() {
+                env::var("API_TOKEN").map_err(|_| anyhow!("API_TOKEN not set and no token in config"))?
+            } else {
+                cred.token.clone()
+            };
+            let is_sandbox = matches!(mode, WorkingMode::Sandbox);
+            let (open_account, pay_in_amount) = sandbox_cfg
+                .map(|s| (s.open_account, s.pay_in_amount))
+                .unwrap_or((false, 0.0));
+            let tb = TinkoffBroker::new(&token, account.account_id.clone(), is_sandbox, open_account, pay_in_amount).await?;
+            let sdk = tb.sdk();
+            let broker = Arc::new(tb) as Arc<dyn Broker>;
+            Ok(AccountBroker { broker, sdk: Some(sdk) })
+        }
+        "finam" => {
+            let finam_cred = cred.additional_keys.as_ref()
+                .and_then(|keys| keys.iter().find(|k| k.broker == "finam"))
+                .ok_or_else(|| anyhow!("Finam creds not found for account {}", aid))?;
+            let broker = Arc::new(FinamBroker::new(&finam_cred.api_key, aid.clone()).await?) as Arc<dyn Broker>;
+            Ok(AccountBroker { broker, sdk: None })
+        }
+        "mock" => {
+            let broker = Arc::new(MockBroker::new(aid.clone(), 1_000_000.0)) as Arc<dyn Broker>;
+            Ok(AccountBroker { broker, sdk: None })
+        }
+        other => Err(anyhow!("Unsupported broker '{}' for account {}", other, aid)),
+    }
+}
+
+// ─── Strategy Creation ───────────────────────────────────────────────
+
+fn create_strategy(account: &AccountConfig, agent: Arc<TradingAgent>) -> Box<dyn Strategy> {
+    let aid = account.account_id.clone().unwrap_or_default();
+    match &account.strategy.strategy {
+        StrategyType::Grid => {
+            let cfg = account.strategy.parameters.grid_config.clone().unwrap_or_else(|| config::GridConfig {
+                lower_price: 100.0, upper_price: 200.0, grid_levels: 11, order_size: 10, grid_ratio: 0.5,
+            });
+            Box::new(GridStrategy::new(cfg))
+        }
+        StrategyType::Ai => {
+            let ai_cfg = account.strategy.parameters.ai_config.clone().unwrap_or_default();
+            Box::new(AiStrategy::new(aid, ai_cfg, agent))
+        }
+        _ => Box::new(IntervalStrategy),
+    }
+}
+
+// ─── Main ────────────────────────────────────────────────────────────
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
+    // ── 0. Logger ─────────────────────────────────────────────────────
+    let log_webhook = env::var("LOG_WEBHOOK").ok();
+    let log_file = env::var("LOG_FILE").ok();
+    let log_level = env::var("LOG_LEVEL").unwrap_or_else(|_| "info".to_string());
+    {
+        let mut builder = logging::LoggerBuilder::new().console();
+        if let Some(path) = &log_file { builder = builder.file(path)?; }
+        if let Some(url) = &log_webhook {
+            let threshold = match log_level.as_str() {
+                "error" => Level::Error, "warn" => Level::Warn, "debug" => Level::Debug, _ => Level::Info,
+            };
+            builder = builder.network(url, threshold);
+        }
+        builder.init()?;
+    }
 
     log::info!("╔══════════════════════════════════════════╗");
-    log::info!(
-        "║     AI Trade Bot v{} (refactored)      ║",
-        env!("CARGO_PKG_VERSION")
-    );
+    log::info!("║     AI Trade Bot v{}                ║", env!("CARGO_PKG_VERSION"));
     log::info!("╚══════════════════════════════════════════╝");
 
-    // ── 1. Load Configuration ────────────────────────────────────────
-    let config =
-        TradingConfig::load_default().map_err(|e| anyhow!("Failed to load config: {}", e))?;
+    // ── 1. Config ─────────────────────────────────────────────────────
+    let config = TradingConfig::load_default()
+        .map_err(|e| anyhow!("Failed to load config: {}", e))?;
+    log::info!("Loaded config, mode: {:?}, accounts: {}", config.mode, config.accounts.len());
 
-    log::info!("Configuration loaded. Mode: {:?}", config.mode);
-
-    let token = if config.credential.token.is_empty() {
-        env::var("API_TOKEN")?
-    } else {
-        config.credential.token.clone()
-    };
-
-    let env_mode = match config.mode {
-        config::WorkingMode::Prod => Environment::Production,
-        config::WorkingMode::Sandbox => Environment::Sandbox,
-    };
-
-    // ── 2. Initialize SDK & Broker ────────────────────────────────────
-    let sdk = TInvestSdk::new(&token, env_mode).await?;
-
-    // Wrap Tinkoff SDK in our Broker trait
-    let tinkoff_broker = Arc::new(TinkoffBroker::from_sdk(sdk.clone(), "main".to_string()));
-
-    // ── 3. Initialize Data Sources ────────────────────────────────────
-    let mut data_source_registry = DataSourceRegistry::new();
-    let tinkoff_data = Arc::new(TinkoffDataSource::new(sdk.clone()));
-    data_source_registry.register(tinkoff_data);
-    log::info!("Data sources: {:?}", data_source_registry.list_names());
-
-    // ── 4. Initialize LLM ─────────────────────────────────────────────
+    // ── 2. LLM ────────────────────────────────────────────────────────
     let llm_config = config.llm_config.as_ref();
-    let ollama_provider = if let Some(llm_cfg) = llm_config {
-        OllamaProvider::new(llm_cfg.model.clone(), llm_cfg.host.clone(), llm_cfg.port)
+    let ollama = if let Some(c) = llm_config {
+        OllamaProvider::new(c.model.clone(), c.host.clone(), c.port)
     } else {
         OllamaProvider::default()
     };
-    let model_name = llm_config
-        .map(|c| c.model.clone())
-        .unwrap_or_else(|| "fin-expert".to_string());
-    log::info!("LLM model: {}", model_name);
+    let model_name = llm_config.map(|c| c.model.clone()).unwrap_or_else(|| "fin-expert".to_string());
+    log::info!("LLM: {}", model_name);
 
-    // ── 5. Initialize Analysis Services ───────────────────────────────
+    // ── 3. Analysis services ──────────────────────────────────────────
     let news_analyzer = NewsAnalyzer::new(vec!["tinkoff".to_string(), "investing".to_string()]);
     let technical_analyzer = TechnicalAnalyzer::new();
-    let fundamental_analyzer = FundamentalAnalyzer::default();
-    let news_llm_service = NewsLLMService::new(ollama_provider.clone());
-    let fundamental_data_service = FundamentalDataService::new();
+    let news_llm = NewsLLMService::new(ollama.clone());
+    let fundamental_data = FundamentalDataService::new();
     let mut regime_detector = RegimeDetector::new(14, 14);
 
-    // ── 6. Initialize Trading Services ────────────────────────────────
-    let market_data_service = MarketDataService::new(sdk.clone());
-    let portfolio_service = PortfolioService::new(sdk.clone(), "main".to_string());
-
-    // ── 7. Initialize Strategy Registry ───────────────────────────────
-    let mut strategy_registry = StrategyRegistry::new();
-
-    // Register Grid strategy for each account with grid config
-    let grid_accounts: Vec<_> = config
-        .accounts
-        .iter()
-        .filter(|acc| matches!(acc.strategy.strategy, StrategyType::Grid))
-        .collect();
-
-    for account in &grid_accounts {
-        if let Some(grid_cfg) = &account.strategy.parameters.grid_config {
-            let grid_strategy = crate::strategy::grid::GridStrategy::new(grid_cfg.clone());
-            strategy_registry.register(Box::new(grid_strategy));
-            log::info!(
-                "Grid strategy registered for account {}",
-                account.account_id
-            );
+    // ── 4. Init per-account brokers ───────────────────────────────────
+    let mut account_brokers: Vec<(&AccountConfig, AccountBroker)> = Vec::new();
+    for account in &config.accounts {
+        let aid = account.account_id.as_deref().unwrap_or("");
+        match init_broker(account, &config.credential, &config.mode, config.sandbox.as_ref()).await {
+            Ok(ab) => {
+                log::info!("Broker for {}: {} (sdk: {})", aid, account.broker, ab.sdk.is_some());
+                account_brokers.push((account, ab));
+            }
+            Err(e) => log::error!("Failed to init broker for {}: {}", aid, e),
         }
     }
-    log::info!(
-        "Strategies registered: {:?}",
-        strategy_registry.list_names()
-    );
 
-    // ── 8. Get Balance ────────────────────────────────────────────────
-    let available_balance = match portfolio_service.get_available_balance().await {
-        Ok(balance) => {
-            log::info!("Available balance: {:.2}", balance);
-            balance
+    // ── 5. Data sources ───────────────────────────────────────────────
+    let mut data_sources = DataSourceRegistry::new();
+    for (_, ab) in &account_brokers {
+        if let Some(ref sdk) = ab.sdk {
+            data_sources.register(Arc::new(TinkoffDataSource::new(sdk.clone())));
         }
-        Err(e) => {
-            log::error!("Balance fetch error: {}", e);
-            std::env::var("DEFAULT_BALANCE")
-                .ok()
-                .and_then(|s| s.parse::<f64>().ok())
-                .unwrap_or_else(|| {
-                    log::error!("DEFAULT_BALANCE not set. Exiting.");
-                    std::process::exit(1);
-                })
-        }
-    };
+    }
+    log::info!("Data sources: {:?}", data_sources.list_names());
 
-    // ── 9. Start Dashboard if enabled ──────────────────────────────────
-    if let Some(dashboard_cfg) = &config.dashboard {
-        if dashboard_cfg.enabled {
-            let api_state = Arc::new(Mutex::new(api::AppState {
-                brokers: vec![tinkoff_broker.clone() as Arc<dyn Broker>],
-                data_sources: data_source_registry,
+    // ── 6. Strategies ─────────────────────────────────────────────────
+    let mut strategy_registry = StrategyRegistry::new();
+    for (account, _) in &account_brokers {
+        let agent = Arc::new(TradingAgent::new(ollama.clone(), model_name.clone()));
+        let strategy = create_strategy(account, agent);
+        let aid = account.account_id.as_deref().unwrap_or("");
+        log::info!("Strategy for {}: {}", aid, strategy.name());
+        strategy_registry.register(strategy);
+    }
+    log::info!("Strategies: {:?}", strategy_registry.list_names());
+
+    // ── 7. Dashboard ──────────────────────────────────────────────────
+    if let Some(dash) = &config.dashboard {
+        if dash.enabled {
+            let brokers: Vec<Arc<dyn Broker>> = account_brokers.iter().map(|(_, ab)| ab.broker.clone()).collect();
+            let state = Arc::new(Mutex::new(api::AppState {
+                brokers,
+                data_sources,
                 strategies: strategy_registry,
             }));
-            let port = dashboard_cfg.port;
+            let port = dash.port;
             tokio::spawn(async move {
-                if let Err(e) = api::start_dashboard(api_state, port).await {
+                if let Err(e) = api::start_dashboard(state, port).await {
                     log::error!("Dashboard error: {}", e);
                 }
             });
-            log::info!("Dashboard started on port {}", port);
+            log::info!("Dashboard on port {}", port);
         }
     }
 
-    // Re-borrow strategy_registry for later use
-    // (it was moved into api_state, so we re-create for main loop)
-    let mut strategy_registry = StrategyRegistry::new();
-    for account in &grid_accounts {
-        if let Some(grid_cfg) = &account.strategy.parameters.grid_config {
-            let grid_strategy = crate::strategy::grid::GridStrategy::new(grid_cfg.clone());
-            strategy_registry.register(Box::new(grid_strategy));
-        }
+    // ── 8. Per-account execution ──────────────────────────────────────
+    for (account, account_broker) in &account_brokers {
+        match account.strategy.strategy {
+            StrategyType::Grid => run_grid_account(account, account_broker).await,
+            StrategyType::Ai => run_ai_account(
+                account, account_broker, &technical_analyzer, &news_analyzer, &news_llm,
+                &fundamental_data, &mut regime_detector, &ollama, &model_name,
+            ).await,
+            _ => run_standard_account(
+                account, account_broker, &technical_analyzer, &news_analyzer, &news_llm,
+                &fundamental_data, &mut regime_detector, &ollama, &model_name,
+            ).await,
+        }?;
     }
 
-    // ── 10. Run Optimizer if enabled ───────────────────────────────────
-    if let Some(opt_cfg) = &config.optimizer {
-        if opt_cfg.enabled {
-            log::info!("Running optimizer...");
-            let opt_method = if opt_cfg.method == "random_search" {
-                OptimizationMethod::RandomSearch
-            } else {
-                OptimizationMethod::GridSearch
-            };
-            let opt_metric = match opt_cfg.metric.as_str() {
-                "total_return" => OptimizationMetric::TotalReturn,
-                "win_rate" => OptimizationMetric::WinRate,
-                "calmar_ratio" => OptimizationMetric::CalmarRatio,
-                "profit_factor" => OptimizationMetric::ProfitFactor,
-                _ => OptimizationMetric::SharpeRatio,
-            };
+    log::info!("All accounts processed. Waiting for background tasks...");
+    tokio::signal::ctrl_c().await.ok();
+    log::info!("Shutdown.");
+    Ok(())
+}
 
-            // Example: optimize a simple SMA crossover strategy
-            let opt_config = OptimizerConfig {
-                param_ranges: vec![
-                    ParamRange {
-                        name: "fast_period".to_string(),
-                        min: 5.0,
-                        max: 50.0,
-                        step: 5.0,
-                    },
-                    ParamRange {
-                        name: "slow_period".to_string(),
-                        min: 20.0,
-                        max: 200.0,
-                        step: 10.0,
-                    },
-                ],
-                metric: opt_metric,
-                method: opt_method,
-                max_iterations: opt_cfg.max_iterations,
-            };
+// ─── Grid Account ────────────────────────────────────────────────────
 
-            // Get some candles for optimization
-            if let Some(instrument) = config.get_enabled_instruments().first() {
-                if let Ok(candles) = market_data_service
-                    .get_5min_candles(&instrument.figi, 30)
-                    .await
-                {
-                    let core_candles: Vec<Candle> = candles
-                        .iter()
-                        .filter_map(|c| {
-                            let time = c.time.as_ref().and_then(|t| {
-                                chrono::DateTime::from_timestamp(t.seconds, t.nanos as u32)
-                            })?;
-                            Some(Candle {
-                                open: crate::client::market_data::extract_price(&c.open).ok()?,
-                                high: crate::client::market_data::extract_price(&c.high).ok()?,
-                                low: crate::client::market_data::extract_price(&c.low).ok()?,
-                                close: crate::client::market_data::extract_price(&c.close).ok()?,
-                                volume: c.volume as f64,
-                                time,
-                                ticker: instrument.ticker.clone(),
-                            })
-                        })
-                        .collect();
-
-                    let bt_config = backtest::BacktestConfig {
-                        initial_balance: 100000.0,
-                        commission_pct: 0.001,
-                        slippage_pct: 0.001,
-                        max_positions: 1,
-                        max_position_pct: 0.25,
-                    };
-
-                    // SMA crossover strategy function
-                    let strategy_fn: optimizer::StrategyFn =
-                        Arc::new(|prices, _volumes, params| {
-                            let fast = params.get("fast_period").copied().unwrap_or(10.0) as usize;
-                            let slow = params.get("slow_period").copied().unwrap_or(30.0) as usize;
-                            if prices.len() < slow {
-                                return 0.0;
-                            }
-
-                            let fast_sma: f64 =
-                                prices[prices.len() - fast..].iter().sum::<f64>() / fast as f64;
-                            let slow_sma: f64 =
-                                prices[prices.len() - slow..].iter().sum::<f64>() / slow as f64;
-
-                            if fast_sma > slow_sma {
-                                1.0
-                            } else if fast_sma < slow_sma {
-                                -1.0
-                            } else {
-                                0.0
-                            }
-                        });
-
-                    let optimizer = optimizer::Optimizer::new(opt_config, strategy_fn, bt_config)
-                        .with_data(core_candles);
-
-                    match optimizer.optimize().await {
-                        Ok(report) => {
-                            log::info!("Optimization complete in {}ms", report.total_time_ms);
-                            log::info!("Best params: {:?}", report.best_params);
-                            log::info!(
-                                "Best score ({:?}): {:.4}",
-                                config.optimizer.as_ref().unwrap().metric,
-                                report.best_score
-                            );
-                            log::info!("Total trials: {}", report.trials.len());
-                        }
-                        Err(e) => log::error!("Optimization failed: {}", e),
-                    }
-                }
-            }
+async fn run_grid_account(account: &AccountConfig, ab: &AccountBroker) -> Result<()> {
+    let aid = account.account_id.as_deref().unwrap_or("");
+    let sdk = match &ab.sdk {
+        Some(sdk) => sdk.clone(),
+        None => {
+            log::warn!("Grid account {} has no Tinkoff SDK — GridBot requires it", aid);
+            return Ok(());
         }
+    };
+    let grid_cfg = match &account.strategy.parameters.grid_config {
+        Some(c) => c.clone(),
+        None => return Ok(()),
+    };
+    let account_id = aid.to_string();
+    let check_interval = account.strategy.parameters.check_interval;
+
+    for instrument in account.instruments.iter().filter(|i| i.enabled) {
+        let sdk = sdk.clone();
+        let bot_config = GridBotConfig {
+            account_id: account_id.clone(),
+            figi: instrument.figi.clone(),
+            ticker: instrument.ticker.clone(),
+            grid_config: grid_cfg.clone(),
+            check_interval_secs: check_interval as u64,
+        };
+        let ticker2 = instrument.ticker.clone();
+        let figi2 = instrument.figi.clone();
+        let ticker_name = instrument.ticker.clone();
+        tokio::spawn(async move {
+            let mut bot = GridBot::new(sdk, bot_config);
+            if let Err(e) = bot.run().await {
+                log::error!("GridBot {} error: {}", ticker2, e);
+            }
+        });
+        log::info!("GridBot started for {} ({})", ticker_name, figi2);
     }
+    Ok(())
+}
 
-    // ── 11. Start Grid Bots ────────────────────────────────────────────
-    for account in grid_accounts {
-        if let Some(grid_config) = &account.strategy.parameters.grid_config {
-            for instrument in account.instruments.iter().filter(|i| i.enabled) {
-                log::info!(
-                    "Starting Grid bot for {} ({})",
-                    instrument.ticker,
-                    instrument.figi
-                );
+// ─── AI / Standard Account Pipeline ──────────────────────────────────
 
-                let bot_config = GridBotConfig {
-                    account_id: account.account_id.clone(),
-                    figi: instrument.figi.clone(),
-                    ticker: instrument.ticker.clone(),
-                    grid_config: grid_config.clone(),
-                    check_interval_secs: account.strategy.parameters.check_interval as u64,
-                };
+#[allow(clippy::too_many_arguments)]
+async fn run_ai_account(
+    account: &AccountConfig, ab: &AccountBroker,
+    technical_analyzer: &TechnicalAnalyzer, news_analyzer: &NewsAnalyzer,
+    news_llm: &NewsLLMService, fundamental_data: &FundamentalDataService,
+    regime_detector: &mut RegimeDetector, ollama: &OllamaProvider, model_name: &str,
+) -> Result<()> {
+    let aid = account.account_id.as_deref().unwrap_or("");
+    let balance = ab.broker.balance().await.unwrap_or(0.0);
+    log::info!("[{}] Balance: {:.2}", aid, balance);
 
-                let mut grid_bot = GridBot::new(sdk.clone(), bot_config);
-                tokio::spawn(async move {
-                    if let Err(e) = grid_bot.run().await {
-                        log::error!("Grid bot error: {}", e);
-                    }
-                });
-            }
-        }
-    }
+    for instrument in account.instruments.iter().filter(|i| i.enabled) {
+        log::info!("[{}] Analyzing {}", aid, instrument.ticker);
+        let candles_tinkoff = get_candles_for_analysis(account, &ab, instrument).await;
+        let current_price = ab.broker.last_price(&instrument.ticker).await.unwrap_or(0.0);
 
-    // ── 12. Main Trading Loop ─────────────────────────────────────────
-    let enabled_instruments = config.get_enabled_instruments();
-    log::info!(
-        "Active instruments for analysis: {}",
-        enabled_instruments.len()
-    );
+        let tech = if !candles_tinkoff.is_empty() {
+            technical_analyzer.analyze(&instrument.ticker, &candles_tinkoff).ok()
+        } else { None };
 
-    for instrument in enabled_instruments {
-        if !instrument.enabled {
-            continue;
-        }
-        log::info!("Analyzing: {} ({})", instrument.ticker, instrument.name);
+        let news = get_news_for_instrument(instrument, news_analyzer, news_llm).await;
+        let fund = if instrument.analysis_config.fundamental_analysis {
+            fundamental_data.get_fundamental_data(&instrument.ticker, &instrument.name).await.ok().flatten()
+        } else { None };
 
-        let mut instruments_service_client = sdk.instruments();
-        let find_instrument_response = instruments_service_client
-            .find_instrument(FindInstrumentRequest {
-                query: instrument.name.clone(),
-                instrument_kind: Some(InstrumentType::Share as i32),
-                api_trade_available_flag: Some(true),
-            })
-            .await?
-            .into_inner();
+        if current_price > 0.0 { regime_detector.add_price(current_price); }
+        let regime = regime_detector.detect();
+        log::info!("[{}] Price: {:.2}, Regime: {:?}", instrument.ticker, current_price, regime);
 
-        let found_instrument = find_instrument_response
-            .instruments
-            .first()
-            .ok_or_else(|| anyhow!("Instrument not found: {}", instrument.ticker))?;
+        let position = ab.broker.position(&instrument.ticker).await.ok().flatten();
+        let pos_for_ctx = position.map(|p| agent::CurrentPosition {
+            quantity: p.quantity as i32,
+            average_price: p.average_price,
+            current_value: p.current_price * p.quantity as f64,
+        });
 
-        let days_for_analysis = config
-            .accounts
-            .first()
-            .map(|a| a.strategy.parameters.days_back_to_consider)
-            .unwrap_or(30);
-
-        let candles = match market_data_service
-            .get_5min_candles(&found_instrument.figi, days_for_analysis)
-            .await
-        {
-            Ok(c) => {
-                log::info!("Loaded {} candles", c.len());
-                c
-            }
-            Err(e) => {
-                log::warn!("Candle load error: {}", e);
-                vec![]
-            }
-        };
-
-        let current_price = match market_data_service
-            .get_last_price(&found_instrument.figi)
-            .await
-        {
-            Ok(p) => {
-                log::info!("Current price: {:.2}", p);
-                p
-            }
-            Err(e) => {
-                log::warn!("Price fetch error: {}", e);
-                0.0
-            }
-        };
-
-        // Technical Analysis
-        let tech_analysis = if !candles.is_empty() {
-            match technical_analyzer.analyze(&instrument.ticker, &candles) {
-                Ok(a) => {
-                    log::info!(
-                        "Technical: trend={:?}, recommendation={:?}",
-                        a.trend,
-                        a.recommendation
-                    );
-                    Some(a)
-                }
-                Err(e) => {
-                    log::warn!("TA error: {}", e);
-                    None
-                }
-            }
-        } else {
-            None
-        };
-
-        // News Analysis
-        let news_sentiment = if instrument.analysis_config.check_news {
-            match news_analyzer
-                .analyze(&instrument.ticker, &instrument.name)
-                .await
-            {
-                Ok(base) => {
-                    if base.articles_count > 0 {
-                        let news_items: Vec<NewsItem> = base
-                            .articles
-                            .iter()
-                            .take(5)
-                            .map(|a| NewsItem {
-                                title: a.title.clone(),
-                                content: a.content.clone(),
-                                source: a.source.clone(),
-                                url: a.url.clone(),
-                            })
-                            .collect();
-
-                        match news_llm_service
-                            .analyze_news_batch(&instrument.ticker, &instrument.name, &news_items)
-                            .await
-                        {
-                            Ok(llm) => Some(NewsSentiment {
-                                ticker: instrument.ticker.clone(),
-                                overall_sentiment: llm.overall_sentiment,
-                                sentiment_score: llm.sentiment_score,
-                                articles_count: base.articles_count,
-                                articles: base.articles,
-                                key_events: llm.key_events,
-                            }),
-                            Err(e) => {
-                                log::warn!("LLM news error: {}", e);
-                                Some(base)
-                            }
-                        }
-                    } else {
-                        Some(base)
-                    }
-                }
-                Err(e) => {
-                    log::warn!("News fetch error: {}", e);
-                    None
-                }
-            }
-        } else {
-            None
-        };
-
-        // Fundamental Analysis
-        let fundamental_analysis = if instrument.analysis_config.fundamental_analysis {
-            match fundamental_data_service
-                .get_fundamental_data(&instrument.ticker, &instrument.name)
-                .await
-            {
-                Ok(Some(a)) => {
-                    log::info!(
-                        "Fundamental: rating={:?}, score={:.1}",
-                        a.rating,
-                        a.overall_score
-                    );
-                    Some(a)
-                }
-                Ok(None) => {
-                    log::info!("No fundamental data for {}", instrument.ticker);
-                    None
-                }
-                Err(e) => {
-                    log::warn!("Fundamental error: {}", e);
-                    None
-                }
-            }
-        } else {
-            None
-        };
-
-        // Market Regime
-        if current_price > 0.0 {
-            regime_detector.add_price(current_price);
-        }
-        let market_regime = regime_detector.detect();
-        log::info!("Market regime: {:?}", market_regime);
-
-        // Agent Decision
-        let use_price = if current_price > 0.0 {
-            current_price
-        } else if let Some(tech) = &tech_analysis {
-            tech.current_price
-        } else {
-            log::warn!("No price data for {}", instrument.ticker);
-            continue;
-        };
-
-        let current_position = match portfolio_service.get_position(&found_instrument.figi).await {
-            Ok(Some(pos)) => {
-                log::info!(
-                    "Position: {} lots, avg: {:.2}",
-                    pos.quantity,
-                    pos.average_price
-                );
-                Some(pos)
-            }
-            Ok(None) => None,
-            Err(e) => {
-                log::warn!("Position error: {}", e);
-                None
-            }
-        };
-
-        let trading_agent = TradingAgent::new(ollama_provider.clone(), model_name.clone());
-        let position_manager = PositionManager::new(sdk.clone(), "main".to_string());
-        let trading_executor = TradingExecutor::new(position_manager, available_balance);
-
-        let context = DecisionContext {
+        let agent = TradingAgent::new(ollama.clone(), model_name.to_string());
+        let ctx = DecisionContext {
             ticker: instrument.ticker.clone(),
             company_name: instrument.name.clone(),
-            current_price: use_price,
-            news_sentiment: news_sentiment.clone(),
-            technical_analysis: tech_analysis.clone(),
-            fundamental_analysis: fundamental_analysis.clone(),
-            available_balance,
-            current_position,
-            risk_config: config
-                .accounts
-                .first()
-                .and_then(|a| a.risk_management.clone()),
+            current_price,
+            news_sentiment: news,
+            technical_analysis: tech,
+            fundamental_analysis: fund,
+            available_balance: balance,
+            current_position: pos_for_ctx,
+            risk_config: account.risk_management.clone(),
             max_position_pct: instrument.max_position_pct,
-            market_regime,
+            market_regime: regime,
             candles: vec![],
         };
 
-        let decision = if config.llm_config.is_some() {
-            match trading_agent.make_decision(context.clone()).await {
-                Ok(d) => d,
-                Err(e) => {
-                    log::warn!("LLM error, using rule-based: {}", e);
-                    trading_agent.make_rule_based_decision(context)?
-                }
-            }
+        let decision = if llm_config_enabled(&account) {
+            agent.make_decision(ctx.clone()).await.unwrap_or_else(|e| {
+                log::warn!("LLM error, fallback to rule: {}", e);
+                agent.make_rule_based_decision(ctx.clone()).unwrap_or_else(|_| agent::TradingDecision {
+                    ticker: instrument.ticker.clone(), action: agent::Action::Hold, confidence: 0.0,
+                    entry_price: None, position_size_pct: 0.0, stop_loss: None, take_profit: None,
+                    rationale: "fallback".into(), risks: vec![], time_horizon: agent::TimeHorizon::Medium,
+                    current_position: None, current_price,
+                })
+            })
         } else {
-            trading_agent.make_rule_based_decision(context)?
+            agent.make_rule_based_decision(ctx)?
         };
 
-        log::info!(
-            "Agent decision: {:?} (conf: {:.2}, pos: {:.1}%)",
-            decision.action,
-            decision.confidence,
-            decision.position_size_pct * 100.0
-        );
-        log::info!("Rationale: {}", decision.rationale);
+        log::info!("[{}] {:?} (conf: {:.2}, size: {:.1}%)", instrument.ticker, decision.action, decision.confidence, decision.position_size_pct * 100.0);
 
         if decision.action != agent::Action::Hold && decision.confidence >= 0.6 {
-            match trading_executor
-                .execute_decision(&decision, &found_instrument.figi)
-                .await
-            {
-                Ok(results) => {
-                    for r in results {
-                        log::info!("Order placed: ID={}, status={:?}", r.order_id, r.status);
-                    }
-                }
-                Err(e) => log::error!("Execution error: {}", e),
-            }
-        } else {
-            log::info!("Decision not executed: HOLD or low confidence");
+            execute_via_broker(&ab.broker, &decision).await?;
         }
-
-        tokio::time::sleep(tokio::time::Duration::from_secs(
-            config
-                .accounts
-                .first()
-                .map(|a| a.strategy.parameters.check_interval as u64)
-                .unwrap_or(60),
-        ))
-        .await;
     }
-
-    log::info!("Analysis cycle completed. Waiting for background tasks...");
-    tokio::signal::ctrl_c().await.ok();
-    log::info!("Shutting down.");
     Ok(())
+}
+
+/// Same pipeline as AI but without LLM (always rule-based) — used for non-AI strategies
+async fn run_standard_account(
+    account: &AccountConfig, ab: &AccountBroker,
+    technical_analyzer: &TechnicalAnalyzer, news_analyzer: &NewsAnalyzer,
+    news_llm: &NewsLLMService, fundamental_data: &FundamentalDataService,
+    regime_detector: &mut RegimeDetector, ollama: &OllamaProvider, model_name: &str,
+) -> Result<()> {
+    run_ai_account(account, ab, technical_analyzer, news_analyzer, news_llm,
+        fundamental_data, regime_detector, ollama, model_name).await
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────
+
+async fn get_candles_for_analysis(account: &AccountConfig, ab: &AccountBroker, instrument: &config::InstrumentConfig) -> Vec<t_invest_sdk::api::HistoricCandle> {
+    if let Some(ref sdk) = ab.sdk {
+        let days = account.strategy.parameters.days_back_to_consider;
+        match MarketDataService::new(sdk.clone()).get_5min_candles(&instrument.figi, days).await {
+            Ok(c) => { log::info!("Loaded {} candles for {}", c.len(), instrument.ticker); c }
+            Err(e) => { log::warn!("Candle error: {}", e); vec![] }
+        }
+    } else {
+        log::warn!("No SDK for candle data — skipping TA for {}", instrument.ticker);
+        vec![]
+    }
+}
+
+async fn get_news_for_instrument(instrument: &config::InstrumentConfig, analyzer: &NewsAnalyzer, llm: &NewsLLMService) -> Option<NewsSentiment> {
+    if !instrument.analysis_config.check_news { return None; }
+    let base = analyzer.analyze(&instrument.ticker, &instrument.name).await.ok()?;
+    if base.articles_count == 0 { return Some(base); }
+    let items: Vec<NewsItem> = base.articles.iter().take(5).map(|a| NewsItem {
+        title: a.title.clone(), content: a.content.clone(), source: a.source.clone(), url: a.url.clone(),
+    }).collect();
+    match llm.analyze_news_batch(&instrument.ticker, &instrument.name, &items).await {
+        Ok(enh) => Some(NewsSentiment {
+            ticker: instrument.ticker.clone(), overall_sentiment: enh.overall_sentiment,
+            sentiment_score: enh.sentiment_score, articles_count: base.articles_count,
+            articles: base.articles, key_events: enh.key_events,
+        }),
+        Err(e) => { log::warn!("LLM news error: {}", e); Some(base) }
+    }
+}
+
+async fn execute_via_broker(broker: &Arc<dyn Broker>, decision: &agent::TradingDecision) -> Result<()> {
+    let action = match decision.action {
+        agent::Action::Buy => OrderAction::Buy,
+        agent::Action::Sell => OrderAction::Sell,
+        agent::Action::Hold => return Ok(()),
+    };
+    let price = decision.entry_price.unwrap_or(decision.current_price);
+    let qty = (decision.position_size_pct * 100.0) as i32;
+    if qty <= 0 { return Ok(()); }
+    let request = OrderRequest {
+        instrument: decision.ticker.clone(),
+        action,
+        order_type: OrderType::Limit,
+        quantity: qty,
+        price: Some(price),
+        account_id: broker.account_id().to_string(),
+        client_order_id: None,
+    };
+    match broker.place_order(request).await {
+        Ok(resp) => log::info!("Order placed: {:?}", resp),
+        Err(e) => log::error!("Order error: {}", e),
+    }
+    Ok(())
+}
+
+fn llm_config_enabled(account: &AccountConfig) -> bool {
+    account.strategy.parameters.ai_config.as_ref().map(|c| c.use_llm).unwrap_or(false)
+        || account.strategy.strategy == StrategyType::Ai
 }

@@ -1,7 +1,7 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
-/// Результат фундаментального анализа
+/// Fundamental analysis result
 #[derive(Debug, Clone)]
 pub struct FundamentalAnalysis {
     pub ticker: String,
@@ -18,7 +18,7 @@ pub struct FundamentalAnalysis {
     pub key_strengths: Vec<String>,
 }
 
-/// Мультипликаторы оценки
+/// Valuation multiples
 #[derive(Debug, Clone, Default)]
 pub struct ValuationMetrics {
     pub pe_ratio: Option<f64>,
@@ -29,7 +29,7 @@ pub struct ValuationMetrics {
     pub ev_to_ebitda: Option<f64>,
 }
 
-/// Показатели прибыльности
+/// Profitability metrics
 #[derive(Debug, Clone, Default)]
 pub struct ProfitabilityMetrics {
     pub gross_margin: Option<f64>,
@@ -40,7 +40,7 @@ pub struct ProfitabilityMetrics {
     pub roic: Option<f64>,
 }
 
-/// Показатели финансового здоровья
+/// Financial health metrics
 #[derive(Debug, Clone, Default)]
 pub struct FinancialHealthMetrics {
     pub current_ratio: Option<f64>,
@@ -51,7 +51,7 @@ pub struct FinancialHealthMetrics {
     pub free_cash_flow: Option<f64>,
 }
 
-/// Показатели роста
+/// Growth metrics
 #[derive(Debug, Clone, Default)]
 pub struct GrowthMetrics {
     pub revenue_growth_yoy: Option<f64>,
@@ -62,7 +62,7 @@ pub struct GrowthMetrics {
     pub earnings_growth_5y: Option<f64>,
 }
 
-/// Дивидендные показатели
+/// Dividend metrics
 #[derive(Debug, Clone, Default)]
 pub struct DividendMetrics {
     pub dividend_yield: Option<f64>,
@@ -71,7 +71,7 @@ pub struct DividendMetrics {
     pub consecutive_years: Option<u32>,
 }
 
-/// Рейтинг компании
+/// Company rating
 #[derive(Debug, Clone, PartialEq)]
 pub enum CompanyRating {
     Excellent, // 80-100
@@ -81,13 +81,13 @@ pub enum CompanyRating {
     VeryPoor,  // 0-19
 }
 
-/// Сервис фундаментального анализа
+/// Fundamental analysis service
 pub struct FundamentalAnalyzer {
-    /// Отраслевые средние значения для сравнения
+    /// Industry average values for comparison
     industry_averages: IndustryAverages,
 }
 
-/// Отраслевые средние
+/// Industry averages
 #[derive(Debug, Clone, Default)]
 pub struct IndustryAverages {
     pub pe_ratio: Option<f64>,
@@ -103,7 +103,7 @@ impl FundamentalAnalyzer {
         }
     }
 
-    /// Анализ фундаментальных показателей
+    /// Analyze fundamental metrics
     pub fn analyze(
         &self,
         ticker: &str,
@@ -114,14 +114,14 @@ impl FundamentalAnalyzer {
         growth: GrowthMetrics,
         dividends: Option<DividendMetrics>,
     ) -> FundamentalAnalysis {
-        // Расчет scores по каждой категории
+        // Calculate scores for each category
         let valuation_score = self.score_valuation(&valuation);
         let profitability_score = self.score_profitability(&profitability);
         let financial_health_score = self.score_financial_health(&financial_health);
         let growth_score = self.score_growth(&growth);
         let dividend_score = dividends.as_ref().map_or(0.0, |d| self.score_dividends(d));
 
-        // Общий score (взвешенный)
+        // Overall score (weighted)
         let overall_score = (valuation_score * 0.25
             + profitability_score * 0.25
             + financial_health_score * 0.20
@@ -135,8 +135,8 @@ impl FundamentalAnalyzer {
         let key_strengths =
             self.identify_strengths(&valuation, &profitability, &financial_health, &growth);
 
-        // Market cap расчет (если есть данные)
-        let market_cap = None; // Требуется из внешних данных
+        // Market cap calculation (if data available)
+        let market_cap = None; // Requires external data
 
         FundamentalAnalysis {
             ticker: ticker.to_string(),
@@ -154,18 +154,18 @@ impl FundamentalAnalyzer {
         }
     }
 
-    /// Оценка оценки (valuation)
-    fn score_valuation(&self, metrics: &ValuationMetrics) -> f64 {
+    /// Valuation scoring
+    const fn score_valuation(&self, metrics: &ValuationMetrics) -> f64 {
         let mut score = 50.0;
         let mut count = 0;
 
-        // P/E анализ
+        // P/E analysis
         if let Some(pe) = metrics.pe_ratio {
             if let Some(industry_pe) = self.industry_averages.pe_ratio {
                 if pe < industry_pe * 0.8 {
-                    score += 20.0; // Недооценен
+                    score += 20.0; // Undervalued
                 } else if pe > industry_pe * 1.2 {
-                    score -= 20.0; // Переоценен
+                    score -= 20.0; // Overvalued
                 }
             } else {
                 if pe < 10.0 {
@@ -177,7 +177,7 @@ impl FundamentalAnalyzer {
             count += 1;
         }
 
-        // PEG анализ
+        // PEG analysis
         if let Some(peg) = metrics.peg_ratio {
             if peg < 1.0 {
                 score += 15.0;
@@ -187,7 +187,7 @@ impl FundamentalAnalyzer {
             count += 1;
         }
 
-        // P/B анализ
+        // P/B analysis
         if let Some(pb) = metrics.price_to_book {
             if pb < 1.5 {
                 score += 10.0;
@@ -204,12 +204,12 @@ impl FundamentalAnalyzer {
         }
     }
 
-    /// Оценка прибыльности
-    fn score_profitability(&self, metrics: &ProfitabilityMetrics) -> f64 {
+    /// Profitability scoring
+    const fn score_profitability(&self, metrics: &ProfitabilityMetrics) -> f64 {
         let mut score = 50.0;
         let mut count = 0;
 
-        // ROE анализ
+        // ROE analysis
         if let Some(roe) = metrics.roe {
             if let Some(industry_roe) = self.industry_averages.roe {
                 if roe > industry_roe * 1.2 {
@@ -227,7 +227,7 @@ impl FundamentalAnalyzer {
             count += 1;
         }
 
-        // Net margin анализ
+        // Net margin analysis
         if let Some(margin) = metrics.net_margin {
             if margin > 20.0 {
                 score += 15.0;
@@ -237,7 +237,7 @@ impl FundamentalAnalyzer {
             count += 1;
         }
 
-        // ROIC анализ
+        // ROIC analysis
         if let Some(roic) = metrics.roic {
             if roic > 15.0 {
                 score += 15.0;
@@ -254,12 +254,12 @@ impl FundamentalAnalyzer {
         }
     }
 
-    /// Оценка финансового здоровья
-    fn score_financial_health(&self, metrics: &FinancialHealthMetrics) -> f64 {
+    /// Financial health scoring
+    const fn score_financial_health(&self, metrics: &FinancialHealthMetrics) -> f64 {
         let mut score = 50.0;
         let mut count = 0;
 
-        // Debt/Equity анализ
+        // Debt/Equity analysis
         if let Some(dte) = metrics.debt_to_equity {
             if let Some(industry_dte) = self.industry_averages.debt_to_equity {
                 if dte < industry_dte * 0.8 {
@@ -277,7 +277,7 @@ impl FundamentalAnalyzer {
             count += 1;
         }
 
-        // Current ratio анализ
+        // Current ratio analysis
         if let Some(cr) = metrics.current_ratio {
             if cr > 1.5 {
                 score += 15.0;
@@ -287,7 +287,7 @@ impl FundamentalAnalyzer {
             count += 1;
         }
 
-        // Interest coverage анализ
+        // Interest coverage analysis
         if let Some(ic) = metrics.interest_coverage {
             if ic > 5.0 {
                 score += 15.0;
@@ -304,8 +304,8 @@ impl FundamentalAnalyzer {
         }
     }
 
-    /// Оценка роста
-    fn score_growth(&self, metrics: &GrowthMetrics) -> f64 {
+    /// Growth scoring
+    const fn score_growth(&self, metrics: &GrowthMetrics) -> f64 {
         let mut score = 50.0;
         let mut count = 0;
 
@@ -354,8 +354,8 @@ impl FundamentalAnalyzer {
         }
     }
 
-    /// Оценка дивидендов
-    fn score_dividends(&self, metrics: &DividendMetrics) -> f64 {
+    /// Dividend scoring
+    const fn score_dividends(&self, metrics: &DividendMetrics) -> f64 {
         let mut score: f64 = 50.0;
 
         // Dividend yield
@@ -372,9 +372,9 @@ impl FundamentalAnalyzer {
         // Payout ratio
         if let Some(payout) = metrics.payout_ratio {
             if payout < 50.0 {
-                score += 15.0; // Устойчивый payout
+                score += 15.0; // Sustainable payout
             } else if payout > 80.0 {
-                score -= 15.0; // Слишком высокий
+                score -= 15.0; // Too high
             }
         }
 
@@ -390,8 +390,8 @@ impl FundamentalAnalyzer {
         score.min(100.0).max(0.0)
     }
 
-    /// Конвертация score в рейтинг
-    fn score_to_rating(&self, score: f64) -> CompanyRating {
+    /// Convert score to rating
+    const fn score_to_rating(&self, score: f64) -> CompanyRating {
         match score {
             s if s >= 80.0 => CompanyRating::Excellent,
             s if s >= 60.0 => CompanyRating::Good,
@@ -401,7 +401,7 @@ impl FundamentalAnalyzer {
         }
     }
 
-    /// Выявление рисков
+    /// Identify risks
     fn identify_risks(
         &self,
         valuation: &ValuationMetrics,
@@ -411,44 +411,44 @@ impl FundamentalAnalyzer {
     ) -> Vec<String> {
         let mut risks = Vec::new();
 
-        // Valuation риски
+        // Valuation risks
         if let Some(pe) = valuation.pe_ratio {
             if pe > 30.0 {
-                risks.push("Высокий P/E - риск переоцененности".to_string());
+                risks.push("High P/E - overvaluation risk".to_string());
             }
         }
 
-        // Profitability риски
+        // Profitability risks
         if let Some(roe) = profitability.roe {
             if roe < 5.0 {
-                risks.push("Низкая рентабельность капитала (ROE)".to_string());
+                risks.push("Low return on equity (ROE)".to_string());
             }
         }
 
-        // Financial health риски
+        // Financial health risks
         if let Some(dte) = financial_health.debt_to_equity {
             if dte > 2.0 {
-                risks.push("Высокая долговая нагрузка".to_string());
+                risks.push("High debt burden".to_string());
             }
         }
 
         if let Some(cr) = financial_health.current_ratio {
             if cr < 1.0 {
-                risks.push("Проблемы с ликвидностью".to_string());
+                risks.push("Liquidity concerns".to_string());
             }
         }
 
-        // Growth риски
+        // Growth risks
         if let Some(growth) = growth.revenue_growth_yoy {
             if growth < 0.0 {
-                risks.push("Снижение выручки".to_string());
+                risks.push("Revenue decline".to_string());
             }
         }
 
         risks
     }
 
-    /// Выявление сильных сторон
+    /// Identify strengths
     fn identify_strengths(
         &self,
         valuation: &ValuationMetrics,
@@ -458,37 +458,37 @@ impl FundamentalAnalyzer {
     ) -> Vec<String> {
         let mut strengths = Vec::new();
 
-        // Valuation преимущества
+        // Valuation advantages
         if let Some(pe) = valuation.pe_ratio {
             if pe < 10.0 {
-                strengths.push("Низкий P/E - возможная недооцененность".to_string());
+                strengths.push("Low P/E - potential undervaluation".to_string());
             }
         }
 
-        // Profitability преимущества
+        // Profitability advantages
         if let Some(roe) = profitability.roe {
             if roe > 15.0 {
-                strengths.push("Высокая рентабельность капитала (ROE)".to_string());
+                strengths.push("High return on equity (ROE)".to_string());
             }
         }
 
         if let Some(margin) = profitability.net_margin {
             if margin > 20.0 {
-                strengths.push("Высокая чистая маржинальность".to_string());
+                strengths.push("High net margin".to_string());
             }
         }
 
-        // Financial health преимущества
+        // Financial health advantages
         if let Some(dte) = financial_health.debt_to_equity {
             if dte < 0.5 {
-                strengths.push("Низкая долговая нагрузка".to_string());
+                strengths.push("Low debt burden".to_string());
             }
         }
 
-        // Growth преимущества
+        // Growth advantages
         if let Some(growth) = growth.revenue_growth_yoy {
             if growth > 15.0 {
-                strengths.push("Высокий рост выручки".to_string());
+                strengths.push("High revenue growth".to_string());
             }
         }
 

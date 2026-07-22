@@ -1,7 +1,7 @@
 //! Grid Trading Bot Module
 //!
-//! Grid бот для торговли в боковом тренде.
-//! Расставляет ордера на покупку и продажу по ценовой сетке.
+//! Grid bot for trading in a sideways trend.
+//! Places buy and sell orders on a price grid.
 
 use crate::client::MarketDataService;
 use crate::config::GridConfig;
@@ -10,7 +10,7 @@ use anyhow::Result;
 use log::{error, info, warn};
 use t_invest_sdk::TInvestSdk;
 
-/// Конфигурация Grid бота
+/// Grid bot configuration
 pub struct GridBotConfig {
     pub account_id: String,
     pub figi: String,
@@ -19,7 +19,7 @@ pub struct GridBotConfig {
     pub check_interval_secs: u64,
 }
 
-/// Grid бот
+/// Grid bot
 pub struct GridBot {
     config: GridBotConfig,
     executor: Option<GridExecutor>,
@@ -37,17 +37,17 @@ impl GridBot {
         }
     }
 
-    /// Запуск Grid бота
+    /// Run Grid bot
     pub async fn run(&mut self) -> Result<()> {
         info!(
-            "Запуск Grid бота для {} ({})",
+            "Starting Grid bot for {} ({})",
             self.config.ticker, self.config.figi
         );
 
-        // Создание стратегии
+        // Create strategy
         let grid_strategy = GridStrategy::new(self.config.grid_config.clone());
 
-        // Создание исполнителя
+        // Create executor
         let mut executor = GridExecutor::new(
             self.market_data_service.sdk_clone(),
             self.config.account_id.clone(),
@@ -55,7 +55,7 @@ impl GridBot {
             self.config.figi.clone(),
         );
 
-        // Получение текущей цены
+        // Get current price
         let current_price = match self
             .market_data_service
             .get_last_price(&self.config.figi)
@@ -63,29 +63,29 @@ impl GridBot {
         {
             Ok(p) => p,
             Err(e) => {
-                error!("Ошибка получения цены: {}", e);
+                error!("Price fetch error: {}", e);
                 return Err(e);
             }
         };
-        info!("Текущая цена: {:.2}", current_price);
+        info!("Current price: {:.2}", current_price);
 
-        // Инициализация сетки
+        // Initialize grid
         match executor.initialize_grid(current_price).await {
             Ok(results) => {
                 info!(
-                    "Grid сетка инициализирована, размещено ордеров: {}",
+                    "Grid initialized, orders placed: {}",
                     results.len()
                 );
             }
             Err(e) => {
-                error!("Ошибка инициализации Grid сетки: {}", e);
+                error!("Grid initialization error: {}", e);
                 return Err(e);
             }
         }
 
         self.executor = Some(executor);
 
-        // Основной цикл мониторинга
+        // Main monitoring loop
         loop {
             tokio::time::sleep(tokio::time::Duration::from_secs(
                 self.config.check_interval_secs,
@@ -93,7 +93,7 @@ impl GridBot {
             .await;
 
             if let Some(ref mut executor) = self.executor {
-                // Получение новой цены
+                // Get new price
                 let new_price = match self
                     .market_data_service
                     .get_last_price(&self.config.figi)
@@ -101,32 +101,32 @@ impl GridBot {
                 {
                     Ok(p) => p,
                     Err(e) => {
-                        warn!("Ошибка получения цены: {}", e);
+                        warn!("Price fetch error: {}", e);
                         continue;
                     }
                 };
 
-                // Перебалансировка сетки
+                // Rebalance grid
                 match executor.rebalance_grid(new_price).await {
                     Ok(result) => {
                         if result.cancelled_orders > 0 || result.placed_orders > 0 {
                             info!(
-                                "Сетка перебалансирована: отменено={}, размещено={}",
+                                "Grid rebalanced: cancelled={}, placed={}",
                                 result.cancelled_orders, result.placed_orders
                             );
                         }
                     }
                     Err(e) => {
-                        warn!("Ошибка перебалансировки: {}", e);
+                        warn!("Grid rebalance error: {}", e);
                     }
                 }
             }
         }
     }
 
-    /// Остановка бота
+    /// Stop bot
     pub async fn stop(&mut self) -> Result<()> {
-        info!("Остановка Grid бота...");
+        info!("Stopping Grid bot...");
 
         if let Some(ref mut executor) = self.executor {
             executor.stop_grid().await?;

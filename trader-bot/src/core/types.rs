@@ -17,7 +17,7 @@ pub enum CandleInterval {
 }
 
 impl CandleInterval {
-    pub fn as_str(&self) -> &'static str {
+    pub const fn as_str(&self) -> &'static str {
         match self {
             CandleInterval::Min1 => "1m",
             CandleInterval::Min5 => "5m",
@@ -208,6 +208,7 @@ pub enum StrategyKind {
     Interval,
     Momentum,
     MeanReversion,
+    Ai,
     PairsTrading,
     StatisticalArbitrage,
     Custom(String),
@@ -220,6 +221,7 @@ impl StrategyKind {
             StrategyKind::Interval => "interval",
             StrategyKind::Momentum => "momentum",
             StrategyKind::MeanReversion => "mean_reversion",
+            StrategyKind::Ai => "ai",
             StrategyKind::PairsTrading => "pairs",
             StrategyKind::StatisticalArbitrage => "stat_arb",
             StrategyKind::Custom(s) => Box::leak(s.clone().into_boxed_str()),
@@ -242,11 +244,11 @@ pub struct Signal {
 
 // ─── Conversion helpers ──────────────────────────────────────────────
 
-pub fn to_f64(units: i64, nano: i32) -> f64 {
+pub const fn to_f64(units: i64, nano: i32) -> f64 {
     units as f64 + nano as f64 / 1_000_000_000.0
 }
 
-pub fn to_quotation(value: f64) -> (i64, i32) {
+pub const fn to_quotation(value: f64) -> (i64, i32) {
     let units = value as i64;
     let nano = ((value.fract() * 1_000_000_000.0).round() as i32).abs();
     (units, nano)

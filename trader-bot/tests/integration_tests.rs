@@ -1,35 +1,34 @@
-//! Integration тесты для торгового бота
+//! Integration tests for the trading bot
 //!
-//! Эти тесты проверяют взаимодействие между компонентами системы
+//! These tests verify interaction between system components
 
 use trader_bot::error::{BotError, StrategyError};
 
-/// Тест интеграции Sentiment анализа
+/// Integration test for Sentiment analysis
 #[test]
 fn test_sentiment_analysis_integration() {
     use trader_bot::analysis::{NewsArticle, Sentiment};
 
-    // Создаём тестовые новости
     let articles = vec![
         NewsArticle {
-            title: "Позитивная новость".to_string(),
-            content: "Компания показала рост прибыли".to_string(),
+            title: "Positive news".to_string(),
+            content: "Company showed profit growth".to_string(),
             source: "tinkoff".to_string(),
             url: "https://example.com/1".to_string(),
             published_at: None,
             sentiment: Some(Sentiment::Positive),
         },
         NewsArticle {
-            title: "Негативная новость".to_string(),
-            content: "Санкции против компании".to_string(),
+            title: "Negative news".to_string(),
+            content: "Sanctions against company".to_string(),
             source: "bloomberg".to_string(),
             url: "https://example.com/2".to_string(),
             published_at: None,
             sentiment: Some(Sentiment::Negative),
         },
         NewsArticle {
-            title: "Нейтральная новость".to_string(),
-            content: "Обычный отчёт".to_string(),
+            title: "Neutral news".to_string(),
+            content: "Regular report".to_string(),
             source: "investing".to_string(),
             url: "https://example.com/3".to_string(),
             published_at: None,
@@ -37,7 +36,7 @@ fn test_sentiment_analysis_integration() {
         },
     ];
 
-    // Проверяем конвертацию sentiment в score
+    // Verify sentiment to score conversion
     let scores: Vec<f64> = articles
         .iter()
         .map(|a| a.sentiment.as_ref().map_or(0.0, Sentiment::to_score))
@@ -45,16 +44,14 @@ fn test_sentiment_analysis_integration() {
 
     assert_eq!(scores, vec![1.0, -1.0, 0.0]);
 
-    // Средний score должен быть 0.0
     let avg_score: f64 = scores.iter().sum::<f64>() / scores.len() as f64;
     assert_eq!(avg_score, 0.0);
 
-    // Конвертация обратно в Sentiment должна дать Neutral
     let overall = Sentiment::from_score(avg_score);
     assert_eq!(overall, Sentiment::Neutral);
 }
 
-/// Тест интеграции Grid стратегии
+/// Integration test for Grid strategy
 #[test]
 fn test_grid_strategy_integration() {
     use trader_bot::config::GridConfig;
@@ -71,7 +68,6 @@ fn test_grid_strategy_integration() {
     let strategy = GridStrategy::new(config);
     let levels = strategy.calculate_grid_levels();
 
-    // Проверяем, что уровни корректно разделены
     let buy_levels: Vec<_> = levels
         .iter()
         .filter(|l| l.order_type == OrderSide::Buy)
@@ -84,17 +80,15 @@ fn test_grid_strategy_integration() {
     assert!(!buy_levels.is_empty());
     assert!(!sell_levels.is_empty());
 
-    // Проверяем, что buy уровни ниже sell уровней
     let max_buy = buy_levels.iter().map(|l| l.price).fold(f64::MIN, f64::max);
     let min_sell = sell_levels.iter().map(|l| l.price).fold(f64::MAX, f64::min);
 
     assert!(max_buy <= min_sell);
 }
 
-/// Тест интеграции расчета количества лотов
+/// Integration test for position calculation
 #[test]
 fn test_position_calculation_integration() {
-    // Тестируем логику расчета позиции
     let balance = 100000.0;
     let position_pct = 0.1; // 10%
     let price = 150.0;
@@ -104,21 +98,19 @@ fn test_position_calculation_integration() {
 
     assert_eq!(quantity, 66); // 10000 / 150 = 66.67 -> 66
 
-    // Проверяем, что общая стоимость не превышает выделенный бюджет
     let total_cost = quantity as f64 * price;
     assert!(total_cost <= position_value);
-    assert!(total_cost + price > position_value); // Нельзя купить ещё один лот
+    assert!(total_cost + price > position_value);
 }
 
-/// Тест интеграции error типов
+/// Integration test for error types
 #[test]
 fn test_error_types_integration() {
-    // Проверяем, что ошибки корректно конвертируются
     let position_err = BotError::Position("test".to_string());
-    assert!(position_err.to_string().contains("позиции"));
+    assert!(position_err.to_string().contains("Position error"));
 
     let strategy_err = BotError::Strategy("config error".to_string());
-    assert!(strategy_err.to_string().contains("стратегии"));
+    assert!(strategy_err.to_string().contains("Strategy error"));
 
     let insufficient_funds = BotError::InsufficientFunds {
         required: 1000.0,
@@ -129,21 +121,17 @@ fn test_error_types_integration() {
     assert!(err_msg.contains("500"));
 }
 
-/// Тест интеграции TechnicalAnalyzer
+/// Integration test for TechnicalAnalyzer
 #[test]
 fn test_technical_analyzer_integration() {
     use trader_bot::TechnicalAnalyzer;
 
-    // TechnicalAnalyzer требует свечи для анализа
-    // Проверяем, что создание анализатора работает корректно
-    // Полноценный тест требует моковых данных SDK
     let analyzer = TechnicalAnalyzer::new();
 
-    // Просто проверяем, что анализатор создаётся
     drop(analyzer);
 }
 
-/// Тест интеграции FundamentalAnalyzer
+/// Integration test for FundamentalAnalyzer
 #[test]
 fn test_fundamental_analyzer_integration() {
     use trader_bot::{
@@ -153,7 +141,6 @@ fn test_fundamental_analyzer_integration() {
 
     let analyzer = FundamentalAnalyzer::default();
 
-    // Тестовые данные для анализа
     let valuation = ValuationMetrics {
         pe_ratio: Some(10.0),
         forward_pe: Some(8.0),
@@ -197,7 +184,6 @@ fn test_fundamental_analyzer_integration() {
         consecutive_years: None,
     });
 
-    // Проверяем, что анализ возвращает результат
     let result = analyzer.analyze(
         "TINK",
         "Tinkoff",
@@ -208,7 +194,6 @@ fn test_fundamental_analyzer_integration() {
         dividends,
     );
 
-    // Результат должен содержать рейтинг
     assert!(result.overall_score >= 0.0);
     assert!(matches!(
         result.rating,
@@ -220,13 +205,11 @@ fn test_fundamental_analyzer_integration() {
     ));
 }
 
-/// Тест интеграции GridState и RebalanceResult
+/// Integration test for GridState and RebalanceResult
 #[test]
 fn test_grid_state_rebalance_integration() {
     use trader_bot::strategy::grid_executor::RebalanceResult;
     use trader_bot::strategy::{GridLevel, GridState, OrderSide};
-
-    // Создаём начальное состояние сетки
     let mut state = GridState {
         ticker: "TINK".to_string(),
         figi: "BBG000B9XRY4".to_string(),
@@ -247,7 +230,6 @@ fn test_grid_state_rebalance_integration() {
         current_price: 125.0,
     };
 
-    // Имитация исполнения ордера на уровне 0
     let filled_level = 0;
     state.active_orders.retain(|&i| i != filled_level);
     state.filled_orders.push(filled_level);
@@ -257,7 +239,6 @@ fn test_grid_state_rebalance_integration() {
     assert!(!state.active_orders.contains(&0));
     assert!(state.filled_orders.contains(&0));
 
-    // Имитация результата перебалансировки
     let rebalance_result = RebalanceResult {
         cancelled_orders: 1,
         placed_orders: 2,
@@ -267,12 +248,11 @@ fn test_grid_state_rebalance_integration() {
     assert_eq!(rebalance_result.placed_orders, 2);
 }
 
-/// Тест интеграции VolumeAnalysis
+/// Integration test for VolumeAnalysis
 #[test]
 fn test_volume_analysis_integration() {
     use trader_bot::analysis::technical::VolumeAnalysis;
 
-    // Нормальный объём
     let normal = VolumeAnalysis {
         current_volume: 500.0,
         avg_volume: 500.0,
@@ -283,7 +263,6 @@ fn test_volume_analysis_integration() {
     assert!(!normal.is_unusual);
     assert_eq!(normal.volume_ratio, 1.0);
 
-    // Аномальный объём
     let unusual = VolumeAnalysis {
         current_volume: 2000.0,
         avg_volume: 500.0,
@@ -295,12 +274,10 @@ fn test_volume_analysis_integration() {
     assert_eq!(unusual.volume_ratio, 4.0);
 }
 
-/// Тест интеграции Recommendation
+/// Integration test for Recommendation
 #[test]
 fn test_recommendation_integration() {
     use trader_bot::analysis::Recommendation;
-
-    // Проверяем все варианты рекомендаций
     let recommendations = vec![
         Recommendation::StrongBuy,
         Recommendation::Buy,
@@ -315,7 +292,7 @@ fn test_recommendation_integration() {
     }
 }
 
-/// Тест интеграции NewsSentiment
+/// Integration test for NewsSentiment
 #[test]
 fn test_news_sentiment_integration() {
     use trader_bot::analysis::{NewsArticle, NewsSentiment, Sentiment};
@@ -333,7 +310,7 @@ fn test_news_sentiment_integration() {
             published_at: None,
             sentiment: Some(Sentiment::Positive),
         }],
-        key_events: vec!["Событие 1".to_string()],
+        key_events: vec!["Event 1".to_string()],
     };
 
     assert_eq!(sentiment.ticker, "TINK");
