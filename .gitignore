@@ -20,6 +20,11 @@ models/
 *.arrow
 training/data_collected/
 
+# ─── Python ──────────────────────────────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+
 # ─── AI Agent configs ────────────────────────────────────────────────
 .qwen/
 .claude/
@@ -40,3 +45,8 @@ Thumbs.db
 task.md
 tmp/
 temp/
+/training/data_collected/
+/training/finbert_sft/data_backup
+/training/data_collection/*.json
+/training/finbert_sft/data
+
