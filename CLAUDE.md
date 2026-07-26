@@ -1,4 +1,4 @@
-# AI Trade Bot — CLAUDE.md
+# Market Bot — CLAUDE.md
 
 ## Project Overview
 

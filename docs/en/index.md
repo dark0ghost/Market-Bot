@@ -3,9 +3,9 @@ hide:
   - navigation
 ---
 
-# AI Trade Bot Documentation
+# Market Bot Documentation
 
-Welcome to the AI Trade Bot documentation — a comprehensive AI-powered trading system for the Moscow Exchange.
+Welcome to the Market Bot documentation — a comprehensive algorithmic trading system for the Moscow Exchange.
 
 ## Quick Start
 
@@ -30,7 +30,7 @@ cargo run -p trader-bot
 
 ### Getting Started
 
-- **[What is AI Trade Bot?](getting-started/what-is.md)** — Feature overview
+- **[What is Market Bot?](getting-started/what-is.md)** — Feature overview
 - **[Quick Start](getting-started/quickstart.md)** — Installation and launch
 
 ### User Guide

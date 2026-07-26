@@ -1,6 +1,6 @@
-# What is AI Trade Bot?
+# What is Market Bot?
 
-AI Trade Bot is an automated trading system that uses artificial intelligence for market analysis and trading decisions.
+Market Bot is an automated trading system with multi-strategy support (AI, Grid, Gates), multi-broker support, and ML-based market analysis.
 
 ## Key Features
 
@@ -61,7 +61,7 @@ graph TD
 
 ```
 +-------------------------------------------------------+
-|                  AI Trade Bot                          |
+|                  Market Bot                            |
 +-------------------------------------------------------+
 |  +---------------+  +---------------+  +-------------+ |
 |  |   Market      |  |   News        |  |  Fundamental| |

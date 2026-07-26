@@ -1,9 +1,9 @@
 [project]
 name = "ai-trade-bot-training"
 version = "0.3.0"
-description = "FinBERT SFT training pipeline and data collection for AI Trade Bot"
+description = "FinBERT SFT training pipeline and data collection for Market Bot"
 requires-python = ">=3.10"
-authors = [{ name = "AI Trade Bot Contributors" }]
+authors = [{ name = "Market Bot Contributors" }]
 license = { text = "MIT" }
 
 dependencies = [

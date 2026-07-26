@@ -1,4 +1,4 @@
-# GitLab CI/CD for AI Trade Bot
+# GitLab CI/CD for Market Bot
 
 stages:
   - test

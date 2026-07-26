@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-# AI Trade Bot — Full Training Pipeline
+# Market Bot — Full Training Pipeline
 # Usage: HF_TOKEN=hf_xxx ./training/pipeline.sh [--days 30]
 
 DAYS=7
@@ -16,7 +16,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 echo "========================================================"
-echo "  AI Trade Bot — Sberbank FinBERT Pipeline"
+echo "  Market Bot — Sberbank FinBERT Pipeline"
 echo "  Days: $DAYS | Image: $DOCKER_IMAGE"
 echo "========================================================"
 

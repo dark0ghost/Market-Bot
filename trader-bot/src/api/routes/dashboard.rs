@@ -33,7 +33,7 @@ pub struct DashboardData {
 }
 
 pub async fn index() -> &'static str {
-    "AI Trade Bot Dashboard\n\nEndpoints:\n  /api/status\n  /api/portfolio\n  /api/strategies\n  /api/brokers\n  /api/health"
+    "Market Bot Dashboard\n\nEndpoints:\n  /api/status\n  /api/portfolio\n  /api/strategies\n  /api/brokers\n  /api/health"
 }
 
 pub async fn status(State(state): State<Arc<Mutex<AppState>>>) -> Json<StatusResponse> {

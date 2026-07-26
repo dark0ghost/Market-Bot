@@ -4,9 +4,9 @@ members = ["trader-bot"]
 
 [workspace.package]
 version = "0.2.0"
-authors = ["AI Trade Bot Contributors"]
+authors = ["Market Bot Contributors"]
 edition = "2024"
-description = "AI-powered algorithmic trading bot with multi-broker support, LLM integration, and strategy optimization"
+description = "Algorithmic trading bot with multi-broker support, multi-strategy pipeline, LLM integration, and ML inference"
 homepage = "https://github.com/AlexWan/ai-trade-bot"
 repository = "https://github.com/AlexWan/ai-trade-bot"
 license = "MIT"

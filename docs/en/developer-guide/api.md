@@ -1,6 +1,6 @@
 # API Documentation
 
-Documentation for the AI Trade Bot internal API.
+Documentation for the Market Bot internal API.
 
 ## Modules
 

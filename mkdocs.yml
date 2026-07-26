@@ -1,6 +1,6 @@
-site_name: AI Trade Bot
-site_description: AI Trade Bot — AI-powered trading system documentation
-site_author: AI Trade Bot Team
+site_name: Market Bot
+site_description: Market Bot — algorithmic trading system documentation
+site_author: Market Bot Team
 site_url: https://your-username.gitlab.io/ai-trade-bot/
 
 repo_name: ai-trade-bot
@@ -57,7 +57,7 @@ plugins:
           nav_translations:
             Home: Главная
             "Quick Start": "Быстрый старт"
-            "What is AI Trade Bot?": "Что такое AI Trade Bot?"
+            "What is Market Bot?": "Что такое Market Bot?"
             "User Guide": "Руководство пользователя"
             Configuration: Конфигурация
             "Broker Setup": "Настройка брокеров"
@@ -80,7 +80,7 @@ plugins:
 nav:
   - Home: index.md
   - Quick Start:
-    - "What is AI Trade Bot?": getting-started/what-is.md
+    - "What is Market Bot?": getting-started/what-is.md
     - "Quick Start": getting-started/quickstart.md
   - User Guide:
     - Configuration: user-guide/configuration.md

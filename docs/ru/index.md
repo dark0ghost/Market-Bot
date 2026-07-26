@@ -3,9 +3,9 @@ hide:
   - navigation
 ---
 
-# AI Trade Bot Documentation
+# Market Bot Documentation
 
-Добро пожаловать в документацию AI Trade Bot — комплексной торговой системы с искусственным интеллектом для торговли на Московской бирже.
+Добро пожаловать в документацию Market Bot — комплексной торговой системы с поддержкой множества стратегий (AI, Grid, Gates) и брокеров для Московской биржи.
 
 ## 🚀 Быстрый старт
 
@@ -30,7 +30,7 @@ cargo run -p trader-bot
 
 ### Для начинающих
 
-- **[Что такое AI Trade Bot?](getting-started/what-is.md)** — Обзор возможностей
+- **[Что такое Market Bot?](getting-started/what-is.md)** — Обзор возможностей
 - **[Быстрый старт](getting-started/quickstart.md)** — Установка и запуск
 
 ### Для пользователей

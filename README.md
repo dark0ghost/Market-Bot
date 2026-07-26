@@ -1,4 +1,4 @@
-# AI Trade Bot — Комплексная торговая система
+# Market Bot — Комплексная торговая система
 
 [![Rust](https://img.shields.io/badge/rust-v1.70+-orange.svg)](https://www.rust-lang.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)

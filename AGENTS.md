@@ -1,4 +1,4 @@
-# AI Trade Bot — Agents & Skills
+# Market Bot — Agents & Skills
 
 ## Architecture Overview
 

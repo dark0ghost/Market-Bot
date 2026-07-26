@@ -171,7 +171,7 @@ async fn main() -> Result<()> {
 
     log::info!("╔══════════════════════════════════════════╗");
     log::info!(
-        "║     AI Trade Bot v{}                ║",
+        "║     Market Bot v{}                  ║",
         env!("CARGO_PKG_VERSION")
     );
     log::info!("╚══════════════════════════════════════════╝");
