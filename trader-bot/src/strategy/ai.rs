@@ -102,13 +102,11 @@ impl Strategy for AiStrategy {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::agent::{
-        Action, CurrentPosition, DecisionContext, OllamaQuery, TimeHorizon,
-    };
+    use crate::agent::{Action, CurrentPosition, DecisionContext, OllamaQuery, TimeHorizon};
     use crate::analysis::{
-        BollingerValues, CompanyRating, FinancialHealthMetrics,
-        FundamentalAnalysis, GrowthMetrics, MacdValues, MarketRegime, ProfitabilityMetrics,
-        Recommendation, Sentiment, TechnicalAnalysis, Trend, ValuationMetrics,
+        BollingerValues, CompanyRating, FinancialHealthMetrics, FundamentalAnalysis, GrowthMetrics,
+        MacdValues, MarketRegime, ProfitabilityMetrics, Recommendation, Sentiment,
+        TechnicalAnalysis, Trend, ValuationMetrics,
     };
     use crate::config::RiskManagementConfig;
 
