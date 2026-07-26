@@ -32,7 +32,7 @@ ai-trade-bot/
 ├── models/                         # ONNX model artifacts
 │   └── finbert/                    # FinBERT model.onnx
 ├── mcp-client/                     # MCP client for LLM (Ollama)
-├── ollama-mcp/                     # Docker container with Ollama
+├── ollama/                         # Docker container with Ollama + fin-expert
 ├── docs/                           # Документация MkDocs
 │   ├── index.md                    # Главная страница
 │   ├── README.md                   # Инструкция по работе с docs

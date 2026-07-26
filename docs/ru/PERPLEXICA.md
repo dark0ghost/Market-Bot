@@ -46,7 +46,7 @@ curl http://localhost:3000/api/providers
       "name": "Ollama",
       "chatModels": [
         { "name": "Llama 3.1", "key": "llama3.1:latest" },
-        { "name": "Qwen 3", "key": "qwen3:1.7b" }
+        { "name": "Finance-Llama-8B", "key": "finance-llama-8b" }
       ],
       "embeddingModels": [
         { "name": "Nomic Embed Text", "key": "nomic-embed-text" }

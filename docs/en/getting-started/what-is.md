@@ -15,7 +15,7 @@ The system combines three analysis types:
    - Support and resistance levels
 
 2. **News Sentiment Analysis**
-   - LLM-powered tone analysis (Ollama/qwen3)
+   - LLM-powered tone analysis (Ollama/Finance-Llama-8B)
    - Key event extraction
    - Risk and opportunity identification
 

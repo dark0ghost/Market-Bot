@@ -5,9 +5,12 @@ use crate::analysis::{
 use crate::config::RiskManagementConfig;
 use anyhow::Result;
 use async_trait::async_trait;
-use mcp_client::llm_provider::LLMProvider;
-use mcp_client::ollama::OllamaProvider;
+use crate::agent::{DecisionMemory, DecisionRecord};
+use crate::mcp::llm_provider::LlmProvider;
+use crate::mcp::ollama::OllamaProvider;
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
+use std::sync::{Arc, RwLock};
 
 /// Trait abstracting the LLM query interface.
 /// Returns the raw text response from an LLM given a prompt.
@@ -97,26 +100,34 @@ pub struct CurrentPosition {
 pub struct TradingAgent {
     llm_query: Box<dyn LlmQuery>,
     model_name: String,
+    /// Dual persistence: RAM + flash (JSON file)
+    pub memory: Arc<RwLock<DecisionMemory>>,
 }
 
 impl TradingAgent {
-    pub fn new(llm_query: Box<dyn LlmQuery>, model_name: String) -> Self {
-        TradingAgent {
+    pub fn new(
+        llm_query: Box<dyn LlmQuery>,
+        model_name: String,
+        memory_path: Option<PathBuf>,
+    ) -> Result<Self> {
+        let memory = match memory_path {
+            Some(path) => DecisionMemory::with_persistence(1000, path)?,
+            None => DecisionMemory::new(1000),
+        };
+        Ok(TradingAgent {
             llm_query,
             model_name,
-        }
+            memory: Arc::new(RwLock::new(memory)),
+        })
     }
 
     /// Make trading decision
     pub async fn make_decision(&self, context: DecisionContext) -> Result<TradingDecision> {
-        // Build prompt for LLM
         let prompt = self.build_decision_prompt(&context);
-
-        // Request to LLM
         let llm_response = self.llm_query.query(prompt).await?;
-
-        // Parse LLM response
         let decision = self.parse_llm_response(&llm_response, &context)?;
+
+        self.record_decision(&decision, "llm");
 
         Ok(decision)
     }
@@ -207,17 +218,15 @@ impl TradingAgent {
             }
 
             // Levels
-            if !tech.support_levels.is_empty() {
-                if let Some(&support) = tech.support_levels.first() {
-                    if context.current_price <= support * 1.05 {
+            if !tech.support_levels.is_empty()
+                && let Some(&support) = tech.support_levels.first()
+                    && context.current_price <= support * 1.05 {
                         rationale_parts.push(format!("Price at support: {:.2}", support));
                         if action == Action::Hold {
                             action = Action::Buy;
                             confidence += 0.1;
                         }
                     }
-                }
-            }
         }
 
         // Fundamental analysis
@@ -271,7 +280,7 @@ impl TradingAgent {
         // Get current position in lots
         let current_position = context.current_position.as_ref().map(|p| p.quantity);
 
-        Ok(TradingDecision {
+        let decision = TradingDecision {
             ticker: context.ticker,
             action,
             confidence,
@@ -284,7 +293,11 @@ impl TradingAgent {
             time_horizon,
             current_position,
             current_price: context.current_price,
-        })
+        };
+
+        self.record_decision(&decision, "rule-based");
+
+        Ok(decision)
     }
 
     /// Calculate position size
@@ -324,7 +337,7 @@ impl TradingAgent {
         };
 
         // Account for available balance
-        let max_affordable = if context.current_price > 0.0 {
+        let _max_affordable = if context.current_price > 0.0 {
             (context.available_balance * (1.0 - 0.1)) / context.current_price // 10% reserve
         } else {
             0.0
@@ -365,22 +378,39 @@ impl TradingAgent {
     /// Determine time horizon
     fn determine_time_horizon(&self, context: &DecisionContext) -> TimeHorizon {
         // If fundamental analysis has high rating - long horizon
-        if let Some(fund) = &context.fundamental_analysis {
-            if fund.rating == CompanyRating::Excellent || fund.rating == CompanyRating::Good {
+        if let Some(fund) = &context.fundamental_analysis
+            && (fund.rating == CompanyRating::Excellent || fund.rating == CompanyRating::Good) {
                 return TimeHorizon::Long;
             }
-        }
 
         // If strong technical signal - short horizon
-        if let Some(tech) = &context.technical_analysis {
-            if tech.recommendation == Recommendation::StrongBuy
-                || tech.recommendation == Recommendation::StrongSell
+        if let Some(tech) = &context.technical_analysis
+            && (tech.recommendation == Recommendation::StrongBuy
+                || tech.recommendation == Recommendation::StrongSell)
             {
                 return TimeHorizon::Short;
             }
-        }
 
         TimeHorizon::Medium
+    }
+
+    /// Record a decision into dual memory (RAM + flash)
+    fn record_decision(&self, decision: &TradingDecision, provider: &str) {
+        if decision.action == Action::Hold {
+            return;
+        }
+        if let Ok(mut memory) = self.memory.write() {
+            let record = DecisionRecord::new(
+                &decision.ticker,
+                decision.action.clone(),
+                decision.confidence,
+                decision.current_price,
+                decision.stop_loss,
+                &decision.rationale,
+                provider,
+            );
+            let _ = memory.add(record);
+        }
     }
 
     /// Build prompt for LLM
@@ -444,7 +474,7 @@ impl TradingAgent {
         if let Some(fund) = &context.fundamental_analysis {
             prompt.push_str("FUNDAMENTAL ANALYSIS:\n");
             prompt.push_str(&format!(
-                "Рейтинг: {:?} (score: {:.1}/100)\n",
+                "Rating: {:?} (score: {:.1}/100)\n",
                 fund.rating, fund.overall_score
             ));
             if let Some(pe) = fund.valuation.pe_ratio {
@@ -492,20 +522,35 @@ impl TradingAgent {
         }
         prompt.push('\n');
 
+        // Recent decisions for this ticker (RAG)
+        if let Ok(guard) = self.memory.read() {
+            let recent: Vec<_> = guard
+                .records()
+                .iter()
+                .rev()
+                .filter(|r| r.ticker == context.ticker)
+                .take(3)
+                .collect();
+            if !recent.is_empty() {
+                prompt.push_str("RECENT DECISIONS:\n");
+                for r in &recent {
+                    prompt.push_str(&format!(
+                        "  {}: action={:?}, confidence={:.2}, entry={:.2}, pnl={}, exit={}\n",
+                        r.ticker,
+                        r.action,
+                        r.conviction,
+                        r.entry_price,
+                        r.pnl.map_or("N/A".into(), |p| format!("{:.2}", p)),
+                        r.exit_price.map_or("open".into(), |p| format!("{:.2}", p)),
+                    ));
+                }
+                prompt.push('\n');
+            }
+        }
+
         // Request
         prompt.push_str("TASK:\n");
-        prompt.push_str("Provide a recommendation in JSON format:\n");
-        prompt.push_str("{\n");
-        prompt.push_str("  \"action\": \"BUY\" | \"SELL\" | \"HOLD\",\n");
-        prompt.push_str("  \"confidence\": 0.0-1.0,\n");
-        prompt.push_str("  \"entry_price\": entry price,\n");
-        prompt.push_str("  \"position_size_pct\": portfolio share 0.0-1.0,\n");
-        prompt.push_str("  \"stop_loss\": stop-loss price,\n");
-        prompt.push_str("  \"take_profit\": take-profit price,\n");
-        prompt.push_str("  \"rationale\": \"rationale\",\n");
-        prompt.push_str("  \"risks\": [\"risk1\", \"risk2\"],\n");
-        prompt.push_str("  \"time_horizon\": \"SHORT\" | \"MEDIUM\" | \"LONG\"\n");
-        prompt.push_str("}\n");
+        prompt.push_str("Output a JSON object with fields: action (BUY/SELL/HOLD), confidence (0-1), entry_price, position_size_pct (0-1), stop_loss, take_profit, rationale, risks (array), time_horizon (SHORT/MEDIUM/LONG)\n");
 
         prompt
     }
@@ -617,7 +662,7 @@ mod tests {
     }
 
     fn make_mock_agent(response: &str) -> TradingAgent {
-        TradingAgent::new(Box::new(MockLlmQuery::new(response)), "test".to_string())
+        TradingAgent::new(Box::new(MockLlmQuery::new(response)), "test".to_string(), None).unwrap()
     }
 
     fn context_basic(ticker: &str, price: f64) -> DecisionContext {

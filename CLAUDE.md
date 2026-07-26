@@ -25,7 +25,7 @@ ai-trade-bot/
 │   ├── finbert_sft/             # FinBERT SFT pipeline
 │   └── data_collection/         # RSS + Perplexica → Ollama labeling
 ├── models/finbert/              # ONNX artifacts
-└── ollama-mcp/                  # Docker Ollama
+└── ollama/                      # Docker Ollama + fin-expert model
 ```
 
 **Data flow:**

@@ -1,8 +1,8 @@
 # Clippy configuration for ai-trade-bot
 # https://doc.rust-lang.org/clippy/configuration.html
 
-# Разрешить unwrap() только в тестах
+# Allow unwrap() only in tests
 allow-unwrap-in-tests = true
 
-# Порог для "больших" enum (по умолчанию 200 байт)
+# Threshold for "large" enum (default 200 bytes)
 large-error-threshold = 200

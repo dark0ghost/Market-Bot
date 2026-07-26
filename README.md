@@ -20,7 +20,7 @@ AI-powered торговая система для торговли на Моск
 
 ### AI-анализ рынка
 - **Технический анализ**: RSI, MACD, Bollinger Bands, уровни поддержки/сопротивления
-- **Новостной анализ**: LLM-анализ тональности новостей (Ollama/qwen3)
+- **Новостной анализ**: LLM-анализ тональности новостей (Ollama/Finance-Llama-8B)
 - **Фундаментальный анализ**: P/E, ROE, D/E, рост выручки и прибыли
 
 ### Торговые стратегии
@@ -63,7 +63,7 @@ ai-trade-bot/
 │   └── finbert_sft/        # FinBERT SFT (Supervised Fine-Tuning)
 ├── models/                 # ONNX model artifacts
 │   └── finbert/            # FinBERT ONNX model
-└── ollama-mcp/             # Docker container with Ollama
+└── ollama/                 # Docker container with Ollama + fin-expert
 ```
 
 ### Data Flow
@@ -117,8 +117,7 @@ export API_TOKEN="YOUR_TOKEN_HERE"
 ### 3. Запуск Ollama (опционально, для LLM-анализа)
 
 ```bash
-cd ollama-mcp
-docker-compose up -d
+docker compose up -d ollama
 ```
 
 ### 4. Запуск бота
@@ -249,7 +248,7 @@ RUST_LOG=info cargo run -p trader-bot
 
 ### Ollama LLM
 
-- Модель: `fin-expert` (на базе qwen3:1.7b)
+- Модель: `fin-expert` (на базе Finance-Llama-8B)
 - Анализ новостей
 - Принятие торговых решений
 - Порт: 11435
@@ -401,7 +400,7 @@ Error: Connection refused (os error 111)
 docker ps | grep ollama
 
 # Запустите Ollama
-cd ollama-mcp && docker-compose up -d
+docker compose up -d ollama
 ```
 
 ### Бот не размещает ордера

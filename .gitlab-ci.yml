@@ -1,18 +1,18 @@
-# GitLab CI/CD для AI Trade Bot
+# GitLab CI/CD for AI Trade Bot
 
 stages:
   - test
   - build
   - deploy
 
-# Переменные
+# Variables
 variables:
   CARGO_HOME: "${CI_PROJECT_DIR}/.cargo"
   RUST_VERSION: "1.75.0"
   PYTHON_VERSION: "3.11"
   MKDOCS_VERSION: "1.5.3"
 
-# Кэширование
+# Caching
 .cache: &cache
   cache:
     key: "${CI_JOB_NAME}"
@@ -20,7 +20,7 @@ variables:
       - .cargo/
       - target/
 
-# Тестирование Rust
+# Rust tests
 test:rust:
   <<: *cache
   stage: test
@@ -35,7 +35,7 @@ test:rust:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == "main"
 
-# Тестирование документации
+# Documentation tests
 test:docs:
   stage: test
   image: python:${PYTHON_VERSION}
@@ -47,7 +47,7 @@ test:docs:
     - if: $CI_COMMIT_BRANCH == "main"
   allow_failure: true
 
-# Сборка бота
+# Build bot
 build:bot:
   <<: *cache
   stage: build
@@ -64,14 +64,14 @@ build:bot:
     - if: $CI_COMMIT_TAG
     - if: $CI_COMMIT_BRANCH == "main"
 
-# Деплой документации на GitLab Pages
+# Deploy docs to GitLab Pages
 pages:
   stage: deploy
   image: python:${PYTHON_VERSION}
   script:
     - pip install mkdocs mkdocs-material mkdocs-static-i18n mkdocs-minify-plugin mkdocs-git-revision-date-localized-plugin mkdocs-mermaid2-plugin
     - mkdocs build --clean --site-dir public
-    - echo "Документация успешно собрана"
+    - echo "Documentation built successfully"
   artifacts:
     paths:
       - public
@@ -80,7 +80,7 @@ pages:
     - if: $CI_COMMIT_BRANCH == "main"
       when: always
 
-# Ручной деплой конкретной версии
+# Manual version deploy
 deploy:version:
   stage: deploy
   image: python:${PYTHON_VERSION}
@@ -93,7 +93,7 @@ deploy:version:
     - if: $CI_COMMIT_TAG
       when: manual
 
-# Уведомления
+# Notifications
 notify:
   stage: .post
   image: curlimages/curl:latest
