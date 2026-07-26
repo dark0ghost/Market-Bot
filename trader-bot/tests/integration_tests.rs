@@ -2,14 +2,14 @@
 //!
 //! These tests verify interaction between system components
 
-use trader_bot::error::{BotError, StrategyError};
+use trader_bot::error::BotError;
 
 /// Integration test for Sentiment analysis
 #[test]
 fn test_sentiment_analysis_integration() {
     use trader_bot::analysis::{NewsArticle, Sentiment};
 
-    let articles = vec![
+    let articles = [
         NewsArticle {
             title: "Positive news".to_string(),
             content: "Company showed profit growth".to_string(),
@@ -28,8 +28,8 @@ fn test_sentiment_analysis_integration() {
         },
         NewsArticle {
             title: "Neutral news".to_string(),
-            content: "Regular report".to_string(),
-            source: "investing".to_string(),
+            content: "Board meeting scheduled".to_string(),
+            source: "interfax".to_string(),
             url: "https://example.com/3".to_string(),
             published_at: None,
             sentiment: Some(Sentiment::Neutral),
@@ -128,7 +128,7 @@ fn test_technical_analyzer_integration() {
 
     let analyzer = TechnicalAnalyzer::new();
 
-    drop(analyzer);
+    let _ = analyzer;
 }
 
 /// Integration test for FundamentalAnalyzer

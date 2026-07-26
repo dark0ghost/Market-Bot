@@ -274,7 +274,7 @@ impl TradingAgent {
         let time_horizon = self.determine_time_horizon(&context);
 
         // Clamp confidence
-        confidence = confidence.min(0.95).max(0.05);
+        confidence = confidence.clamp(0.05, 0.95);
 
         let rationale = rationale_parts.join("; ");
 

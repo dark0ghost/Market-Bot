@@ -185,8 +185,8 @@ impl EnsemblePredictor {
         };
 
         let confidence = match action {
-            Action::Buy => buy_score.min(0.95).max(0.05),
-            Action::Sell => sell_score.min(0.95).max(0.05),
+            Action::Buy => buy_score.clamp(0.05, 0.95),
+            Action::Sell => sell_score.clamp(0.05, 0.95),
             Action::Hold => 0.5,
         };
 

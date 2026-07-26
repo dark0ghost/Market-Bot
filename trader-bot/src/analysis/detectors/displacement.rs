@@ -69,7 +69,7 @@ mod tests {
 
     fn normal_candles(n: usize, open: f64) -> Vec<Candle> {
         let mut candles = Vec::new();
-        for i in 0..n {
+        for _i in 0..n {
             candles.push(Candle {
                 open,
                 high: open + 1.0,

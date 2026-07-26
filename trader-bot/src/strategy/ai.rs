@@ -103,12 +103,12 @@ impl Strategy for AiStrategy {
 mod tests {
     use super::*;
     use crate::agent::{
-        Action, CurrentPosition, DecisionContext, OllamaQuery, TimeHorizon, TradingDecision,
+        Action, CurrentPosition, DecisionContext, OllamaQuery, TimeHorizon,
     };
     use crate::analysis::{
-        BollingerValues, CompanyRating, DividendMetrics, FinancialHealthMetrics,
+        BollingerValues, CompanyRating, FinancialHealthMetrics,
         FundamentalAnalysis, GrowthMetrics, MacdValues, MarketRegime, ProfitabilityMetrics,
-        Recommendation, Sentiment, TechnicalAnalysis, Trend, ValuationMetrics, VolumeAnalysis,
+        Recommendation, Sentiment, TechnicalAnalysis, Trend, ValuationMetrics,
     };
     use crate::config::RiskManagementConfig;
 
@@ -660,7 +660,7 @@ mod tests {
     #[test]
     fn test_time_horizon_ordering() {
         let short = TimeHorizon::Short;
-        let medium = TimeHorizon::Medium;
+        let _medium = TimeHorizon::Medium;
         let long = TimeHorizon::Long;
 
         // Just check they're different values

@@ -390,17 +390,7 @@ mod tests {
         // A mock SDK is needed for a full test
         // Only test the method logic
 
-        let mut state: Option<GridState> = Some(GridState {
-            ticker: "TINK".to_string(),
-            figi: "BBG000B9XRY4".to_string(),
-            levels: vec![],
-            active_orders: vec![1, 2],
-            filled_orders: vec![],
-            current_price: 150.0,
-        });
-
-        // Simulate stop_grid
-        state = None;
+        let state: Option<GridState> = None;
 
         assert!(state.is_none());
     }

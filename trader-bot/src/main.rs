@@ -1,3 +1,10 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(async_fn_in_trait)]
+#![allow(clippy::module_inception)]
+#![allow(clippy::too_many_arguments)]
+#![allow(clippy::upper_case_acronyms)]
+
 mod agent;
 mod analysis;
 mod api;

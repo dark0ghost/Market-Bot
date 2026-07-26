@@ -21,7 +21,7 @@ pub struct OllamaProvider {
 
 impl Clone for OllamaProvider {
     fn clone(&self) -> Self {
-        let ollama = Ollama::new(self.host.clone(), self.port);
+        let ollama = Ollama::builder().host(self.host.clone()).port(self.port).build();
         let coordinator = Arc::new(Mutex::new(
             Coordinator::new(ollama, self.model.clone(), vec![]).format(FormatType::Json),
         ));
@@ -36,7 +36,7 @@ impl Clone for OllamaProvider {
 
 impl OllamaProvider {
     pub fn new(model: String, host: String, port: u16) -> Self {
-        let ollama = Ollama::new(host.clone(), port);
+        let ollama = Ollama::builder().host(host.clone()).port(port).build();
         let coordinator = Arc::new(Mutex::new(
             Coordinator::new(ollama, model.clone(), vec![]).format(FormatType::Json),
         ));
@@ -50,7 +50,7 @@ impl OllamaProvider {
 
     #[cfg(test)]
     fn add_tool<T: ollama_rs::generation::tools::Tool + 'static>(&mut self, tools: Vec<T>) {
-        let ollama = Ollama::new(self.host.clone(), self.port);
+        let ollama = Ollama::builder().host(self.host.clone()).port(self.port).build();
         let mut coordinator = Coordinator::new(ollama, self.model.clone(), vec![]);
         for tool in tools {
             coordinator = coordinator.add_tool(tool)
@@ -64,7 +64,7 @@ impl OllamaProvider {
 
     #[cfg(test)]
     async fn get_local_model(self) -> Result<Vec<ollama_rs::models::LocalModel>, OllamaError> {
-        let ollama = Ollama::new(self.host.clone(), self.port);
+        let ollama = Ollama::builder().host(self.host.clone()).port(self.port).build();
         ollama.list_local_models().await
     }
 }

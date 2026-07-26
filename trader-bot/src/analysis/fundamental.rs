@@ -124,8 +124,7 @@ impl FundamentalAnalyzer {
             + financial_health_score * 0.20
             + growth_score * 0.20
             + dividend_score * 0.10)
-            .min(100.0)
-            .max(0.0);
+            .clamp(0.0, 100.0);
 
         let rating = self.score_to_rating(overall_score);
         let key_risks = self.identify_risks(&valuation, &profitability, &financial_health, &growth);
@@ -552,6 +551,6 @@ mod tests {
         );
 
         assert!(result.overall_score > 60.0);
-        assert!(result.key_strengths.len() > 0);
+        assert!(!result.key_strengths.is_empty());
     }
 }

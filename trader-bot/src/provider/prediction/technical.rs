@@ -30,6 +30,7 @@ impl TechnicalPredictor {
     }
 
     pub async fn predict(&self, ctx: &PredictionContext) -> Result<Prediction> {
+        #[allow(unused_assignments)]
         let mut action = Action::Hold;
         let mut conviction = 0.0;
         let mut features = HashMap::new();
@@ -129,7 +130,7 @@ impl TechnicalPredictor {
 
         Ok(Prediction {
             action,
-            confidence: conviction.abs().min(0.9).max(0.1),
+            confidence: conviction.abs().clamp(0.1, 0.9),
             conviction,
             features,
             metadata: serde_json::json!({"method": "technical_indicator_weighted"}),

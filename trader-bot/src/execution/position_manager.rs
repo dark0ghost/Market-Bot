@@ -341,7 +341,6 @@ mod tests {
 /// Tests for TradingExecutor
 #[cfg(test)]
 mod executor_tests {
-    use super::*;
 
     #[test]
     fn test_calculate_quantity_basic() {

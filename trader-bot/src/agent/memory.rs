@@ -222,7 +222,6 @@ impl DecisionMemory {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
 
     #[test]
     fn test_new_memory_is_empty() {
@@ -363,7 +362,7 @@ mod tests {
     #[test]
     fn test_profit_factor() {
         let mut mem = DecisionMemory::new(100);
-        for i in 0..5 {
+        for _i in 0..5 {
             let mut w =
                 DecisionRecord::new("AAPL", Action::Buy, 0.8, 100.0, Some(90.0), "", "test");
             w.close(120.0);

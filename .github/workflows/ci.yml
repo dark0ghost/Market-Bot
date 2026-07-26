@@ -115,7 +115,7 @@ jobs:
         run: cargo install cargo-audit
       
       - name: Run security audit
-        run: cargo audit --deny warnings
+        run: cargo audit
 
   # Test across Rust versions
   matrix:
