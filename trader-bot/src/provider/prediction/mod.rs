@@ -54,7 +54,7 @@ impl PredictionContext {
 #[derive(Debug, Clone)]
 pub enum PredictionProviderKind {
     Technical(technical::TechnicalPredictor),
-    LLM(llm::LLMPredictor),
+    Llm(llm::LlmPredictor),
     StatArb(stat_arb::StatArbPredictor),
     Fundamental(fundamental::FundamentalPredictor),
 }
@@ -63,7 +63,7 @@ impl PredictionProviderKind {
     pub fn provider_id(&self) -> &str {
         match self {
             PredictionProviderKind::Technical(_) => "technical",
-            PredictionProviderKind::LLM(_) => "llm",
+            PredictionProviderKind::Llm(_) => "llm",
             PredictionProviderKind::StatArb(_) => "stat_arb",
             PredictionProviderKind::Fundamental(_) => "fundamental",
         }
@@ -72,7 +72,7 @@ impl PredictionProviderKind {
     pub fn ensemble_weight(&self) -> f64 {
         match self {
             PredictionProviderKind::Technical(_) => 0.30,
-            PredictionProviderKind::LLM(_) => 0.35,
+            PredictionProviderKind::Llm(_) => 0.35,
             PredictionProviderKind::StatArb(_) => 0.15,
             PredictionProviderKind::Fundamental(_) => 0.20,
         }
@@ -81,7 +81,7 @@ impl PredictionProviderKind {
     pub async fn predict(&self, ctx: &PredictionContext) -> Result<Prediction> {
         match self {
             PredictionProviderKind::Technical(p) => p.predict(ctx).await,
-            PredictionProviderKind::LLM(p) => p.predict(ctx).await,
+            PredictionProviderKind::Llm(p) => p.predict(ctx).await,
             PredictionProviderKind::StatArb(p) => p.predict(ctx).await,
             PredictionProviderKind::Fundamental(p) => p.predict(ctx).await,
         }

@@ -1,6 +1,3 @@
-use anyhow::Result;
-use serde::{Deserialize, Serialize};
-
 /// Fundamental analysis result
 #[derive(Debug, Clone)]
 pub struct FundamentalAnalysis {
@@ -412,37 +409,37 @@ impl FundamentalAnalyzer {
         let mut risks = Vec::new();
 
         // Valuation risks
-        if let Some(pe) = valuation.pe_ratio {
-            if pe > 30.0 {
-                risks.push("High P/E - overvaluation risk".to_string());
-            }
+        if let Some(pe) = valuation.pe_ratio
+            && pe > 30.0
+        {
+            risks.push("High P/E - overvaluation risk".to_string());
         }
 
         // Profitability risks
-        if let Some(roe) = profitability.roe {
-            if roe < 5.0 {
-                risks.push("Low return on equity (ROE)".to_string());
-            }
+        if let Some(roe) = profitability.roe
+            && roe < 5.0
+        {
+            risks.push("Low return on equity (ROE)".to_string());
         }
 
         // Financial health risks
-        if let Some(dte) = financial_health.debt_to_equity {
-            if dte > 2.0 {
-                risks.push("High debt burden".to_string());
-            }
+        if let Some(dte) = financial_health.debt_to_equity
+            && dte > 2.0
+        {
+            risks.push("High debt burden".to_string());
         }
 
-        if let Some(cr) = financial_health.current_ratio {
-            if cr < 1.0 {
-                risks.push("Liquidity concerns".to_string());
-            }
+        if let Some(cr) = financial_health.current_ratio
+            && cr < 1.0
+        {
+            risks.push("Liquidity concerns".to_string());
         }
 
         // Growth risks
-        if let Some(growth) = growth.revenue_growth_yoy {
-            if growth < 0.0 {
-                risks.push("Revenue decline".to_string());
-            }
+        if let Some(growth) = growth.revenue_growth_yoy
+            && growth < 0.0
+        {
+            risks.push("Revenue decline".to_string());
         }
 
         risks
@@ -459,37 +456,37 @@ impl FundamentalAnalyzer {
         let mut strengths = Vec::new();
 
         // Valuation advantages
-        if let Some(pe) = valuation.pe_ratio {
-            if pe < 10.0 {
-                strengths.push("Low P/E - potential undervaluation".to_string());
-            }
+        if let Some(pe) = valuation.pe_ratio
+            && pe < 10.0
+        {
+            strengths.push("Low P/E - potential undervaluation".to_string());
         }
 
         // Profitability advantages
-        if let Some(roe) = profitability.roe {
-            if roe > 15.0 {
-                strengths.push("High return on equity (ROE)".to_string());
-            }
+        if let Some(roe) = profitability.roe
+            && roe > 15.0
+        {
+            strengths.push("High return on equity (ROE)".to_string());
         }
 
-        if let Some(margin) = profitability.net_margin {
-            if margin > 20.0 {
-                strengths.push("High net margin".to_string());
-            }
+        if let Some(margin) = profitability.net_margin
+            && margin > 20.0
+        {
+            strengths.push("High net margin".to_string());
         }
 
         // Financial health advantages
-        if let Some(dte) = financial_health.debt_to_equity {
-            if dte < 0.5 {
-                strengths.push("Low debt burden".to_string());
-            }
+        if let Some(dte) = financial_health.debt_to_equity
+            && dte < 0.5
+        {
+            strengths.push("Low debt burden".to_string());
         }
 
         // Growth advantages
-        if let Some(growth) = growth.revenue_growth_yoy {
-            if growth > 15.0 {
-                strengths.push("High revenue growth".to_string());
-            }
+        if let Some(growth) = growth.revenue_growth_yoy
+            && growth > 15.0
+        {
+            strengths.push("High revenue growth".to_string());
         }
 
         strengths

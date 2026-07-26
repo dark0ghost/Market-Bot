@@ -98,7 +98,7 @@ impl FinamDataSource {
         })
     }
 
-    pub fn new_with_token(api_token: String, token: String, name: Option<String>) -> Self {
+    pub fn new_with_token(_api_token: String, token: String, name: Option<String>) -> Self {
         let http = Client::builder()
             .user_agent("ai-trade-bot/0.2")
             .build()

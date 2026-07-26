@@ -2,11 +2,17 @@ use anyhow::Result;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use crate::core::{DataSource, DataSourceKind, InstrumentInfo};
+use crate::core::{DataSource, DataSourceKind};
 
 /// Registry of available data sources.
 pub struct DataSourceRegistry {
     sources: HashMap<String, Arc<dyn DataSource>>,
+}
+
+impl Default for DataSourceRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl DataSourceRegistry {
@@ -45,10 +51,10 @@ impl DataSourceRegistry {
         days: u32,
     ) -> Result<Vec<crate::core::Candle>> {
         for source in self.sources.values() {
-            if let Ok(candles) = source.candles(ticker, interval, days).await {
-                if !candles.is_empty() {
-                    return Ok(candles);
-                }
+            if let Ok(candles) = source.candles(ticker, interval, days).await
+                && !candles.is_empty()
+            {
+                return Ok(candles);
             }
         }
         anyhow::bail!("No data source returned candles for {}", ticker)

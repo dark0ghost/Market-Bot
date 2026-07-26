@@ -154,7 +154,7 @@ async fn handle_market_response(
                 figi: candle.figi,
                 time: candle
                     .time
-                    .and_then(|t| DateTime::from_timestamp(t.seconds as i64, 0))
+                    .and_then(|t| DateTime::from_timestamp(t.seconds, 0))
                     .unwrap_or(Utc::now()),
                 open: candle
                     .open
@@ -187,7 +187,7 @@ async fn handle_market_response(
                 figi: book.figi,
                 time: book
                     .time
-                    .and_then(|t| DateTime::from_timestamp(t.seconds as i64, 0))
+                    .and_then(|t| DateTime::from_timestamp(t.seconds, 0))
                     .unwrap_or(Utc::now()),
                 bids: book
                     .bids
@@ -221,7 +221,7 @@ async fn handle_market_response(
                 figi: trade.figi,
                 time: trade
                     .time
-                    .and_then(|t| DateTime::from_timestamp(t.seconds as i64, 0))
+                    .and_then(|t| DateTime::from_timestamp(t.seconds, 0))
                     .unwrap_or(Utc::now()),
                 price: trade
                     .price
@@ -243,7 +243,7 @@ async fn handle_market_response(
                     .unwrap_or(0.0),
                 time: last
                     .time
-                    .and_then(|t| DateTime::from_timestamp(t.seconds as i64, 0))
+                    .and_then(|t| DateTime::from_timestamp(t.seconds, 0))
                     .unwrap_or(Utc::now()),
             };
             let _ = tx.try_send(event);
@@ -252,7 +252,7 @@ async fn handle_market_response(
             let event = MarketEvent::Ping {
                 time: ping
                     .time
-                    .and_then(|t| DateTime::from_timestamp(t.seconds as i64, 0))
+                    .and_then(|t| DateTime::from_timestamp(t.seconds, 0))
                     .unwrap_or(Utc::now()),
             };
             let _ = tx.try_send(event);

@@ -1,13 +1,13 @@
+use crate::agent::{DecisionMemory, DecisionRecord};
 use crate::analysis::{
     CompanyRating, FundamentalAnalysis, MarketRegime, NewsSentiment, Recommendation, Sentiment,
     TechnicalAnalysis, Trend,
 };
 use crate::config::RiskManagementConfig;
-use anyhow::Result;
-use async_trait::async_trait;
-use crate::agent::{DecisionMemory, DecisionRecord};
 use crate::mcp::llm_provider::LlmProvider;
 use crate::mcp::ollama::OllamaProvider;
+use anyhow::Result;
+use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
@@ -220,13 +220,14 @@ impl TradingAgent {
             // Levels
             if !tech.support_levels.is_empty()
                 && let Some(&support) = tech.support_levels.first()
-                    && context.current_price <= support * 1.05 {
-                        rationale_parts.push(format!("Price at support: {:.2}", support));
-                        if action == Action::Hold {
-                            action = Action::Buy;
-                            confidence += 0.1;
-                        }
-                    }
+                && context.current_price <= support * 1.05
+            {
+                rationale_parts.push(format!("Price at support: {:.2}", support));
+                if action == Action::Hold {
+                    action = Action::Buy;
+                    confidence += 0.1;
+                }
+            }
         }
 
         // Fundamental analysis
@@ -379,17 +380,18 @@ impl TradingAgent {
     fn determine_time_horizon(&self, context: &DecisionContext) -> TimeHorizon {
         // If fundamental analysis has high rating - long horizon
         if let Some(fund) = &context.fundamental_analysis
-            && (fund.rating == CompanyRating::Excellent || fund.rating == CompanyRating::Good) {
-                return TimeHorizon::Long;
-            }
+            && (fund.rating == CompanyRating::Excellent || fund.rating == CompanyRating::Good)
+        {
+            return TimeHorizon::Long;
+        }
 
         // If strong technical signal - short horizon
         if let Some(tech) = &context.technical_analysis
             && (tech.recommendation == Recommendation::StrongBuy
                 || tech.recommendation == Recommendation::StrongSell)
-            {
-                return TimeHorizon::Short;
-            }
+        {
+            return TimeHorizon::Short;
+        }
 
         TimeHorizon::Medium
     }
@@ -662,7 +664,12 @@ mod tests {
     }
 
     fn make_mock_agent(response: &str) -> TradingAgent {
-        TradingAgent::new(Box::new(MockLlmQuery::new(response)), "test".to_string(), None).unwrap()
+        TradingAgent::new(
+            Box::new(MockLlmQuery::new(response)),
+            "test".to_string(),
+            None,
+        )
+        .unwrap()
     }
 
     fn context_basic(ticker: &str, price: f64) -> DecisionContext {

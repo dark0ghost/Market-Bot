@@ -88,18 +88,18 @@ impl RegimeDetector {
         let up_moves: f64 = slice
             .windows(2)
             .filter(|w| w[1] > w[0])
-            .map(|w| (w[1] - w[0]))
+            .map(|w| w[1] - w[0])
             .sum();
         let down_moves: f64 = slice
             .windows(2)
             .filter(|w| w[1] < w[0])
-            .map(|w| (w[0] - w[1]))
+            .map(|w| w[0] - w[1])
             .sum();
         let total = up_moves + down_moves;
         if total == 0.0 {
             return 0.0;
         }
-        let di_diff = (up_moves - down_moves).abs() / total * 100.0;
-        di_diff
+
+        (up_moves - down_moves).abs() / total * 100.0
     }
 }

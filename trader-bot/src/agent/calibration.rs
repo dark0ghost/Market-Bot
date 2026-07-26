@@ -73,6 +73,12 @@ pub struct PredictionRecord {
     pub actual_pnl: Option<f64>,
 }
 
+impl Default for PredictionTracker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PredictionTracker {
     pub fn new() -> Self {
         PredictionTracker {

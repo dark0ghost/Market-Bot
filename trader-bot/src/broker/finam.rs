@@ -239,7 +239,7 @@ impl FinamBroker {
             .await?;
 
         let token = auth_resp.token;
-        let name = format!("finam_{}", &account_id);
+        let name = format!("finam_{}", account_id);
         log::info!("Finam auth successful, token obtained");
 
         Ok(FinamBroker {

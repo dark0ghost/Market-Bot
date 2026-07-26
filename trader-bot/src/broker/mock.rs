@@ -129,7 +129,7 @@ impl Broker for MockBroker {
         })
     }
 
-    async fn liquidity(&self, instrument: &str, _depth: u32) -> Result<LiquidityInfo> {
+    async fn liquidity(&self, _instrument: &str, _depth: u32) -> Result<LiquidityInfo> {
         Ok(LiquidityInfo {
             total_bid_volume: 10000.0,
             total_ask_volume: 10000.0,
@@ -200,28 +200,27 @@ impl Broker for MockBroker {
                 let exists = state.positions.contains_key(&request.instrument);
                 if exists {
                     let pos = state.positions.get(&request.instrument).cloned();
-                    if let Some(p) = pos {
-                        if p.quantity >= request.quantity {
-                            let remaining = p.quantity - request.quantity;
-                            let pnl = (price - p.average_price) * request.quantity as f64;
-                            state.balance += cost;
-                            if remaining > 0 {
-                                state.positions.insert(
-                                    request.instrument.clone(),
-                                    PositionView {
-                                        instrument: request.instrument.clone(),
-                                        quantity: remaining,
-                                        average_price: p.average_price,
-                                        current_price: price,
-                                        pnl,
-                                        pnl_pct: (price - p.average_price) / p.average_price
-                                            * 100.0,
-                                        total_value: price * remaining as f64,
-                                    },
-                                );
-                            } else {
-                                state.positions.remove(&request.instrument);
-                            }
+                    if let Some(p) = pos
+                        && p.quantity >= request.quantity
+                    {
+                        let remaining = p.quantity - request.quantity;
+                        let pnl = (price - p.average_price) * request.quantity as f64;
+                        state.balance += cost;
+                        if remaining > 0 {
+                            state.positions.insert(
+                                request.instrument.clone(),
+                                PositionView {
+                                    instrument: request.instrument.clone(),
+                                    quantity: remaining,
+                                    average_price: p.average_price,
+                                    current_price: price,
+                                    pnl,
+                                    pnl_pct: (price - p.average_price) / p.average_price * 100.0,
+                                    total_value: price * remaining as f64,
+                                },
+                            );
+                        } else {
+                            state.positions.remove(&request.instrument);
                         }
                     }
                 }

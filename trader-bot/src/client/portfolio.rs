@@ -52,13 +52,13 @@ impl PortfolioService {
             .or(portfolio_response.total_amount_etf)
             .or(portfolio_response.total_amount_currencies)
             .or(portfolio_response.total_amount_futures)
-            .and_then(|q| Some(q.units as f64 + q.nano as f64 / 1_000_000_000.0))
+            .map(|q| q.units as f64 + q.nano as f64 / 1_000_000_000.0)
             .unwrap_or(0.0);
 
         let positions = portfolio_response
             .positions
             .into_iter()
-            .map(|pos| PositionInfo::from(pos))
+            .map(PositionInfo::from)
             .collect();
 
         Ok(PortfolioInfo {

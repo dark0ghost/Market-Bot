@@ -107,16 +107,26 @@ pub struct AiConfig {
     /// Use LLM for decisions (if false, rule-based is used)
     #[serde(default = "default_ai_use_llm")]
     pub use_llm: bool,
+    /// Use FinBERT for news sentiment (if false, Ollama LLM is used)
+    #[serde(default = "default_ai_use_finbert")]
+    pub use_finbert: bool,
     /// Minimum confidence threshold to execute trades
     #[serde(default = "default_ai_min_confidence")]
     pub min_confidence: f64,
     /// Override market regime detection
     #[serde(default)]
     pub force_regime: Option<String>,
+    /// Path to decision memory JSON file (dual persistence: RAM + flash)
+    #[serde(default)]
+    pub memory_path: Option<String>,
 }
 
 fn default_ai_use_llm() -> bool {
     true
+}
+
+fn default_ai_use_finbert() -> bool {
+    false
 }
 
 fn default_ai_min_confidence() -> f64 {
@@ -127,8 +137,10 @@ impl Default for AiConfig {
     fn default() -> Self {
         AiConfig {
             use_llm: default_ai_use_llm(),
+            use_finbert: default_ai_use_finbert(),
             min_confidence: default_ai_min_confidence(),
             force_regime: None,
+            memory_path: None,
         }
     }
 }

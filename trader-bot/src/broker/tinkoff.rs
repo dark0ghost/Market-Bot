@@ -34,7 +34,7 @@ impl TinkoffBroker {
         let sdk = TInvestSdk::new(token, env).await?;
 
         let account_id =
-            if sandbox && open_account && account_id.as_deref().map_or(true, |s| s.is_empty()) {
+            if sandbox && open_account && account_id.as_deref().is_none_or(|s| s.is_empty()) {
                 let mut sc = sdk.sandbox();
                 let resp = sc
                     .open_sandbox_account(OpenSandboxAccountRequest { name: None })

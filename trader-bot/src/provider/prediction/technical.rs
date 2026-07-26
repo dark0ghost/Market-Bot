@@ -12,6 +12,12 @@ pub struct TechnicalPredictor {
     trend_weight: f64,
 }
 
+impl Default for TechnicalPredictor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TechnicalPredictor {
     pub fn new() -> Self {
         TechnicalPredictor {

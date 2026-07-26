@@ -126,7 +126,7 @@ impl TechnicalAnalyzer {
 
         let current_candle = candles.last().unwrap();
         let current_price = extract_price(&current_candle.close)?;
-        let current_time = current_candle.time.clone().unwrap_or_default();
+        let current_time = current_candle.time.unwrap_or_default();
 
         // Extract closing prices
         let closes: Vec<f64> = candles
@@ -167,8 +167,7 @@ impl TechnicalAnalyzer {
 
         Ok(TechnicalAnalysis {
             ticker: ticker.to_string(),
-            timestamp: DateTime::from_timestamp(current_time.seconds as i64, 0)
-                .unwrap_or_else(Utc::now),
+            timestamp: DateTime::from_timestamp(current_time.seconds, 0).unwrap_or_else(Utc::now),
             current_price,
             trend,
             rsi,

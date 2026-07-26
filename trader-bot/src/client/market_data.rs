@@ -1,5 +1,5 @@
 use anyhow::Result;
-use chrono::{DateTime, Duration, Utc};
+use chrono::{Duration, Utc};
 use t_invest_sdk::TInvestSdk;
 use t_invest_sdk::api::{CandleInterval, GetCandlesRequest, GetCandlesResponse, HistoricCandle};
 

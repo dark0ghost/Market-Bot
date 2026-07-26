@@ -102,7 +102,9 @@ impl Strategy for AiStrategy {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::agent::{Action, CurrentPosition, DecisionContext, OllamaQuery, TimeHorizon, TradingDecision};
+    use crate::agent::{
+        Action, CurrentPosition, DecisionContext, OllamaQuery, TimeHorizon, TradingDecision,
+    };
     use crate::analysis::{
         BollingerValues, CompanyRating, DividendMetrics, FinancialHealthMetrics,
         FundamentalAnalysis, GrowthMetrics, MacdValues, MarketRegime, ProfitabilityMetrics,
@@ -114,14 +116,22 @@ mod tests {
 
     #[test]
     fn test_ai_strategy_name_and_kind() {
-        let agent = Arc::new(TradingAgent::new(
-            Box::new(OllamaQuery::new(mcp_client::ollama::OllamaProvider::default())),
-            "test".to_string(),
-        ));
+        let agent = Arc::new(
+            TradingAgent::new(
+                Box::new(OllamaQuery::new(
+                    crate::mcp::ollama::OllamaProvider::default(),
+                )),
+                "test".to_string(),
+                None,
+            )
+            .unwrap(),
+        );
         let config = AiConfig {
             use_llm: false,
+            use_finbert: false,
             min_confidence: 0.5,
             force_regime: None,
+            memory_path: None,
         };
         let strategy = AiStrategy::new("test".to_string(), config, agent);
         assert_eq!(strategy.name(), "ai");
@@ -130,14 +140,22 @@ mod tests {
 
     #[test]
     fn test_ai_strategy_validate() {
-        let agent = Arc::new(TradingAgent::new(
-            Box::new(OllamaQuery::new(mcp_client::ollama::OllamaProvider::default())),
-            "test".to_string(),
-        ));
+        let agent = Arc::new(
+            TradingAgent::new(
+                Box::new(OllamaQuery::new(
+                    crate::mcp::ollama::OllamaProvider::default(),
+                )),
+                "test".to_string(),
+                None,
+            )
+            .unwrap(),
+        );
         let config = AiConfig {
             use_llm: true,
+            use_finbert: false,
             min_confidence: 0.6,
             force_regime: None,
+            memory_path: None,
         };
         let strategy = AiStrategy::new("test".to_string(), config, agent);
         assert!(strategy.validate().is_ok());
@@ -145,14 +163,22 @@ mod tests {
 
     #[test]
     fn test_ai_strategy_validate_invalid() {
-        let agent = Arc::new(TradingAgent::new(
-            Box::new(OllamaQuery::new(mcp_client::ollama::OllamaProvider::default())),
-            "test".to_string(),
-        ));
+        let agent = Arc::new(
+            TradingAgent::new(
+                Box::new(OllamaQuery::new(
+                    crate::mcp::ollama::OllamaProvider::default(),
+                )),
+                "test".to_string(),
+                None,
+            )
+            .unwrap(),
+        );
         let config = AiConfig {
             use_llm: true,
+            use_finbert: false,
             min_confidence: 1.5,
             force_regime: None,
+            memory_path: None,
         };
         let strategy = AiStrategy::new("test".to_string(), config, agent);
         assert!(strategy.validate().is_err());
@@ -160,14 +186,22 @@ mod tests {
 
     #[test]
     fn test_ai_strategy_config_access() {
-        let agent = Arc::new(TradingAgent::new(
-            Box::new(OllamaQuery::new(mcp_client::ollama::OllamaProvider::default())),
-            "test".to_string(),
-        ));
+        let agent = Arc::new(
+            TradingAgent::new(
+                Box::new(OllamaQuery::new(
+                    crate::mcp::ollama::OllamaProvider::default(),
+                )),
+                "test".to_string(),
+                None,
+            )
+            .unwrap(),
+        );
         let config = AiConfig {
             use_llm: true,
+            use_finbert: false,
             min_confidence: 0.7,
             force_regime: Some("trending".to_string()),
+            memory_path: None,
         };
         let strategy = AiStrategy::new("test".to_string(), config, agent);
         assert_eq!(strategy.config().min_confidence, 0.7);
@@ -179,9 +213,13 @@ mod tests {
 
     fn make_agent() -> TradingAgent {
         TradingAgent::new(
-            Box::new(OllamaQuery::new(mcp_client::ollama::OllamaProvider::default())),
+            Box::new(OllamaQuery::new(
+                crate::mcp::ollama::OllamaProvider::default(),
+            )),
             "test".to_string(),
+            None,
         )
+        .unwrap()
     }
 
     #[test]

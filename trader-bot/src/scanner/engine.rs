@@ -1,10 +1,8 @@
 use crate::agent::{DecisionContext, TradingAgent, TradingDecision};
-use crate::analysis::{MarketRegime, *};
+use crate::analysis::{MarketRegime, NewsItem, NewsSentiment, NewsSentimentAnalyzer, *};
 use crate::client::{MarketDataService, PortfolioService};
-use mcp_client::ollama::OllamaProvider;
 use std::sync::Arc;
 use t_invest_sdk::TInvestSdk;
-use t_invest_sdk::api::CandleInterval;
 use tokio::sync::Semaphore;
 
 pub struct ScanResult {
@@ -21,7 +19,7 @@ pub struct SignalScanner {
     technical_analyzer: TechnicalAnalyzer,
     news_analyzer: NewsAnalyzer,
     fundamental_data: FundamentalDataService,
-    news_llm: Option<NewsLLMService>,
+    news_sentiment: Option<Arc<dyn NewsSentimentAnalyzer>>,
     concurrency_limit: Arc<Semaphore>,
 }
 
@@ -30,7 +28,7 @@ impl SignalScanner {
         sdk: TInvestSdk,
         portfolio: PortfolioService,
         agent: TradingAgent,
-        llm_provider: Option<OllamaProvider>,
+        news_sentiment: Option<Arc<dyn NewsSentimentAnalyzer>>,
         max_concurrent: usize,
     ) -> Self {
         SignalScanner {
@@ -40,7 +38,7 @@ impl SignalScanner {
             technical_analyzer: TechnicalAnalyzer::new(),
             news_analyzer: NewsAnalyzer::new(vec!["tinkoff".into(), "investing".into()]),
             fundamental_data: FundamentalDataService::new(),
-            news_llm: llm_provider.map(NewsLLMService::new),
+            news_sentiment,
             sdk,
             concurrency_limit: Arc::new(Semaphore::new(max_concurrent)),
         }
@@ -76,7 +74,7 @@ impl SignalScanner {
 
         let tech = self.technical_analyzer.analyze(ticker, &candles).ok();
 
-        let news = if let Some(ref llm) = self.news_llm {
+        let news = if let Some(ref analyzer) = self.news_sentiment {
             match self.news_analyzer.analyze(ticker, name).await {
                 Ok(sentiment) => {
                     let items: Vec<NewsItem> = sentiment
@@ -91,14 +89,14 @@ impl SignalScanner {
                         })
                         .collect();
 
-                    match llm.analyze_news_batch(ticker, name, &items).await {
-                        Ok(llm_result) => Some(NewsSentiment {
+                    match analyzer.analyze_news_batch(ticker, name, &items).await {
+                        Ok(result) => Some(NewsSentiment {
                             ticker: ticker.to_string(),
-                            overall_sentiment: llm_result.overall_sentiment,
-                            sentiment_score: llm_result.sentiment_score,
+                            overall_sentiment: result.overall_sentiment,
+                            sentiment_score: result.sentiment_score,
                             articles_count: sentiment.articles_count,
                             articles: sentiment.articles,
-                            key_events: llm_result.key_events,
+                            key_events: result.key_events,
                         }),
                         Err(_) => Some(sentiment),
                     }
@@ -152,7 +150,7 @@ impl SignalScanner {
         let mut handles = Vec::new();
 
         for (ticker, figi, name) in instruments {
-            let self_ref: &SignalScanner = &*self;
+            let self_ref: &SignalScanner = self;
             let ticker_ = ticker.clone();
             let figi_ = figi.clone();
             let name_ = name.clone();

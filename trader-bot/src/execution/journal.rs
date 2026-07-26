@@ -44,8 +44,8 @@ impl TradeJournal {
         let trades_path = PathBuf::from(dir).join("trades.csv");
         let signals_path = PathBuf::from(dir).join("signals.csv");
 
-        let trades_exists = trades_path.exists();
-        let signals_exists = signals_path.exists();
+        let _trades_exists = trades_path.exists();
+        let _signals_exists = signals_path.exists();
 
         let trades_writer = csv::Writer::from_writer(
             OpenOptions::new()

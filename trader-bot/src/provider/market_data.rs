@@ -1,8 +1,8 @@
 use crate::client::MarketDataService;
 use crate::client::OrderBookService;
-use crate::client::{LiquidityInfo, OrderBook, OrderBookLevel};
+use crate::client::{LiquidityInfo, OrderBook};
 use anyhow::Result;
-use t_invest_sdk::api::{CandleInterval, HistoricCandle, Quotation};
+use t_invest_sdk::api::{CandleInterval, HistoricCandle};
 
 pub trait MarketDataProvider {
     async fn get_historical_candles(

@@ -23,8 +23,7 @@ impl Clone for OllamaProvider {
     fn clone(&self) -> Self {
         let ollama = Ollama::new(self.host.clone(), self.port);
         let coordinator = Arc::new(Mutex::new(
-            Coordinator::new(ollama, self.model.clone(), vec![])
-                .format(FormatType::Json),
+            Coordinator::new(ollama, self.model.clone(), vec![]).format(FormatType::Json),
         ));
         OllamaProvider {
             model: self.model.clone(),
@@ -39,8 +38,7 @@ impl OllamaProvider {
     pub fn new(model: String, host: String, port: u16) -> Self {
         let ollama = Ollama::new(host.clone(), port);
         let coordinator = Arc::new(Mutex::new(
-            Coordinator::new(ollama, model.clone(), vec![])
-                .format(FormatType::Json),
+            Coordinator::new(ollama, model.clone(), vec![]).format(FormatType::Json),
         ));
         OllamaProvider {
             model,

@@ -1,6 +1,6 @@
 pub mod routes;
 
-use axum::{Router, extract::State, routing::get};
+use axum::{Router, routing::get};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 

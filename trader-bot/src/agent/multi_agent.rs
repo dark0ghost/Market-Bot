@@ -4,7 +4,7 @@ use crate::agent::{Action, DecisionContext};
 use crate::analysis::regime::MarketRegime;
 use crate::provider::prediction::EnsemblePredictor;
 use crate::provider::prediction::fundamental::FundamentalPredictor;
-use crate::provider::prediction::llm::LLMPredictor;
+use crate::provider::prediction::llm::LlmPredictor;
 use crate::provider::prediction::stat_arb::StatArbPredictor;
 use crate::provider::prediction::technical::TechnicalPredictor;
 use crate::provider::prediction::{Prediction, PredictionContext};
@@ -46,13 +46,13 @@ pub struct AnalystAgent {
 }
 
 impl AnalystAgent {
-    pub fn new(llm_provider: mcp_client::ollama::OllamaProvider, model_name: &str) -> Self {
+    pub fn new(llm_provider: crate::mcp::ollama::OllamaProvider, model_name: &str) -> Self {
         let tracker = PredictionTracker::new();
         let providers = vec![
             crate::provider::prediction::PredictionProviderKind::Technical(
                 TechnicalPredictor::new(),
             ),
-            crate::provider::prediction::PredictionProviderKind::LLM(LLMPredictor::new(
+            crate::provider::prediction::PredictionProviderKind::Llm(LlmPredictor::new(
                 llm_provider,
                 model_name,
             )),
@@ -131,11 +131,9 @@ impl RiskAgent {
                 risk_score += 0.2;
                 reasons.push("volatile regime");
             }
-            MarketRegime::Trending => {
-                if proposal.conviction.abs() > 0.5 {
-                    risk_score -= 0.1;
-                    reasons.push("strong trend conviction");
-                }
+            MarketRegime::Trending if proposal.conviction.abs() > 0.5 => {
+                risk_score -= 0.1;
+                reasons.push("strong trend conviction");
             }
             _ => {}
         }
@@ -144,7 +142,13 @@ impl RiskAgent {
             .technical_analysis
             .as_ref()
             .and_then(|t| t.rsi)
-            .map(|rsi| if rsi > 70.0 || rsi < 30.0 { 0.15 } else { 0.0 })
+            .map(|rsi| {
+                if !(30.0..=70.0).contains(&rsi) {
+                    0.15
+                } else {
+                    0.0
+                }
+            })
             .unwrap_or(0.0);
         risk_score += price_volatility;
 
@@ -186,7 +190,7 @@ pub struct SupervisorAgent {
 
 impl SupervisorAgent {
     pub fn new(
-        llm_provider: mcp_client::ollama::OllamaProvider,
+        llm_provider: crate::mcp::ollama::OllamaProvider,
         model_name: &str,
         max_position_pct: f64,
         max_drawdown_pct: f64,

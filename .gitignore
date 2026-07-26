@@ -1,55 +1,47 @@
-# ─── Rust ─────────────────────────────────────────────────────────────
-target/
-**/target/
-*.rs.bk
 
+*~
+# ─── AI Agent configs ────────────────────────────────────────────────
+*.arrow
+.claude/
 # ─── Config (API keys, secrets) ───────────────────────────────────────
-trader-bot/config/
-!trader-bot/config/.gitkeep
+credentials.json
+credentials.yml
+# ─── Data & Models (large binaries, datasets) ─────────────────────────
+.DS_Store
 .env
 .env.*
-*.pem
+.idea/
+# ─── IDE / OS ─────────────────────────────────────────────────────────
 *.key
-credentials.yml
-credentials.json
-
-# ─── Data & Models (large binaries, datasets) ─────────────────────────
+*.log
+# ─── Logs ─────────────────────────────────────────────────────────────
+# ─── MkDocs build output ────────────────────────────────────────────
 models/
 *.onnx
 *.parquet
-*.arrow
-training/data_collected/
-
-# ─── Python ──────────────────────────────────────────────────────────
-__pycache__/
+*.pem
 *.pyc
+__pycache__/
 *.pyo
-
-# ─── AI Agent configs ────────────────────────────────────────────────
+# ─── Python ──────────────────────────────────────────────────────────
 .qwen/
-.claude/
-
-# ─── IDE / OS ─────────────────────────────────────────────────────────
-.idea/
-.vscode/
-*.swp
-*.swo
-*~
-.DS_Store
-Thumbs.db
-
-# ─── Logs ─────────────────────────────────────────────────────────────
-*.log
-
-# ─── MkDocs build output ────────────────────────────────────────────
+*.rs.bk
+# ─── Rust ─────────────────────────────────────────────────────────────
 site/
-
-# ─── Temp ─────────────────────────────────────────────────────────────
+*.swo
+*.swp
+**/target/
+target/
 task.md
-tmp/
 temp/
+# ─── Temp ─────────────────────────────────────────────────────────────
+Thumbs.db
+tmp/
+trader-bot/config/
+!trader-bot/config/.gitkeep
 /training/data_collected/
-/training/finbert_sft/data_backup
+training/data_collected/
 /training/data_collection/*.json
 /training/finbert_sft/data
-
+/training/finbert_sft/data_backup
+.vscode/

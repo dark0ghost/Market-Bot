@@ -77,7 +77,7 @@ pub fn run_backtest(
         let timestamp = candles[i]
             .time
             .as_ref()
-            .and_then(|t| DateTime::from_timestamp(t.seconds as i64, 0))
+            .and_then(|t| DateTime::from_timestamp(t.seconds, 0))
             .unwrap_or(Utc::now());
 
         if signal > 0.5 && position == 0.0 {
@@ -104,7 +104,7 @@ pub fn run_backtest(
             let cost = position * current_price;
             let commission = cost * config.commission_pct;
             let fill_price = current_price * (1.0 - config.slippage_pct);
-            let pnl = (fill_price - (balance + commission).max(0.0)) + commission;
+            let _pnl = (fill_price - (balance + commission).max(0.0)) + commission;
 
             balance += cost - commission;
             let trade_pnl = cost - commission - (balance - cost);
@@ -210,7 +210,7 @@ pub fn backtest_grid(
     let step = (upper_price - lower_price) / (grid_levels - 1) as f64;
     let mut balance = config.initial_balance;
     let mut grid_positions: Vec<(f64, f64)> = Vec::new();
-    let mut trades = Vec::new();
+    let trades = Vec::new();
     let mut peak_balance = config.initial_balance;
     let mut max_drawdown: f64 = 0.0;
 

@@ -55,10 +55,10 @@ pub async fn portfolio(State(state): State<Arc<Mutex<AppState>>>) -> Json<Vec<se
     let mut results = Vec::new();
 
     for broker in &guard.brokers {
-        if let Ok(portfolio) = broker.portfolio().await {
-            if let Ok(val) = serde_json::to_value(&portfolio) {
-                results.push(val);
-            }
+        if let Ok(portfolio) = broker.portfolio().await
+            && let Ok(val) = serde_json::to_value(&portfolio)
+        {
+            results.push(val);
         }
     }
 

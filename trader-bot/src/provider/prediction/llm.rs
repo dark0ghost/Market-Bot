@@ -1,27 +1,27 @@
 use crate::agent::Action;
+use crate::mcp::llm_provider::LlmProvider;
+use crate::mcp::ollama::OllamaProvider;
 use crate::provider::prediction::{Prediction, PredictionContext};
 use anyhow::Result;
-use mcp_client::llm_provider::LLMProvider;
-use mcp_client::ollama::OllamaProvider;
 use std::collections::HashMap;
 
 #[derive(Clone)]
-pub struct LLMPredictor {
+pub struct LlmPredictor {
     llm_provider: OllamaProvider,
     model_name: String,
 }
 
-impl std::fmt::Debug for LLMPredictor {
+impl std::fmt::Debug for LlmPredictor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("LLMPredictor")
+        f.debug_struct("LlmPredictor")
             .field("model_name", &self.model_name)
             .finish()
     }
 }
 
-impl LLMPredictor {
+impl LlmPredictor {
     pub fn new(llm_provider: OllamaProvider, model_name: &str) -> Self {
-        LLMPredictor {
+        LlmPredictor {
             llm_provider,
             model_name: model_name.to_string(),
         }

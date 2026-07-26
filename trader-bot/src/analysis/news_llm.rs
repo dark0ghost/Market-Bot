@@ -1,17 +1,29 @@
 use super::news::Sentiment;
+use crate::mcp::llm_provider::LlmProvider;
+use crate::mcp::ollama::OllamaProvider;
 use anyhow::Result;
-use mcp_client::llm_provider::LLMProvider;
-use mcp_client::ollama::OllamaProvider;
+use async_trait::async_trait;
 use std::sync::Arc;
 
+/// Trait abstracting news sentiment analysis (Ollama or FinBERT).
+#[async_trait]
+pub trait NewsSentimentAnalyzer: Send + Sync {
+    async fn analyze_news_batch(
+        &self,
+        ticker: &str,
+        company_name: &str,
+        news_items: &[NewsItem],
+    ) -> Result<BatchSentimentResult>;
+}
+
 /// Service for LLM news analysis
-pub struct NewsLLMService {
+pub struct NewsLlmService {
     llm_provider: Arc<OllamaProvider>,
 }
 
-impl NewsLLMService {
+impl NewsLlmService {
     pub fn new(llm_provider: OllamaProvider) -> Self {
-        NewsLLMService {
+        NewsLlmService {
             llm_provider: Arc::new(llm_provider),
         }
     }
@@ -205,6 +217,19 @@ Respond in JSON format:
             opportunities,
             summary,
         })
+    }
+}
+
+#[async_trait]
+impl NewsSentimentAnalyzer for NewsLlmService {
+    async fn analyze_news_batch(
+        &self,
+        ticker: &str,
+        company_name: &str,
+        news_items: &[NewsItem],
+    ) -> Result<BatchSentimentResult> {
+        self.analyze_news_batch(ticker, company_name, news_items)
+            .await
     }
 }
 

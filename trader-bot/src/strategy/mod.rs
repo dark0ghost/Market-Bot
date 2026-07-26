@@ -1,4 +1,5 @@
 pub mod ai;
+pub mod gates;
 pub mod grid;
 pub mod grid_bot;
 pub mod grid_executor;
@@ -9,6 +10,7 @@ pub mod stat_arb;
 pub mod strategy;
 
 pub use ai::AiStrategy;
+pub use gates::*;
 pub use grid::{GridLevel, GridState, GridStrategy, OrderSide};
 pub use grid_bot::{GridBot, GridBotConfig};
 pub use grid_executor::{GridExecutor, GridOrderResult, RebalanceResult};

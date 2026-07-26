@@ -10,6 +10,12 @@ pub struct StrategyRegistry {
     strategies: HashMap<String, Arc<Mutex<Box<dyn Strategy>>>>,
 }
 
+impl Default for StrategyRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl StrategyRegistry {
     pub fn new() -> Self {
         StrategyRegistry {

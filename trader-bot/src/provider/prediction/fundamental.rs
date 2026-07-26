@@ -12,6 +12,12 @@ pub struct FundamentalPredictor {
     growth_weight: f64,
 }
 
+impl Default for FundamentalPredictor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FundamentalPredictor {
     pub fn new() -> Self {
         FundamentalPredictor {

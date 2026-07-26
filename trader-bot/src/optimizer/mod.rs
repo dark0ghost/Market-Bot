@@ -3,7 +3,7 @@ use chrono::Utc;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use crate::backtest::{BacktestConfig, BacktestResult, run_backtest};
+use crate::backtest::{BacktestConfig, BacktestResult};
 use crate::core::*;
 
 /// Strategy function type used by the optimizer.

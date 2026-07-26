@@ -152,7 +152,7 @@ impl NewsAnalyzer {
 
         match self.client.get(&url).send().await {
             Ok(response) => {
-                let text = response.text().await?;
+                let _text = response.text().await?;
                 // Simplified parsing - in reality, use an HTML parser
                 Ok(vec![]) // Placeholder - real implementation via task agent
             }

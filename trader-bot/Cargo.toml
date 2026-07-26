@@ -23,7 +23,6 @@ path = "src/main.rs"
 
 [dependencies]
 t-invest-sdk = "0.17.0"
-mcp-client = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 anyhow = { workspace = true }
 thiserror = "2.0"
@@ -51,6 +50,10 @@ tokenizers = "0.21"
 arc-swap = "1.7"
 notify = "7.0"
 notify-debouncer-mini = "0.4"
+
+# ─── LLM / Ollama ─────────────────────────────────────────────────────
+ollama-rs = { version = "0.3.1", features = ["stream", "macros", "tool-implementations"] }
+schemars = { workspace = true, features = ["preserve_order"] }
 
 # ─── New dependencies for refactored architecture ─────────────────────
 async-trait = "0.1"

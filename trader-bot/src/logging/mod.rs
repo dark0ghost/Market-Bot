@@ -115,6 +115,12 @@ pub struct LogRouter {
     destinations: Vec<Box<dyn LogDestination>>,
 }
 
+impl Default for LogRouter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl LogRouter {
     pub fn new() -> Self {
         LogRouter {

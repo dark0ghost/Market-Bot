@@ -27,22 +27,22 @@ use anyhow::{Result, anyhow};
 use log::Level;
 use std::env;
 use std::sync::Arc;
-use t_invest_sdk::api::{FindInstrumentRequest, InstrumentType};
-use t_invest_sdk::{Environment, TInvestSdk};
+use t_invest_sdk::TInvestSdk;
 use tokio::sync::Mutex;
 
 use agent::{DecisionContext, OllamaQuery, TradingAgent};
 use analysis::{
-    FundamentalDataService, NewsAnalyzer, NewsItem, NewsLLMService, NewsSentiment, RegimeDetector,
-    TechnicalAnalyzer,
+    FinBertSentimentService, FundamentalDataService, NewsAnalyzer, NewsItem, NewsLlmService,
+    NewsSentiment, NewsSentimentAnalyzer, RegimeDetector, TechnicalAnalyzer,
 };
 use broker::{FinamBroker, MockBroker, TinkoffBroker};
 use client::MarketDataService;
 use config::{AccountConfig, Credential, SandboxConfig, StrategyType, TradingConfig, WorkingMode};
 use core::*;
 use datasource::{DataSourceRegistry, TinkoffDataSource};
+use execution::PositionTracker;
 
-use mcp_client::ollama::OllamaProvider;
+use crate::mcp::ollama::OllamaProvider;
 use strategy::{
     AiStrategy, GridBot, GridBotConfig, GridStrategy, IntervalStrategy, StrategyRegistry,
 };
@@ -116,18 +116,19 @@ fn create_strategy(account: &AccountConfig, agent: Arc<TradingAgent>) -> Box<dyn
     let aid = account.account_id.clone().unwrap_or_default();
     match &account.strategy.strategy {
         StrategyType::Grid => {
-            let cfg = account
-                .strategy
-                .parameters
-                .grid_config
-                .clone()
-                .unwrap_or_else(|| config::GridConfig {
-                    lower_price: 100.0,
-                    upper_price: 200.0,
-                    grid_levels: 11,
-                    order_size: 10,
-                    grid_ratio: 0.5,
-                });
+            let cfg =
+                account
+                    .strategy
+                    .parameters
+                    .grid_config
+                    .clone()
+                    .unwrap_or(config::GridConfig {
+                        lower_price: 100.0,
+                        upper_price: 200.0,
+                        grid_levels: 11,
+                        order_size: 10,
+                        grid_ratio: 0.5,
+                    });
             Box::new(GridStrategy::new(cfg))
         }
         StrategyType::Ai => {
@@ -199,9 +200,28 @@ async fn main() -> Result<()> {
     // ── 3. Analysis services ──────────────────────────────────────────
     let news_analyzer = NewsAnalyzer::new(vec!["tinkoff".to_string(), "investing".to_string()]);
     let technical_analyzer = TechnicalAnalyzer::new();
-    let news_llm = NewsLLMService::new(ollama.clone());
     let fundamental_data = FundamentalDataService::new();
     let mut regime_detector = RegimeDetector::new(14, 14);
+
+    let use_finbert = config
+        .accounts
+        .first()
+        .and_then(|a| a.strategy.parameters.ai_config.as_ref())
+        .map(|c| c.use_finbert)
+        .unwrap_or(false);
+    let news_analyzer_service: Arc<dyn NewsSentimentAnalyzer> = if use_finbert {
+        log::info!("News sentiment: FinBERT");
+        match FinBertSentimentService::new("models/finbert") {
+            Ok(fb) => Arc::new(fb),
+            Err(e) => {
+                log::warn!("Failed to init FinBERT ({}), falling back to Ollama", e);
+                Arc::new(NewsLlmService::new(ollama.clone()))
+            }
+        }
+    } else {
+        log::info!("News sentiment: Ollama LLM");
+        Arc::new(NewsLlmService::new(ollama.clone()))
+    };
 
     // ── 4. Init per-account brokers ───────────────────────────────────
     let mut account_brokers: Vec<(&AccountConfig, AccountBroker)> = Vec::new();
@@ -240,10 +260,21 @@ async fn main() -> Result<()> {
     // ── 6. Strategies ─────────────────────────────────────────────────
     let mut strategy_registry = StrategyRegistry::new();
     for (account, _) in &account_brokers {
-        let agent = Arc::new(TradingAgent::new(
-            Box::new(OllamaQuery::new(ollama.clone())),
-            model_name.clone(),
-        ));
+        let memory_path = account
+            .strategy
+            .parameters
+            .ai_config
+            .as_ref()
+            .and_then(|a| a.memory_path.clone())
+            .map(std::path::PathBuf::from);
+        let agent = Arc::new(
+            TradingAgent::new(
+                Box::new(OllamaQuery::new(ollama.clone())),
+                model_name.clone(),
+                memory_path,
+            )
+            .unwrap(),
+        );
         let strategy = create_strategy(account, agent);
         let aid = account.account_id.as_deref().unwrap_or("");
         log::info!("Strategy for {}: {}", aid, strategy.name());
@@ -252,25 +283,25 @@ async fn main() -> Result<()> {
     log::info!("Strategies: {:?}", strategy_registry.list_names());
 
     // ── 7. Dashboard ──────────────────────────────────────────────────
-    if let Some(dash) = &config.dashboard {
-        if dash.enabled {
-            let brokers: Vec<Arc<dyn Broker>> = account_brokers
-                .iter()
-                .map(|(_, ab)| ab.broker.clone())
-                .collect();
-            let state = Arc::new(Mutex::new(api::AppState {
-                brokers,
-                data_sources,
-                strategies: strategy_registry,
-            }));
-            let port = dash.port;
-            tokio::spawn(async move {
-                if let Err(e) = api::start_dashboard(state, port).await {
-                    log::error!("Dashboard error: {}", e);
-                }
-            });
-            log::info!("Dashboard on port {}", port);
-        }
+    if let Some(dash) = &config.dashboard
+        && dash.enabled
+    {
+        let brokers: Vec<Arc<dyn Broker>> = account_brokers
+            .iter()
+            .map(|(_, ab)| ab.broker.clone())
+            .collect();
+        let state = Arc::new(Mutex::new(api::AppState {
+            brokers,
+            data_sources,
+            strategies: strategy_registry,
+        }));
+        let port = dash.port;
+        tokio::spawn(async move {
+            if let Err(e) = api::start_dashboard(state, port).await {
+                log::error!("Dashboard error: {}", e);
+            }
+        });
+        log::info!("Dashboard on port {}", port);
     }
 
     // ── 8. Per-account execution ──────────────────────────────────────
@@ -283,7 +314,7 @@ async fn main() -> Result<()> {
                     account_broker,
                     &technical_analyzer,
                     &news_analyzer,
-                    &news_llm,
+                    news_analyzer_service.as_ref(),
                     &fundamental_data,
                     &mut regime_detector,
                     &ollama,
@@ -297,7 +328,7 @@ async fn main() -> Result<()> {
                     account_broker,
                     &technical_analyzer,
                     &news_analyzer,
-                    &news_llm,
+                    news_analyzer_service.as_ref(),
                     &fundamental_data,
                     &mut regime_detector,
                     &ollama,
@@ -366,7 +397,7 @@ async fn run_ai_account(
     ab: &AccountBroker,
     technical_analyzer: &TechnicalAnalyzer,
     news_analyzer: &NewsAnalyzer,
-    news_llm: &NewsLLMService,
+    news_sentiment: &dyn NewsSentimentAnalyzer,
     fundamental_data: &FundamentalDataService,
     regime_detector: &mut RegimeDetector,
     ollama: &OllamaProvider,
@@ -376,24 +407,64 @@ async fn run_ai_account(
     let balance = ab.broker.balance().await.unwrap_or(0.0);
     log::info!("[{}] Balance: {:.2}", aid, balance);
 
+    let memory_path = account
+        .strategy
+        .parameters
+        .ai_config
+        .as_ref()
+        .and_then(|a| a.memory_path.clone())
+        .map(std::path::PathBuf::from);
+    let agent = Arc::new(
+        TradingAgent::new(
+            Box::new(OllamaQuery::new(ollama.clone())),
+            model_name.to_string(),
+            memory_path,
+        )
+        .unwrap(),
+    );
+    let mut tracker = PositionTracker::new(Some(agent.memory.clone()));
+
     for instrument in account.instruments.iter().filter(|i| i.enabled) {
         log::info!("[{}] Analyzing {}", aid, instrument.ticker);
-        let candles_tinkoff = get_candles_for_analysis(account, &ab, instrument).await;
+
+        // 1. Wick-aware exit check before making new decisions
+        let candles = get_candles_for_analysis(account, ab, instrument).await;
+        for candle in &candles {
+            let high = client::market_data::extract_price(&candle.high)?;
+            let low = client::market_data::extract_price(&candle.low)?;
+            let close = client::market_data::extract_price(&candle.close)?;
+            let closed = tracker.check_candle(&instrument.ticker, high, low, close);
+            for pos in &closed {
+                log::info!(
+                    "[{}] Exit via {:?} at {:.2}",
+                    instrument.ticker,
+                    pos.reason,
+                    pos.exit_price
+                );
+            }
+        }
+
         let current_price = ab
             .broker
             .last_price(&instrument.ticker)
             .await
             .unwrap_or(0.0);
 
-        let tech = if !candles_tinkoff.is_empty() {
+        // Skip analysis if we already hold a position (let it run to SL/TP)
+        if tracker.has_position(&instrument.ticker) {
+            log::info!("[{}] Position open, skipping analysis", instrument.ticker);
+            continue;
+        }
+
+        let tech = if !candles.is_empty() {
             technical_analyzer
-                .analyze(&instrument.ticker, &candles_tinkoff)
+                .analyze(&instrument.ticker, &candles)
                 .ok()
         } else {
             None
         };
 
-        let news = get_news_for_instrument(instrument, news_analyzer, news_llm).await;
+        let news = get_news_for_instrument(instrument, news_analyzer, news_sentiment).await;
         let fund = if instrument.analysis_config.fundamental_analysis {
             fundamental_data
                 .get_fundamental_data(&instrument.ticker, &instrument.name)
@@ -417,15 +488,11 @@ async fn run_ai_account(
 
         let position = ab.broker.position(&instrument.ticker).await.ok().flatten();
         let pos_for_ctx = position.map(|p| agent::CurrentPosition {
-            quantity: p.quantity as i32,
+            quantity: p.quantity,
             average_price: p.average_price,
             current_value: p.current_price * p.quantity as f64,
         });
 
-        let agent = TradingAgent::new(
-            Box::new(OllamaQuery::new(ollama.clone())),
-            model_name.to_string(),
-        );
         let ctx = DecisionContext {
             ticker: instrument.ticker.clone(),
             company_name: instrument.name.clone(),
@@ -441,7 +508,7 @@ async fn run_ai_account(
             candles: vec![],
         };
 
-        let decision = if llm_config_enabled(&account) {
+        let decision = if llm_config_enabled(account) {
             agent.make_decision(ctx.clone()).await.unwrap_or_else(|e| {
                 log::warn!("LLM error, fallback to rule: {}", e);
                 agent
@@ -475,6 +542,14 @@ async fn run_ai_account(
 
         if decision.action != agent::Action::Hold && decision.confidence >= 0.6 {
             execute_via_broker(&ab.broker, &decision).await?;
+            tracker.open(
+                &instrument.ticker,
+                decision.current_price,
+                decision.position_size_pct * 100.0,
+                decision.action.clone(),
+                decision.stop_loss,
+                decision.take_profit,
+            );
         }
     }
     Ok(())
@@ -486,7 +561,7 @@ async fn run_standard_account(
     ab: &AccountBroker,
     technical_analyzer: &TechnicalAnalyzer,
     news_analyzer: &NewsAnalyzer,
-    news_llm: &NewsLLMService,
+    news_sentiment: &dyn NewsSentimentAnalyzer,
     fundamental_data: &FundamentalDataService,
     regime_detector: &mut RegimeDetector,
     ollama: &OllamaProvider,
@@ -497,7 +572,7 @@ async fn run_standard_account(
         ab,
         technical_analyzer,
         news_analyzer,
-        news_llm,
+        news_sentiment,
         fundamental_data,
         regime_detector,
         ollama,
@@ -540,7 +615,7 @@ async fn get_candles_for_analysis(
 async fn get_news_for_instrument(
     instrument: &config::InstrumentConfig,
     analyzer: &NewsAnalyzer,
-    llm: &NewsLLMService,
+    news_sentiment: &dyn NewsSentimentAnalyzer,
 ) -> Option<NewsSentiment> {
     if !instrument.analysis_config.check_news {
         return None;
@@ -563,7 +638,8 @@ async fn get_news_for_instrument(
             url: a.url.clone(),
         })
         .collect();
-    match llm
+
+    match news_sentiment
         .analyze_news_batch(&instrument.ticker, &instrument.name, &items)
         .await
     {
@@ -576,7 +652,7 @@ async fn get_news_for_instrument(
             key_events: enh.key_events,
         }),
         Err(e) => {
-            log::warn!("LLM news error: {}", e);
+            log::warn!("News sentiment error: {}", e);
             Some(base)
         }
     }

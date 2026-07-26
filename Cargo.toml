@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["mcp-client", "trader-bot"]
+members = ["trader-bot"]
 
 [workspace.package]
 version = "0.2.0"
@@ -14,7 +14,6 @@ license-file = "LICENSE"
 keywords = ["trading", "algorithmic-trading", "finance", "llm", "moex"]
 
 [workspace.dependencies]
-mcp-client = { path = "mcp-client" }
 tokio = "1.47.1"
 anyhow = "1.0.99"
 serde = { version = "1", features = ["derive"] }

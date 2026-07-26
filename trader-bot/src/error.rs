@@ -21,9 +21,9 @@ pub enum BotError {
     #[error("Market analysis error: {0}")]
     MarketAnalysis(String),
 
-    /// LLM error
+    /// Llm error
     #[error("LLM error: {0}")]
-    LLM(String),
+    Llm(String),
 
     /// Configuration error
     #[error("Configuration error: {0}")]
