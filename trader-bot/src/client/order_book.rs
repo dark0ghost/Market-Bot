@@ -28,6 +28,7 @@ impl OrderBookService {
     }
 
     pub async fn get_order_book(&self, figi: &str, depth: i32) -> Result<OrderBook> {
+        #[allow(deprecated)]
         let request = GetOrderBookRequest {
             figi: Some(figi.to_string()),
             depth,

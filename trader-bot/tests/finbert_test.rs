@@ -6,12 +6,16 @@ fn new_nlp() -> FinBertInference {
     FinBertInference::new(MODEL_DIR).expect("Failed to load FinBERT ONNX model")
 }
 
+// NOTE: requires models/finbert/model.onnx (download via scripts/download_model.sh)
+#[ignore]
 #[test]
 fn test_finbert_load_model() {
     let nlp = FinBertInference::new(MODEL_DIR);
     assert!(nlp.is_ok(), "Model should load without error");
 }
 
+// NOTE: requires models/finbert/model.onnx (download via scripts/download_model.sh)
+#[ignore]
 #[test]
 fn test_finbert_predict_returns_valid_result() {
     let nlp = new_nlp();
@@ -36,6 +40,8 @@ fn test_finbert_predict_returns_valid_result() {
     }
 }
 
+// NOTE: requires models/finbert/model.onnx (download via scripts/download_model.sh)
+#[ignore]
 #[test]
 fn test_finbert_long_text() {
     let nlp = new_nlp();
@@ -47,6 +53,8 @@ fn test_finbert_long_text() {
     assert!(result.confidence > 0.0);
 }
 
+// NOTE: requires models/finbert/model.onnx (download via scripts/download_model.sh)
+#[ignore]
 #[test]
 fn test_finbert_empty_text() {
     let nlp = new_nlp();
@@ -54,6 +62,8 @@ fn test_finbert_empty_text() {
     assert!(!result.label.is_empty());
 }
 
+// NOTE: requires models/finbert/model.onnx (download via scripts/download_model.sh)
+#[ignore]
 #[test]
 fn test_finbert_sentiment_score_neutral() {
     let nlp = new_nlp();
@@ -64,6 +74,8 @@ fn test_finbert_sentiment_score_neutral() {
     assert_eq!(score, 0.0, "Neutral should have score 0, got {}", score);
 }
 
+// NOTE: requires models/finbert/model.onnx (download via scripts/download_model.sh)
+#[ignore]
 #[test]
 fn test_finbert_special_characters() {
     let nlp = new_nlp();
@@ -79,6 +91,8 @@ fn test_finbert_special_characters() {
     }
 }
 
+// NOTE: requires models/finbert/model.onnx (download via scripts/download_model.sh)
+#[ignore]
 #[test]
 fn test_finbert_repeated_calls() {
     let nlp = new_nlp();
@@ -90,6 +104,8 @@ fn test_finbert_repeated_calls() {
     }
 }
 
+// NOTE: requires models/finbert/model.onnx (download via scripts/download_model.sh)
+#[ignore]
 #[test]
 fn test_finbert_different_lengths() {
     let nlp = new_nlp();
@@ -106,6 +122,8 @@ fn test_finbert_different_lengths() {
     }
 }
 
+// NOTE: requires models/finbert/model.onnx (download via scripts/download_model.sh)
+#[ignore]
 #[test]
 fn test_finbert_labels_are_valid() {
     let nlp = new_nlp();
@@ -120,6 +138,8 @@ fn test_finbert_labels_are_valid() {
     }
 }
 
+// NOTE: requires models/finbert/model.onnx (download via scripts/download_model.sh)
+#[ignore]
 #[test]
 fn test_finbert_scores_structure() {
     let nlp = new_nlp();
@@ -141,6 +161,8 @@ fn test_finbert_scores_structure() {
     );
 }
 
+// NOTE: requires models/finbert/model.onnx (download via scripts/download_model.sh)
+#[ignore]
 #[test]
 fn test_finbert_concurrent_predictions() {
     use std::thread;

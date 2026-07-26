@@ -87,6 +87,7 @@ impl MarketDataStream {
 
         for (figi, intervals) in &self.subscriptions {
             for &interval in intervals {
+                #[allow(deprecated)]
                 subs_candles.instruments.push(CandleInstrument {
                     figi: figi.clone(),
                     interval: interval as i32,

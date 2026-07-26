@@ -212,6 +212,7 @@ impl Broker for TinkoffBroker {
             crate::core::OrderType::Market => t_invest_sdk::api::OrderType::Market,
         };
 
+        #[allow(deprecated)]
         let req = PostOrderRequest {
             figi: Some(request.instrument.clone()),
             quantity: request.quantity as i64,

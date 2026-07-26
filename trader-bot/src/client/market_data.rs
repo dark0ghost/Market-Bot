@@ -36,6 +36,7 @@ impl MarketDataService {
         let now = Utc::now();
         let from = now - Duration::days(days as i64);
 
+        #[allow(deprecated)]
         let request = GetCandlesRequest {
             instrument_id: Some(instrument_id.to_string()),
             interval: interval as i32,

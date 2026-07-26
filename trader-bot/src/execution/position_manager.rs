@@ -59,6 +59,7 @@ impl PositionManager {
             OrderAction::Sell => OrderDirection::Sell,
         };
 
+        #[allow(deprecated)]
         let request = PostOrderRequest {
             figi: Some(figi.to_string()),
             quantity: quantity as i64,
@@ -72,8 +73,8 @@ impl PositionManager {
             order_id: format!("order_{}", Utc::now().timestamp()).to_string(),
             instrument_id: figi.to_string(),
             confirm_margin_trade: false,
-            time_in_force: 0, // GoodTillCancel
-            price_type: 0,    // TakeMarket
+            time_in_force: 0,
+            price_type: 0,
         };
 
         let response = self.sdk.orders().post_order(request).await?;
@@ -103,6 +104,7 @@ impl PositionManager {
             OrderAction::Sell => OrderDirection::Sell,
         };
 
+        #[allow(deprecated)]
         let request = PostOrderRequest {
             figi: Some(figi.to_string()),
             quantity: quantity as i64,
