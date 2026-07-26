@@ -1,16 +1,60 @@
 [package]
 name = "trader-bot"
-edition = "2024"
-license-file = "../LICENSE"
 version.workspace = true
+authors.workspace = true
+edition = "2024"
+description.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+keywords.workspace = true
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[lib]
+name = "trader_bot"
+path = "src/lib.rs"
+
+[[bin]]
+name = "trader-bot"
+path = "src/main.rs"
 
 [dependencies]
-t-invest-sdk = { git = "https://github.com/artemevsevev/t-invest-sdk.git", version = "0.6.1"}
-mcp-client = { workspace = true }
-tokio = { version = "1.42.0", features = ["full"] }
-flume = "0.11.1"
-anyhow = "1.0.95"
-serde = { version = "1.0.219", features = ["derive"] }
-tonic = "0.13.0"
-# https://github.com/modelcontextprotocol/rust-sdk
-rmcp = { version = "0.1", features = ["client"] }
+t-invest-sdk = "0.17.0"
+tokio = { workspace = true, features = ["full"] }
+anyhow = { workspace = true }
+thiserror = "2.0"
+serde = { workspace = true }
+serde_json = { workspace = true }
+reqwest = { workspace = true, features = ["json"] }
+ta = "0.5.0"
+chrono = { version = "0.4.38", features = ["serde"] }
+log = "0.4.22"
+env_logger = "0.11.5"
+prost-types = "0.14.3"
+csv = "1.3"
+rust_decimal = "1.42"
+futures = "0.3"
+clickhouse = "0.12"
+tokio-cron-scheduler = "0.13"
+tonic = "0.14"
+tokio-stream = "0.1"
+axum = "0.7"
+
+# ─── ONNX ML Inference ─────────────────────────────────────────────────
+ort = { version = "2.0.0-rc.12", features = ["ndarray", "half"] }
+ndarray = "0.16"
+tokenizers = "0.21"
+arc-swap = "1.7"
+notify = "7.0"
+notify-debouncer-mini = "0.4"
+
+# ─── LLM / Ollama ─────────────────────────────────────────────────────
+ollama-rs = { version = "0.3.1", features = ["stream", "macros", "tool-implementations"] }
+schemars = { workspace = true, features = ["preserve_order"] }
+
+# ─── New dependencies for refactored architecture ─────────────────────
+async-trait = "0.1"
+rand = "0.8"

@@ -1,21 +1,66 @@
 services:
-  ollama:
-    build: ollama-mcp/
+  perplexica:
+    image: itzcrazykns1337/perplexica:latest
     ports:
-      - "11435:11434"
-    container_name: ollama
+      - "3000:3000"
     volumes:
-      - ollama_data:/root/.ollama
-    deploy:
-       resources:
-         reservations:
-           devices:
-             - driver: nvidia
-               count: 1
-               capabilities: [gpu]
+      - perplexica_data:/home/perplexica/data
     environment:
-       - NVIDIA_VISIBLE_DEVICES=all
+      - PERPLEXICA_REDIS_URL=redis://redis:6379
+    depends_on:
+      redis:
+        condition: service_started
+    restart: unless-stopped
 
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+  ollama:
+    build:
+      context: ollama
+      dockerfile: Dockerfile
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+    environment:
+      - OLLAMA_MODEL_NAME=${OLLAMA_MODEL_NAME:-fin-expert}
+      - OLLAMA_BASE_MODEL=${OLLAMA_BASE_MODEL:-martain7r/finance-llama-8b}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  train:
+    build:
+      context: .
+      dockerfile: training/finbert_sft/Dockerfile
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - CUDA_VISIBLE_DEVICES=${CUDA_DEVICE:-0}
+    volumes:
+      - .:/workspace
+      - huggingface_cache:/root/.cache/huggingface
+    working_dir: /workspace
+    shm_size: 8g
+    deploy:
+      resources:
+        limits:
+          memory: 16g
+        reservations:
+          memory: 4g
 
 volumes:
-  ollama_data:
+  perplexica_data:
+  redis_data:
+  ollama_models:
+  huggingface_cache:

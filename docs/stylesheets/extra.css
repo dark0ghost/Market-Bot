@@ -1,0 +1,45 @@
+/* Дополнительные стили для документации */
+
+/* Улучшенное отображение кода */
+.md-typeset pre > code {
+  border-radius: 0.2em;
+  word-break: break-word;
+}
+
+/* Улучшенные таблицы */
+.md-typeset table:not([class]) {
+  font-size: 0.8rem;
+}
+
+/* Цвета для статусов */
+.status-success {
+  color: #00c853;
+  font-weight: bold;
+}
+
+.status-warning {
+  color: #ffab00;
+  font-weight: bold;
+}
+
+.status-error {
+  color: #ff3d00;
+  font-weight: bold;
+}
+
+/* Адаптивные изображения */
+.md-typeset img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Улучшенные вкладки */
+.md-typeset .tabbed-set {
+  border-radius: 0.2em;
+  border: 1px solid var(--md-default-fg-color--lightest);
+}
+
+/* Темы для диаграмм Mermaid */
+.mermaid {
+  text-align: center;
+}

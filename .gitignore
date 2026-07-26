@@ -1,3 +1,47 @@
-**/target
-**/config
-.idea
+
+*~
+# ─── AI Agent configs ────────────────────────────────────────────────
+*.arrow
+.claude/
+# ─── Config (API keys, secrets) ───────────────────────────────────────
+credentials.json
+credentials.yml
+# ─── Data & Models (large binaries, datasets) ─────────────────────────
+.DS_Store
+.env
+.env.*
+.idea/
+# ─── IDE / OS ─────────────────────────────────────────────────────────
+*.key
+*.log
+# ─── Logs ─────────────────────────────────────────────────────────────
+# ─── MkDocs build output ────────────────────────────────────────────
+models/
+*.onnx
+*.parquet
+*.pem
+*.pyc
+__pycache__/
+*.pyo
+# ─── Python ──────────────────────────────────────────────────────────
+.qwen/
+*.rs.bk
+# ─── Rust ─────────────────────────────────────────────────────────────
+site/
+*.swo
+*.swp
+**/target/
+target/
+task.md
+temp/
+# ─── Temp ─────────────────────────────────────────────────────────────
+Thumbs.db
+tmp/
+trader-bot/config/
+!trader-bot/config/.gitkeep
+/training/data_collected/
+training/data_collected/
+/training/data_collection/*.json
+/training/finbert_sft/data
+/training/finbert_sft/data_backup
+.vscode/

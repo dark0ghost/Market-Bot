@@ -1,51 +1,294 @@
-use serde::{Deserialize};
+use anyhow::Result;
+use serde::{Deserialize, Serialize};
 use std::fs;
 
-#[derive(Debug, Deserialize)]
-struct Config {
+/// Main trading bot configuration (extended)
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct TradingConfig {
     #[serde(rename = "type")]
-    config_type: String,
-    creditional: Credential,
-    accounts: Vec<Account>,
-    #[serde(rename = "mode")]
-    working_mode: WorkingMode
+    pub config_type: String,
+    pub credential: Credential,
+    pub accounts: Vec<AccountConfig>,
+    pub mode: WorkingMode,
+    pub llm_config: Option<LlmConfig>,
+    pub dashboard: Option<DashboardConfig>,
+
+    /// List of additional data sources
+    pub data_sources: Option<Vec<DataSourceConfig>>,
+
+    /// Optimizer settings
+    pub optimizer: Option<OptimizerSection>,
+
+    /// Sandbox settings (only used when mode = sandbox)
+    pub sandbox: Option<SandboxConfig>,
 }
 
-#[derive(Debug, Deserialize)]
-struct Credential {
-    token: String,
+/// API credentials
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct Credential {
+    pub token: String,
+    /// Additional keys for other brokers
+    #[serde(default)]
+    pub additional_keys: Option<Vec<BrokerCredential>>,
 }
 
-#[derive(Debug, Deserialize)]
-struct Account {
-    #[serde(flatten)]
-    account_data: std::collections::HashMap<String, Vec<Strategy>>,
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct BrokerCredential {
+    pub broker: String,
+    pub api_key: String,
+    pub secret_key: Option<String>,
+    pub extra: Option<std::collections::HashMap<String, String>>,
 }
 
-#[derive(Debug, Deserialize)]
-struct Strategy {
-    strategy: StrategyType,
-    parameters: Parameters,
+/// Account configuration
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct AccountConfig {
+    #[serde(default)]
+    pub account_id: Option<String>,
+    /// Broker for this account (default "tinkoff")
+    #[serde(default = "default_broker")]
+    pub broker: String,
+    pub instruments: Vec<InstrumentConfig>,
+    pub strategy: StrategyConfig,
+    pub risk_management: Option<RiskManagementConfig>,
 }
 
-#[derive(Debug, Deserialize)]
+fn default_broker() -> String {
+    "tinkoff".to_string()
+}
+
+/// Instrument configuration
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct InstrumentConfig {
+    pub figi: String,
+    pub ticker: String,
+    pub name: String,
+    pub enabled: bool,
+    pub max_position_pct: f64,
+    pub analysis_config: AnalysisConfig,
+}
+
+/// Instrument analysis configuration
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct AnalysisConfig {
+    pub check_news: bool,
+    pub technical_analysis: bool,
+    pub fundamental_analysis: bool,
+    pub news_sources: Vec<String>,
+    pub technical_indicators: Vec<String>,
+    pub fundamental_metrics: Vec<String>,
+}
+
+/// Strategy configuration
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct StrategyConfig {
+    pub strategy: StrategyType,
+    pub parameters: StrategyParameters,
+}
+
+/// Strategy type
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
-enum StrategyType {
+pub enum StrategyType {
     Interval,
+    Momentum,
+    MeanReversion,
+    Grid,
+    Ai,
+    PairsTrading,
+    StatisticalArbitrage,
+    #[serde(other)]
+    Custom,
 }
 
-#[derive(Debug, Deserialize)]
+/// AI strategy configuration
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct AiConfig {
+    /// Use LLM for decisions (if false, rule-based is used)
+    #[serde(default = "default_ai_use_llm")]
+    pub use_llm: bool,
+    /// Use FinBERT for news sentiment (if false, Ollama LLM is used)
+    #[serde(default = "default_ai_use_finbert")]
+    pub use_finbert: bool,
+    /// Minimum confidence threshold to execute trades
+    #[serde(default = "default_ai_min_confidence")]
+    pub min_confidence: f64,
+    /// Override market regime detection
+    #[serde(default)]
+    pub force_regime: Option<String>,
+    /// Path to decision memory JSON file (dual persistence: RAM + flash)
+    #[serde(default)]
+    pub memory_path: Option<String>,
+}
+
+fn default_ai_use_llm() -> bool {
+    true
+}
+
+fn default_ai_use_finbert() -> bool {
+    false
+}
+
+fn default_ai_min_confidence() -> f64 {
+    0.6
+}
+
+impl Default for AiConfig {
+    fn default() -> Self {
+        AiConfig {
+            use_llm: default_ai_use_llm(),
+            use_finbert: default_ai_use_finbert(),
+            min_confidence: default_ai_min_confidence(),
+            force_regime: None,
+            memory_path: None,
+        }
+    }
+}
+
+/// Strategy parameters
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct StrategyParameters {
+    pub interval_size: String,
+    pub days_back_to_consider: u32,
+    pub quantity_limit: u32,
+    pub check_interval: u32,
+    #[serde(default)]
+    pub grid_config: Option<GridConfig>,
+    #[serde(default)]
+    pub pairs_config: Option<PairConfig>,
+    #[serde(default)]
+    pub ai_config: Option<AiConfig>,
+}
+
+/// Grid strategy configuration
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct GridConfig {
+    pub lower_price: f64,
+    pub upper_price: f64,
+    pub grid_levels: u32,
+    pub order_size: u32,
+    #[serde(default = "default_grid_ratio")]
+    pub grid_ratio: f64,
+}
+
+const fn default_grid_ratio() -> f64 {
+    0.5
+}
+
+/// Pairs trading configuration
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct PairConfig {
+    pub pair_ticker: String,
+    pub pair_figi: String,
+    pub entry_zscore: f64,
+    pub exit_zscore: f64,
+    pub lookback_period: u32,
+}
+
+/// Risk management
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct RiskManagementConfig {
+    pub max_loss_pct: f64,
+    pub take_profit_pct: f64,
+    pub stop_loss_pct: f64,
+    pub max_open_positions: u32,
+    pub min_balance_reserve: f64,
+}
+
+/// Working mode
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum WorkingMode {
-    SandBox,
-    Prod
+    Sandbox,
+    Prod,
 }
 
+/// Sandbox configuration
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct SandboxConfig {
+    /// Auto-create sandbox account if account_id is not set
+    #[serde(default = "default_sandbox_open_account")]
+    pub open_account: bool,
+    /// Amount to deposit into sandbox account (RUB)
+    #[serde(default = "default_sandbox_pay_in")]
+    pub pay_in_amount: f64,
+}
 
-#[derive(Debug, Deserialize)]
-struct Parameters {
-    interval_size: String,
-    days_back_to_consider: u32,
-    quantity_limit: u32,
-    check_interval: u32
+fn default_sandbox_open_account() -> bool {
+    true
+}
+fn default_sandbox_pay_in() -> f64 {
+    30_000_000.0
+}
+
+/// LLM configuration
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct LlmConfig {
+    pub model: String,
+    pub host: String,
+    pub port: u16,
+    pub temperature: f32,
+    pub context_window: u32,
+}
+
+/// Dashboard configuration
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct DashboardConfig {
+    #[serde(default = "default_dashboard_port")]
+    pub port: u16,
+    #[serde(default = "default_dashboard_enabled")]
+    pub enabled: bool,
+}
+
+const fn default_dashboard_port() -> u16 {
+    8080
+}
+
+const fn default_dashboard_enabled() -> bool {
+    true
+}
+
+/// External data source configuration
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct DataSourceConfig {
+    pub name: String,
+    pub source_type: String,
+    pub api_key: Option<String>,
+    pub base_url: Option<String>,
+}
+
+/// Optimizer settings
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct OptimizerSection {
+    pub enabled: bool,
+    pub method: String,
+    pub metric: String,
+    pub max_iterations: u32,
+}
+
+impl TradingConfig {
+    pub fn load(path: &str) -> Result<Self> {
+        let content = fs::read_to_string(path)?;
+        let config: TradingConfig = serde_json::from_str(&content)?;
+        Ok(config)
+    }
+
+    pub fn load_default() -> Result<Self> {
+        Self::load("trader-bot/config/account.json")
+    }
+
+    pub fn get_enabled_instruments(&self) -> Vec<&InstrumentConfig> {
+        self.accounts
+            .iter()
+            .flat_map(|acc| acc.instruments.iter())
+            .filter(|inst| inst.enabled)
+            .collect()
+    }
+
+    pub fn get_instrument_by_ticker(&self, ticker: &str) -> Option<&InstrumentConfig> {
+        self.accounts
+            .iter()
+            .flat_map(|acc| acc.instruments.iter())
+            .find(|inst| inst.ticker == ticker)
+    }
 }

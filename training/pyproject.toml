@@ -1,0 +1,55 @@
+[project]
+name = "ai-trade-bot-training"
+version = "0.3.0"
+description = "FinBERT SFT training pipeline and data collection for Market Bot"
+requires-python = ">=3.10"
+authors = [{ name = "Market Bot Contributors" }]
+license = { text = "MIT" }
+
+dependencies = [
+    "torch>=2.0.0",
+    "transformers>=4.30.0",
+    "datasets>=2.12.0",
+    "optimum>=1.12.0",
+    "onnx>=1.14.0",
+    "onnxruntime>=1.15.0",
+    "scikit-learn>=1.2.0",
+    "evaluate>=0.4.0",
+    "accelerate>=0.20.0",
+    "pandas>=2.0.0",
+    "numpy>=1.24.0",
+    "tqdm>=4.65.0",
+    "pyyaml>=6.0",
+    "requests>=2.31.0",
+    "feedparser>=6.0.10",
+    "lxml>=4.9.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "black>=23.0",
+    "ruff>=0.1.0",
+    "mypy>=1.0",
+]
+
+[project.scripts]
+train = "finbert_sft.train:main"
+evaluate = "finbert_sft.evaluate:main"
+export-onnx = "finbert_sft.export_onnx:main"
+collect-data = "data_collection.collect:main"
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.black]
+line-length = 100
+target-version = ["py310"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
