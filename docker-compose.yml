@@ -1,4 +1,25 @@
 services:
+  perplexica:
+    image: itzcrazykns1337/perplexica:latest
+    ports:
+      - "3000:3000"
+    volumes:
+      - perplexica_data:/home/perplexica/data
+    environment:
+      - PERPLEXICA_REDIS_URL=redis://redis:6379
+    depends_on:
+      redis:
+        condition: service_started
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
   ollama:
     build:
       context: ollama
@@ -39,5 +60,7 @@ services:
           memory: 4g
 
 volumes:
+  perplexica_data:
+  redis_data:
   ollama_models:
   huggingface_cache:
