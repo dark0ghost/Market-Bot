@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 use std::collections::HashMap;
 
 // ─── Market Data Types ───────────────────────────────────────────────
@@ -175,15 +176,15 @@ pub enum BrokerKind {
 }
 
 impl BrokerKind {
-    pub fn as_str(&self) -> &'static str {
+    pub fn as_str(&self) -> Cow<'_, str> {
         match self {
-            BrokerKind::Tinkoff => "tinkoff",
-            BrokerKind::Mock => "mock",
-            BrokerKind::Alor => "alor",
-            BrokerKind::Binance => "binance",
-            BrokerKind::ByBit => "bybit",
-            BrokerKind::InteractiveBrokers => "ib",
-            BrokerKind::Other(s) => Box::leak(s.clone().into_boxed_str()),
+            BrokerKind::Tinkoff => Cow::Borrowed("tinkoff"),
+            BrokerKind::Mock => Cow::Borrowed("mock"),
+            BrokerKind::Alor => Cow::Borrowed("alor"),
+            BrokerKind::Binance => Cow::Borrowed("binance"),
+            BrokerKind::ByBit => Cow::Borrowed("bybit"),
+            BrokerKind::InteractiveBrokers => Cow::Borrowed("ib"),
+            BrokerKind::Other(s) => Cow::Borrowed(s.as_str()),
         }
     }
 }
@@ -215,16 +216,16 @@ pub enum StrategyKind {
 }
 
 impl StrategyKind {
-    pub fn as_str(&self) -> &'static str {
+    pub fn as_str(&self) -> Cow<'_, str> {
         match self {
-            StrategyKind::Grid => "grid",
-            StrategyKind::Interval => "interval",
-            StrategyKind::Momentum => "momentum",
-            StrategyKind::MeanReversion => "mean_reversion",
-            StrategyKind::Ai => "ai",
-            StrategyKind::PairsTrading => "pairs",
-            StrategyKind::StatisticalArbitrage => "stat_arb",
-            StrategyKind::Custom(s) => Box::leak(s.clone().into_boxed_str()),
+            StrategyKind::Grid => Cow::Borrowed("grid"),
+            StrategyKind::Interval => Cow::Borrowed("interval"),
+            StrategyKind::Momentum => Cow::Borrowed("momentum"),
+            StrategyKind::MeanReversion => Cow::Borrowed("mean_reversion"),
+            StrategyKind::Ai => Cow::Borrowed("ai"),
+            StrategyKind::PairsTrading => Cow::Borrowed("pairs"),
+            StrategyKind::StatisticalArbitrage => Cow::Borrowed("stat_arb"),
+            StrategyKind::Custom(s) => Cow::Borrowed(s.as_str()),
         }
     }
 }
