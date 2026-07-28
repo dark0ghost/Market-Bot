@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::fs;
 
@@ -274,7 +274,8 @@ impl TradingConfig {
     }
 
     pub fn load_default() -> Result<Self> {
-        Self::load("trader-bot/config/account.json")
+        let path = resolve_config_path();
+        Self::load(&path).with_context(|| format!("failed to load trading config from '{path}'"))
     }
 
     pub fn get_enabled_instruments(&self) -> Vec<&InstrumentConfig> {
@@ -290,5 +291,127 @@ impl TradingConfig {
             .iter()
             .flat_map(|acc| acc.instruments.iter())
             .find(|inst| inst.ticker == ticker)
+    }
+}
+
+/// Scan `std::env::args()` for a `--config <path>` or `--config=<path>` flag.
+///
+/// Returns the first value found, or `None` if the flag is absent.
+fn config_arg_from_args<I>(args: I) -> Option<String>
+where
+    I: IntoIterator<Item = String>,
+{
+    let mut iter = args.into_iter();
+    while let Some(arg) = iter.next() {
+        if let Some(value) = arg.strip_prefix("--config=") {
+            return Some(value.to_string());
+        }
+        if arg == "--config" {
+            return iter.next();
+        }
+    }
+    None
+}
+
+/// Pure path-selection logic used by [`resolve_config_path`].
+///
+/// Resolution order (first match wins):
+/// 1. `cli_arg` (from `--config`), if present.
+/// 2. `env_var` (from `CONFIG_PATH`), if present.
+/// 3. First candidate that satisfies `exists`.
+/// 4. Fallback: the last candidate (so the error message is sensible), or an
+///    empty string if there are no candidates.
+fn pick_config_path(
+    cli_arg: Option<String>,
+    env_var: Option<String>,
+    candidates: &[&str],
+    exists: impl Fn(&str) -> bool,
+) -> String {
+    if let Some(cli) = cli_arg {
+        return cli;
+    }
+    if let Some(env) = env_var {
+        return env;
+    }
+    if let Some(found) = candidates.iter().find(|c| exists(c)) {
+        return (*found).to_string();
+    }
+    candidates
+        .last()
+        .map(|c| (*c).to_string())
+        .unwrap_or_default()
+}
+
+/// Resolve the trading config path in a working-directory-robust way.
+///
+/// Precedence: `--config`/`--config=` CLI arg, then the `CONFIG_PATH` env var,
+/// then the first existing candidate relative path.
+pub fn resolve_config_path() -> String {
+    let cli_arg = config_arg_from_args(std::env::args());
+    let env_var = std::env::var("CONFIG_PATH").ok();
+    let candidates = ["trader-bot/config/account.json", "config/account.json"];
+    pick_config_path(cli_arg, env_var, &candidates, |p| {
+        std::path::Path::new(p).is_file()
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cli_arg_wins_over_env_and_candidates() {
+        let path = pick_config_path(
+            Some("cli.json".to_string()),
+            Some("env.json".to_string()),
+            &["a.json", "b.json"],
+            |_| true,
+        );
+        assert_eq!(path, "cli.json");
+    }
+
+    #[test]
+    fn env_wins_over_candidates() {
+        let path = pick_config_path(
+            None,
+            Some("env.json".to_string()),
+            &["a.json", "b.json"],
+            |_| true,
+        );
+        assert_eq!(path, "env.json");
+    }
+
+    #[test]
+    fn first_existing_candidate_is_chosen() {
+        let path = pick_config_path(None, None, &["a.json", "b.json"], |p| p == "b.json");
+        assert_eq!(path, "b.json");
+    }
+
+    #[test]
+    fn falls_back_to_last_candidate_when_none_exist() {
+        let path = pick_config_path(None, None, &["a.json", "b.json"], |_| false);
+        assert_eq!(path, "b.json");
+    }
+
+    #[test]
+    fn parses_config_flag_space_separated() {
+        let args = vec![
+            "trader-bot".to_string(),
+            "--config".to_string(),
+            "custom.json".to_string(),
+        ];
+        assert_eq!(config_arg_from_args(args), Some("custom.json".to_string()));
+    }
+
+    #[test]
+    fn parses_config_flag_equals_separated() {
+        let args = vec!["trader-bot".to_string(), "--config=custom.json".to_string()];
+        assert_eq!(config_arg_from_args(args), Some("custom.json".to_string()));
+    }
+
+    #[test]
+    fn no_config_flag_returns_none() {
+        let args = vec!["trader-bot".to_string(), "--other".to_string()];
+        assert_eq!(config_arg_from_args(args), None);
     }
 }

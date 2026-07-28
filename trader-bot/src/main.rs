@@ -48,6 +48,7 @@ use config::{AccountConfig, Credential, SandboxConfig, StrategyType, TradingConf
 use core::*;
 use datasource::{DataSourceRegistry, TinkoffDataSource};
 use execution::PositionTracker;
+use execution::risk_gate;
 
 use crate::mcp::ollama::OllamaProvider;
 use strategy::{
@@ -274,16 +275,19 @@ async fn main() -> Result<()> {
             .as_ref()
             .and_then(|a| a.memory_path.clone())
             .map(std::path::PathBuf::from);
-        let agent = Arc::new(
-            TradingAgent::new(
-                Box::new(OllamaQuery::new(ollama.clone())),
-                model_name.clone(),
-                memory_path,
-            )
-            .unwrap(),
-        );
-        let strategy = create_strategy(account, agent);
         let aid = account.account_id.as_deref().unwrap_or("");
+        let agent = match TradingAgent::new(
+            Box::new(OllamaQuery::new(ollama.clone())),
+            model_name.clone(),
+            memory_path,
+        ) {
+            Ok(a) => Arc::new(a),
+            Err(e) => {
+                log::error!("Failed to init TradingAgent for {}: {} — skipping", aid, e);
+                continue;
+            }
+        };
+        let strategy = create_strategy(account, agent);
         log::info!("Strategy for {}: {}", aid, strategy.name());
         strategy_registry.register(strategy);
     }
@@ -329,8 +333,9 @@ async fn main() -> Result<()> {
                 )
                 .await
             }
+            // Non-AI strategies share the same pipeline (rule-based unless use_llm is set)
             _ => {
-                run_standard_account(
+                run_ai_account(
                     account,
                     account_broker,
                     &technical_analyzer,
@@ -427,7 +432,7 @@ async fn run_ai_account(
             model_name.to_string(),
             memory_path,
         )
-        .unwrap(),
+        .map_err(|e| anyhow!("[{}] Failed to init TradingAgent: {}", aid, e))?,
     );
     let mut tracker = PositionTracker::new(Some(agent.memory.clone()));
 
@@ -547,45 +552,57 @@ async fn run_ai_account(
             decision.position_size_pct * 100.0
         );
 
-        if decision.action != agent::Action::Hold && decision.confidence >= 0.6 {
-            execute_via_broker(&ab.broker, &decision).await?;
-            tracker.open(
-                &instrument.ticker,
-                decision.current_price,
-                decision.position_size_pct * 100.0,
-                decision.action.clone(),
-                decision.stop_loss,
-                decision.take_profit,
+        let min_confidence = account
+            .strategy
+            .parameters
+            .ai_config
+            .as_ref()
+            .map(|c| c.min_confidence)
+            .unwrap_or(0.6);
+        if decision.action != agent::Action::Hold && decision.confidence >= min_confidence {
+            // Hard pre-trade risk gate (open-positions limit, balance reserve).
+            let exec_price = decision.entry_price.unwrap_or(decision.current_price);
+            let qty = calc_order_quantity(
+                &decision.action,
+                balance,
+                exec_price,
+                decision.position_size_pct,
+                decision.current_position,
             );
+            let open_positions = ab
+                .broker
+                .portfolio()
+                .await
+                .map(|p| p.positions.len() as u32)
+                .unwrap_or(0);
+            let risk_input = risk_gate::PreTradeInput {
+                available_balance: balance,
+                open_positions,
+                order_value: qty as f64 * exec_price,
+            };
+            match risk_gate::evaluate_pre_trade(&risk_input, account.risk_management.as_ref()) {
+                risk_gate::PreTradeCheck::Allow => {
+                    execute_via_broker(&ab.broker, &decision, balance).await?;
+                    tracker.open(
+                        &instrument.ticker,
+                        decision.current_price,
+                        decision.position_size_pct * 100.0,
+                        decision.action.clone(),
+                        decision.stop_loss,
+                        decision.take_profit,
+                    );
+                }
+                risk_gate::PreTradeCheck::Reject(reason) => {
+                    log::warn!(
+                        "[{}] Order blocked by risk gate: {}",
+                        instrument.ticker,
+                        reason
+                    );
+                }
+            }
         }
     }
     Ok(())
-}
-
-/// Same pipeline as AI but without LLM (always rule-based) — used for non-AI strategies
-async fn run_standard_account(
-    account: &AccountConfig,
-    ab: &AccountBroker,
-    technical_analyzer: &TechnicalAnalyzer,
-    news_analyzer: &NewsAnalyzer,
-    news_sentiment: &dyn NewsSentimentAnalyzer,
-    fundamental_data: &FundamentalDataService,
-    regime_detector: &mut RegimeDetector,
-    ollama: &OllamaProvider,
-    model_name: &str,
-) -> Result<()> {
-    run_ai_account(
-        account,
-        ab,
-        technical_analyzer,
-        news_analyzer,
-        news_sentiment,
-        fundamental_data,
-        regime_detector,
-        ollama,
-        model_name,
-    )
-    .await
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────
@@ -665,9 +682,49 @@ async fn get_news_for_instrument(
     }
 }
 
+/// Convert a decision into an order quantity (in units/lots).
+///
+/// * **Buy** — sized by portfolio value: `floor(balance * position_size_pct / price)`,
+///   so a 15% allocation buys as many units as that share of the balance affords at the
+///   current price (was previously `pct * 100`, which ignored balance and price entirely).
+/// * **Sell** — liquidate the known current position when available; otherwise fall back
+///   to value-based sizing.
+/// * **Hold** — zero.
+///
+/// Returns `0` on non-positive price/balance or a non-positive allocation.
+fn calc_order_quantity(
+    action: &agent::Action,
+    balance: f64,
+    price: f64,
+    position_size_pct: f64,
+    current_position: Option<i32>,
+) -> i32 {
+    match action {
+        agent::Action::Hold => return 0,
+        agent::Action::Sell => {
+            if let Some(qty) = current_position {
+                return qty.max(0);
+            }
+        }
+        agent::Action::Buy => {}
+    }
+    if price <= 0.0 || balance <= 0.0 {
+        return 0;
+    }
+    let pct = position_size_pct.clamp(0.0, 1.0);
+    let allocation = balance * pct;
+    let qty = (allocation / price).floor();
+    if qty.is_finite() && qty > 0.0 {
+        qty as i32
+    } else {
+        0
+    }
+}
+
 async fn execute_via_broker(
     broker: &Arc<dyn Broker>,
     decision: &agent::TradingDecision,
+    balance: f64,
 ) -> Result<()> {
     let action = match decision.action {
         agent::Action::Buy => OrderAction::Buy,
@@ -675,8 +732,21 @@ async fn execute_via_broker(
         agent::Action::Hold => return Ok(()),
     };
     let price = decision.entry_price.unwrap_or(decision.current_price);
-    let qty = (decision.position_size_pct * 100.0) as i32;
+    let qty = calc_order_quantity(
+        &decision.action,
+        balance,
+        price,
+        decision.position_size_pct,
+        decision.current_position,
+    );
     if qty <= 0 {
+        log::warn!(
+            "[{}] Skipping order: computed quantity is 0 (balance {:.2}, price {:.2}, size {:.1}%)",
+            decision.ticker,
+            balance,
+            price,
+            decision.position_size_pct * 100.0
+        );
         return Ok(());
     }
     let request = OrderRequest {
@@ -704,4 +774,83 @@ fn llm_config_enabled(account: &AccountConfig) -> bool {
         .map(|c| c.use_llm)
         .unwrap_or(false)
         || account.strategy.strategy == StrategyType::Ai
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use agent::Action;
+
+    #[test]
+    fn buy_quantity_is_sized_by_balance_and_price() {
+        // 15% of 100_000 = 15_000; at price 200 → 75 units.
+        assert_eq!(
+            calc_order_quantity(&Action::Buy, 100_000.0, 200.0, 0.15, None),
+            75
+        );
+    }
+
+    #[test]
+    fn buy_quantity_floors_partial_units() {
+        // 10_000 / 300 = 33.33 → floor to 33.
+        assert_eq!(
+            calc_order_quantity(&Action::Buy, 100_000.0, 300.0, 0.10, None),
+            33
+        );
+    }
+
+    #[test]
+    fn buy_quantity_is_zero_when_allocation_below_one_unit() {
+        // 1% of 1_000 = 10, price 50 → 0.2 → 0 units (previously pct*100 would have returned 1).
+        assert_eq!(
+            calc_order_quantity(&Action::Buy, 1_000.0, 50.0, 0.01, None),
+            0
+        );
+    }
+
+    #[test]
+    fn zero_or_negative_inputs_yield_zero() {
+        assert_eq!(calc_order_quantity(&Action::Buy, 0.0, 200.0, 0.15, None), 0);
+        assert_eq!(
+            calc_order_quantity(&Action::Buy, 100_000.0, 0.0, 0.15, None),
+            0
+        );
+        assert_eq!(
+            calc_order_quantity(&Action::Buy, 100_000.0, -5.0, 0.15, None),
+            0
+        );
+    }
+
+    #[test]
+    fn pct_is_clamped_to_full_balance() {
+        // pct > 1.0 must not over-allocate: clamped to 1.0 → 100_000 / 200 = 500.
+        assert_eq!(
+            calc_order_quantity(&Action::Buy, 100_000.0, 200.0, 5.0, None),
+            500
+        );
+    }
+
+    #[test]
+    fn sell_liquidates_known_position() {
+        assert_eq!(
+            calc_order_quantity(&Action::Sell, 100_000.0, 200.0, 0.15, Some(42)),
+            42
+        );
+    }
+
+    #[test]
+    fn sell_without_position_falls_back_to_value_sizing() {
+        assert_eq!(
+            calc_order_quantity(&Action::Sell, 100_000.0, 200.0, 0.15, None),
+            75
+        );
+    }
+
+    #[test]
+    fn hold_is_always_zero() {
+        assert_eq!(
+            calc_order_quantity(&Action::Hold, 100_000.0, 200.0, 0.15, Some(10)),
+            0
+        );
+    }
 }
