@@ -1,4 +1,4 @@
-use anyhow::{Result, anyhow};
+use anyhow::Result;
 use chrono::{DateTime, Utc};
 use futures::stream::iter;
 use futures::StreamExt;
@@ -161,7 +161,7 @@ impl MarketDataStream {
                         break;
                     }
                     Err(_) => {
-                        // Timeout — stream is idle, keep it alive with a ping
+                        // Timeout - stream is idle, keep it alive with a ping
                         log::debug!("Stream timeout, keeping connection alive...");
                     }
                 }

@@ -12,7 +12,7 @@ The project supports three broker backends: Tinkoff, Finam, and Mock (in-memory 
 | Place/cancel orders | ✅ | ✅ | ✅ simulated |
 | Portfolio & balance | ✅ | ✅ | ✅ simulated |
 | Sandbox/paper mode | ✅ `Environment::Sandbox` | ❌ production only | ✅ built-in |
-| Production mode | ✅ | ✅ | — |
+| Production mode | ✅ | ✅ | - |
 | Requires API token | ✅ | ✅ | ❌ |
 | SDK | `t-invest-sdk 0.17` | raw `reqwest` | none |
 
@@ -75,7 +75,7 @@ Set the mode to `sandbox` in `trader-bot/config/account.json`:
 }
 ```
 
-The `mode: "sandbox"` field causes the SDK to connect to `Environment::Sandbox` — all orders are executed with virtual money. No real funds are used.
+The `mode: "sandbox"` field causes the SDK to connect to `Environment::Sandbox` - all orders are executed with virtual money. No real funds are used.
 
 You can also pass the token via environment variable (useful for CI/CD or keeping secrets out of VCS):
 
@@ -125,13 +125,13 @@ When `mode` is `"sandbox"`, you can optionally configure automatic account creat
 
 If `account_id` is provided in the config, it will be used as-is (no account creation). If it's empty or missing, the bot calls `OpenSandboxAccount`, logs the new account ID, and deposits the configured amount.
 
-**Important:** Sandbox accounts expire after 3 months of inactivity. Always check the logs for the created `account_id` — you can hardcode it later to reuse the same account across restarts.
+**Important:** Sandbox accounts expire after 3 months of inactivity. Always check the logs for the created `account_id` - you can hardcode it later to reuse the same account across restarts.
 
 ---
 
 ## Finam Trade API
 
-[Finam Trade API](https://www.finam.ru/) provides REST API access to real trading (sandbox/paper trading is not available — only production).
+[Finam Trade API](https://www.finam.ru/) provides REST API access to real trading (sandbox/paper trading is not available - only production).
 
 ### 1. Get API Credentials
 
@@ -191,12 +191,12 @@ broker.set_candles("SBER", candles); // seed historical data
 ```
 
 Mock broker features:
-- **Instant order filling** — all limit/market orders execute immediately
-- **Balance tracking** — buy/sell operations update cash balance
-- **Position tracking** — weighted-average cost for accumulated positions
-- **PnL calculation** — realized profit/loss computed on sell
-- **Synthetic order book** — bid = price × 0.999, ask = price × 1.001
-- **Synthetic liquidity** — hardcoded constant values
+- **Instant order filling** - all limit/market orders execute immediately
+- **Balance tracking** - buy/sell operations update cash balance
+- **Position tracking** - weighted-average cost for accumulated positions
+- **PnL calculation** - realized profit/loss computed on sell
+- **Synthetic order book** - bid = price × 0.999, ask = price × 1.001
+- **Synthetic liquidity** - hardcoded constant values
 
 ### Testing with MockBroker
 
@@ -223,10 +223,10 @@ async fn test_strategy_with_mock() {
 | `Tinkoff` | ✅ | ✅ `Environment::Sandbox` | ✅ | Primary broker |
 | `Mock` | ✅ | N/A (always simulated) | N/A | Testing only |
 | `Other("finam")` | ✅ | ❌ | ✅ | REST API |
-| `Alor` | ❌ enum only | — | — | Not implemented |
-| `Binance` | ❌ enum only | — | — | Not implemented |
-| `ByBit` | ❌ enum only | — | — | Not implemented |
-| `InteractiveBrokers` | ❌ enum only | — | — | Not implemented |
+| `Alor` | ❌ enum only | - | - | Not implemented |
+| `Binance` | ❌ enum only | - | - | Not implemented |
+| `ByBit` | ❌ enum only | - | - | Not implemented |
+| `InteractiveBrokers` | ❌ enum only | - | - | Not implemented |
 
 ---
 

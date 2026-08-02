@@ -1,4 +1,4 @@
-# Market Bot — CLAUDE.md
+# Market Bot - CLAUDE.md
 
 ## Project Overview
 
@@ -8,7 +8,7 @@ Multi-broker algorithmic trading system in Rust with ONNX ML inference (FinBERT)
 
 ```
 ai-trade-bot/
-├── trader-bot/                  # Rust — trading core
+├── trader-bot/                  # Rust - trading core
 │   ├── src/
 │   │   ├── main.rs              # Entry point, wires everything
 │   │   ├── core/                # Broker-agnostic types & traits

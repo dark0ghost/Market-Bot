@@ -1,6 +1,6 @@
-# Market Bot — Комплексная торговая система
+# Market Bot - Комплексная торговая система
 
-[![Rust](https://img.shields.io/badge/rust-v1.70+-orange.svg)](https://www.rust-lang.org)
+[![Rust](https://img.shields.io/badge/rust-v1.85+-orange.svg)](https://www.rust-lang.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 AI-powered торговая система для торговли на Московской бирже через Tinkoff Invest API. Система сочетает технический анализ, анализ новостей с LLM и фундаментальный анализ для принятия торговых решений.
@@ -58,7 +58,7 @@ ai-trade-bot/
 │   │   ├── config/         # Configuration
 │   │   └── api/            # Dashboard (Axum)
 │   └── config/             # Config files
-├── mcp-client/             # MCP client for LLM (Ollama)
+├── ollama/                 # Ollama config for LLM
 ├── training/               # ML training pipeline
 │   └── finbert_sft/        # FinBERT SFT (Supervised Fine-Tuning)
 ├── models/                 # ONNX model artifacts
@@ -93,7 +93,7 @@ flowchart TB
 
 ### 1. Требования
 
-- Rust 1.70+
+- Rust 1.85+
 - Docker (для Ollama)
 - Tinkoff Invest токен
 
@@ -262,11 +262,11 @@ AI-поисковая система для глубокого анализа к
 - Поиск рейтингов и целевых цен
 - Порт: 3000
 
-📖 **Документация**: [docs/PERPLEXICA.md](./docs/PERPLEXICA.md)
+📖 **Документация**: [docs/ru/PERPLEXICA.md](./docs/ru/PERPLEXICA.md)
 
 ### FinBERT SFT (Supervised Fine-Tuning)
 
-[FinBERT](https://huggingface.co/ProsusAI/finbert) — BERT, дообученный на финансовых текстах (SEC filings, earnings reports). Используется для **анализа тональности** новостей и макро-контекста.
+[FinBERT](https://huggingface.co/ProsusAI/finbert) - BERT, дообученный на финансовых текстах (SEC filings, earnings reports). Используется для **анализа тональности** новостей и макро-контекста.
 
 **Pайплайн дообучения (`training/finbert_sft/`):**
 
@@ -279,8 +279,8 @@ AI-поисковая система для глубокого анализа к
 
 **Инференс в Rust (`trader-bot/src/ml_inference/`):**
 
-- `session.rs` — ORT session pool с hot-reload (notify)
-- `nlp.rs` — FinBERT tokenizer + inference + softmax
+- `session.rs` - ORT session pool с hot-reload (notify)
+- `nlp.rs` - FinBERT tokenizer + inference + softmax
 
 ```rust
 let nlp = FinBertInference::new("models/finbert")?;
@@ -443,14 +443,14 @@ RUST_LOG=debug cargo run -p trader-bot
 
 ## 📝 Лицензия
 
-MIT License — см. файл [LICENSE](./LICENSE)
+MIT License - см. файл [LICENSE](./LICENSE)
 
 ## 🔗 Ссылки
 
 - [Tinkoff Invest API](https://developer.tbank.ru/invest/intro/intro)
 - [Документация Grid Bot](./GRID_BOT.md)
 - [Ollama Documentation](https://ollama.ai)
-- [Perplexica Documentation](./docs/PERPLEXICA.md)
+- [Perplexica Documentation](./docs/ru/PERPLEXICA.md)
 - [Perplexica GitHub](https://github.com/ItzCrazyKns/Perplexica)
 
 ## 🤝 Вклад в проект

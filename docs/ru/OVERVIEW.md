@@ -1,4 +1,4 @@
-# 📚 Документация Market Bot — Созданные файлы
+# 📚 Документация Market Bot - Созданные файлы
 
 ## Обзор
 
@@ -14,7 +14,7 @@ ai-trade-bot/
 ├── ml-inference/                   # ONNX model inference (FinBERT, etc.)
 ├── decision-engine/                # Signal fusion + risk management
 ├── execution/                      # Order management
-├── trader-bot/                     # Binary — wiring, config, main loop
+├── trader-bot/                     # Binary - wiring, config, main loop
 │   ├── src/
 │   │   ├── main.rs                 # Точка входа
 │   │   ├── core/                   # Broker-agnostic types & traits
@@ -62,17 +62,17 @@ ai-trade-bot/
 ### Разделы документации
 
 #### Getting Started
-- `what-is.md` — Обзор возможностей
-- `quickstart.md` — Установка и запуск
+- `what-is.md` - Обзор возможностей
+- `quickstart.md` - Установка и запуск
 
 #### User Guide
-- `configuration.md` — Настройка конфигурации
+- `configuration.md` - Настройка конфигурации
 
 #### Strategies
-- `grid-bot.md` — Grid стратегия (полная)
+- `grid-bot.md` - Grid стратегия (полная)
 
 #### Developer Guide
-- `api.md` — API референс
+- `api.md` - API референс
 
 ### Конфигурационные файлы
 
@@ -172,22 +172,22 @@ mike deploy --push 0.2.0
 ### Рекомендуется добавить:
 
 1. **Дополнительные руководства:**
-   - `user-guide/strategies.md` — Обзор всех стратегий
-   - `user-guide/risk-management.md` — Управление рисками
-   - `user-guide/monitoring.md` — Мониторинг и логи
+   - `user-guide/strategies.md` - Обзор всех стратегий
+   - `user-guide/risk-management.md` - Управление рисками
+   - `user-guide/monitoring.md` - Мониторинг и логи
 
 2. **Разработчикам:**
-   - `developer-guide/architecture.md` — Архитектура проекта
-   - `developer-guide/contributing.md` — Как внести вклад
-   - `developer-guide/changelog.md` — Ссылка на CHANGELOG.md
+   - `developer-guide/architecture.md` - Архитектура проекта
+   - `developer-guide/contributing.md` - Как внести вклад
+   - `developer-guide/changelog.md` - Ссылка на CHANGELOG.md
 
 3. **Поддержка:**
-   - `faq.md` — Часто задаваемые вопросы
-   - `troubleshooting.md` — Решение проблем
+   - `faq.md` - Часто задаваемые вопросы
+   - `troubleshooting.md` - Решение проблем
 
 4. **Ассеты:**
-   - `assets/logo.svg` — Логотип проекта
-   - `assets/favicon.ico` — Favicon для сайта
+   - `assets/logo.svg` - Логотип проекта
+   - `assets/favicon.ico` - Favicon для сайта
 
 ## 🔧 Проверка перед деплоем
 
@@ -220,8 +220,8 @@ mkdocs build --clean 2>&1 | grep -i "broken\|error"
 - [x] Инструкции по деплою созданы
 - [x] Python зависимости указаны
 - [x] Кастомные стили добавлены
-- [ ] Ассеты (логотип, favicon) — **требуется добавить**
-- [ ] Дополнительные страницы — **опционально**
+- [ ] Ассеты (логотип, favicon) - **требуется добавить**
+- [ ] Дополнительные страницы - **опционально**
 
 ---
 

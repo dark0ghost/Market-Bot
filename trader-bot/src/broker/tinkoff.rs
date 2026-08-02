@@ -84,7 +84,7 @@ impl RateLimiter {
             let updated_tokens = tokens.saturating_add(refilled).min(self.max_tokens);
 
             if updated_tokens == 0 {
-                // Bucket empty — wait for a refill tick.
+                // Bucket empty - wait for a refill tick.
                 return false;
             }
 

@@ -124,7 +124,34 @@ impl TechnicalAnalyzer {
             });
         }
 
-        let current_candle = candles.last().unwrap();
+        let current_candle = match candles.last() {
+            Some(c) => c,
+            None => {
+                return Ok(TechnicalAnalysis {
+                    ticker: ticker.to_string(),
+                    timestamp: Utc::now(),
+                    current_price: 0.0,
+                    trend: Trend::Sideways,
+                    rsi: None,
+                    macd: None,
+                    bollinger: Some(BollingerValues {
+                        upper: 0.0,
+                        middle: 0.0,
+                        lower: 0.0,
+                        bandwidth: 0.0,
+                    }),
+                    volume_analysis: VolumeAnalysis {
+                        current_volume: 0.0,
+                        avg_volume: 0.0,
+                        volume_ratio: 0.0,
+                        is_unusual: false,
+                    },
+                    support_levels: vec![],
+                    resistance_levels: vec![],
+                    recommendation: Recommendation::Hold,
+                });
+            }
+        };
         let current_price = extract_price(&current_candle.close)?;
         let current_time = current_candle.time.unwrap_or_default();
 
@@ -186,7 +213,7 @@ impl TechnicalAnalyzer {
             return None;
         }
 
-        let mut rsi = RelativeStrengthIndex::new(self.rsi_period).unwrap();
+        let mut rsi = RelativeStrengthIndex::new(self.rsi_period).ok()?;
         let mut result = None;
 
         for price in prices {
@@ -207,7 +234,7 @@ impl TechnicalAnalyzer {
             self.macd_slow,
             self.macd_signal,
         )
-        .unwrap();
+        .ok()?;
 
         let mut macd_line = 0.0;
         let mut signal_line = 0.0;
@@ -233,7 +260,15 @@ impl TechnicalAnalyzer {
             prices.len().max(5)
         };
 
-        let mut bb = BollingerBands::new(period, self.bollinger_std_dev).unwrap();
+        let mut bb = match BollingerBands::new(period, self.bollinger_std_dev) {
+            Ok(bb) => bb,
+            Err(_) => return BollingerValues {
+                upper: 0.0,
+                middle: 0.0,
+                lower: 0.0,
+                bandwidth: 0.0,
+            },
+        };
 
         let mut upper = 0.0;
         let mut middle = 0.0;

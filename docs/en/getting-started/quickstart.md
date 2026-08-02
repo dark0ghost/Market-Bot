@@ -21,7 +21,7 @@ docker compose up -d
 |---------|------|---------|
 | Ollama | 11435 | LLM (fin-expert) for analysis |
 | Redis | 6379 | Context cache, state |
-| Data Collector | — | Background RSS news collection |
+| Data Collector | - | Background RSS news collection |
 
 **Verify:**
 ```bash

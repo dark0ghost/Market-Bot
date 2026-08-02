@@ -67,7 +67,7 @@ def export_to_onnx():
     logger.info(f"Metadata saved to {meta_path}")
 
     # Persist the tokenizer alongside the ONNX model so inference loads the
-    # exact tokenizer used at export time — mismatched tokenizers silently skew
+    # exact tokenizer used at export time - mismatched tokenizers silently skew
     # predictions. Also record checksums for model + tokenizer files.
     tokenizer_dir = Path(ONNX_PATH).parent / "tokenizer"
     tokenizer.save_pretrained(tokenizer_dir)

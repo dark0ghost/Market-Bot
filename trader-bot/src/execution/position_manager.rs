@@ -1,18 +1,11 @@
+use crate::core::{OrderAction, OrderStatus};
 use crate::provider::ExecutionProvider;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
 use t_invest_sdk::TInvestSdk;
 use t_invest_sdk::api::{
     GetOrdersRequest, OrderDirection, OrderExecutionReportStatus, OrderType, PostOrderRequest,
 };
-
-/// Order action
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum OrderAction {
-    Buy,
-    Sell,
-}
 
 /// Order placement result
 #[derive(Debug, Clone)]
@@ -27,23 +20,13 @@ pub struct OrderResult {
     pub message: String,
 }
 
-/// Order status
-#[derive(Debug, Clone, PartialEq)]
-pub enum OrderStatus {
-    New,
-    PartiallyFilled,
-    Filled,
-    Cancelled,
-    Rejected,
-}
-
 /// Position and order manager
 pub struct PositionManager {
     sdk: TInvestSdk,
     account_id: String,
 }
 
-/// Build a Tinkoff `PostOrderRequest` — single source of truth for order placement
+/// Build a Tinkoff `PostOrderRequest` - single source of truth for order placement
 /// (was duplicated in `place_limit_order`, `place_market_order`, and `main.rs`).
 #[allow(deprecated)]
 fn build_post_order_request(
@@ -143,7 +126,7 @@ impl PositionManager {
     }
 
     /// Place a broker-side stop order (StopLoss or TakeProfit). Tinkoff executes it
-    /// server-side, so the stop survives a bot crash — unlike an in-memory stop.
+    /// server-side, so the stop survives a bot crash - unlike an in-memory stop.
     pub async fn place_stop_order(
         &self,
         figi: &str,
@@ -387,7 +370,7 @@ impl<E: ExecutionProvider> TradingExecutor<E> {
     }
 
     /// Place broker-side StopLoss and TakeProfit for the given (already filled) entry.
-    /// Errors are logged, not propagated — a failed stop placement must not roll back the entry,
+    /// Errors are logged, not propagated - a failed stop placement must not roll back the entry,
     /// but the caller's in-memory tracker still keeps a fallback stop.
     async fn place_protection_orders(
         &self,
@@ -529,127 +512,100 @@ mod tests {
 /// Tests for TradingExecutor
 #[cfg(test)]
 mod executor_tests {
+    use super::*;
+    use crate::provider::ExecutionProvider;
+    use anyhow::Result;
+
+    struct MockProvider;
+
+    impl ExecutionProvider for MockProvider {
+        async fn place_limit_order(
+            &self,
+            _figi: &str,
+            action: OrderAction,
+            quantity: i32,
+            price: f64,
+        ) -> Result<OrderResult> {
+            Ok(OrderResult {
+                order_id: "mock_1".to_string(),
+                figi: "MOCK".to_string(),
+                action,
+                quantity,
+                price: Some(price),
+                status: OrderStatus::New,
+                created_at: Utc::now(),
+                message: "mock".to_string(),
+            })
+        }
+
+        async fn place_market_order(
+            &self,
+            _figi: &str,
+            action: OrderAction,
+            quantity: i32,
+        ) -> Result<OrderResult> {
+            Ok(OrderResult {
+                order_id: "mock_2".to_string(),
+                figi: "MOCK".to_string(),
+                action,
+                quantity,
+                price: None,
+                status: OrderStatus::New,
+                created_at: Utc::now(),
+                message: "mock".to_string(),
+            })
+        }
+
+        async fn get_orders(&self) -> Result<Vec<OrderResult>> {
+            Ok(vec![])
+        }
+    }
 
     #[test]
     fn test_calculate_quantity_basic() {
-        // Test quantity calculation logic via closure
-        let balance = 10000.0;
-
-        // Closure for testing logic
-        let calc_qty = |price: f64, position_pct: f64| -> i32 {
-            if price <= 0.0 || position_pct <= 0.0 {
-                return 0;
-            }
-            let position_value = balance * position_pct;
-            let quantity = (position_value / price) as i32;
-            quantity.max(0)
-        };
-
-        // With balance 10000 and 10% position = 1000
-        // At price 100 = 10 lots
-        assert_eq!(calc_qty(100.0, 0.1), 10);
-
-        // At price 50 = 20 lots
-        assert_eq!(calc_qty(50.0, 0.1), 20);
-
-        // At 50% position = 5000, price 100 = 50 lots
-        assert_eq!(calc_qty(100.0, 0.5), 50);
+        let executor = TradingExecutor::new(MockProvider, 10000.0);
+        assert_eq!(executor.calculate_quantity(100.0, 0.1), 10);
+        assert_eq!(executor.calculate_quantity(50.0, 0.1), 20);
+        assert_eq!(executor.calculate_quantity(100.0, 0.5), 50);
     }
 
     #[test]
     fn test_calculate_quantity_edge_cases() {
-        let balance = 10000.0;
-
-        let calc_qty = |price: f64, position_pct: f64| -> i32 {
-            if price <= 0.0 || position_pct <= 0.0 {
-                return 0;
-            }
-            let position_value = balance * position_pct;
-            let quantity = (position_value / price) as i32;
-            quantity.max(0)
-        };
-
-        // Zero price
-        assert_eq!(calc_qty(0.0, 0.1), 0);
-
-        // Negative price
-        assert_eq!(calc_qty(-100.0, 0.1), 0);
-
-        // Zero position percentage
-        assert_eq!(calc_qty(100.0, 0.0), 0);
-
-        // Negative percentage
-        assert_eq!(calc_qty(100.0, -0.1), 0);
+        let executor = TradingExecutor::new(MockProvider, 10000.0);
+        assert_eq!(executor.calculate_quantity(0.0, 0.1), 0);
+        assert_eq!(executor.calculate_quantity(-100.0, 0.1), 0);
+        assert_eq!(executor.calculate_quantity(100.0, 0.0), 0);
+        assert_eq!(executor.calculate_quantity(100.0, -0.1), 0);
     }
 
     #[test]
     fn test_calculate_sell_quantity_basic() {
-        // Closure for testing sell quantity calculation logic
-        let calc_sell = |position: i32, pct: f64| -> i32 {
-            if pct <= 0.0 || position <= 0 {
-                return 0;
-            }
-            let quantity = (position as f64 * pct) as i32;
-            quantity.max(1).min(position)
-        };
-
-        // Selling 50% of 100 lots = 50 lots
-        assert_eq!(calc_sell(100, 0.5), 50);
-
-        // Selling 25% of 100 lots = 25 lots
-        assert_eq!(calc_sell(100, 0.25), 25);
-
-        // Selling 100% of 100 lots = 100 lots
-        assert_eq!(calc_sell(100, 1.0), 100);
+        let executor = TradingExecutor::new(MockProvider, 10000.0);
+        assert_eq!(executor.calculate_sell_quantity(100, 0.5), 50);
+        assert_eq!(executor.calculate_sell_quantity(100, 0.25), 25);
+        assert_eq!(executor.calculate_sell_quantity(100, 1.0), 100);
     }
 
     #[test]
     fn test_calculate_sell_quantity_minimum() {
-        let calc_sell = |position: i32, pct: f64| -> i32 {
-            if pct <= 0.0 || position <= 0 {
-                return 0;
-            }
-            let quantity = (position as f64 * pct) as i32;
-            quantity.max(1).min(position)
-        };
-
-        // Selling 1% of 100 lots = 1 lot (minimum 1)
-        assert_eq!(calc_sell(100, 0.01), 1);
-
-        // Selling 0.1% of 100 lots = 1 lot (minimum 1)
-        assert_eq!(calc_sell(100, 0.001), 1);
+        let executor = TradingExecutor::new(MockProvider, 10000.0);
+        assert_eq!(executor.calculate_sell_quantity(100, 0.01), 1);
+        assert_eq!(executor.calculate_sell_quantity(100, 0.001), 1);
     }
 
     #[test]
     fn test_calculate_sell_quantity_edge_cases() {
-        let calc_sell = |position: i32, pct: f64| -> i32 {
-            if pct <= 0.0 || position <= 0 {
-                return 0;
-            }
-            let quantity = (position as f64 * pct) as i32;
-            quantity.max(1).min(position)
-        };
-
-        // Zero position
-        assert_eq!(calc_sell(0, 0.5), 0);
-
-        // Negative position
-        assert_eq!(calc_sell(-10, 0.5), 0);
-
-        // Zero percentage
-        assert_eq!(calc_sell(100, 0.0), 0);
-
-        // Negative percentage
-        assert_eq!(calc_sell(100, -0.5), 0);
+        let executor = TradingExecutor::new(MockProvider, 10000.0);
+        assert_eq!(executor.calculate_sell_quantity(0, 0.5), 0);
+        assert_eq!(executor.calculate_sell_quantity(-10, 0.5), 0);
+        assert_eq!(executor.calculate_sell_quantity(100, 0.0), 0);
+        assert_eq!(executor.calculate_sell_quantity(100, -0.5), 0);
     }
 
     #[test]
     fn test_update_balance() {
-        // Test that update_balance method is called without errors
-        // A mock SDK is needed for proper testing
-        let balance = 10000.0;
-        let new_balance = 20000.0;
-        // Balance update logic tested by creating with new balance
-        assert!(new_balance > balance);
+        let mut executor = TradingExecutor::new(MockProvider, 10000.0);
+        executor.update_balance(20000.0);
+        assert_eq!(executor.available_balance, 20000.0);
     }
 }

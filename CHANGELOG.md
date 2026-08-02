@@ -2,19 +2,19 @@
 
 Все изменения в проекте Market Bot.
 
-## [Unreleased] — 2026-07-31
+## [Unreleased] - 2026-07-31
 
 ### Добавлено
 
 #### Торговый календарь MOEX
-- **`trader-bot/src/strategy/trading_calendar.rs`** — `TradingCalendar`:
+- **`trader-bot/src/strategy/trading_calendar.rs`** - `TradingCalendar`:
   проверка торговых часов MOEX (10:00–18:45 МСК), выходных и праздников.
-  Гейт перед каждым ордером в `run_ai_account` и в цикле `GridBot` —
+  Гейт перед каждым ордером в `run_ai_account` и в цикле `GridBot` -
   бот больше не шлёт ордера 24/7.
 
 #### Broker-side Stop-Loss / Take-Profit
 - `StopOrderRequest` / `StopOrderKind` в `core::types`, метод
-  `place_stop_order` в `Broker` trait (дефолт — error для брокеров без поддержки).
+  `place_stop_order` в `Broker` trait (дефолт - error для брокеров без поддержки).
 - Реализация для Tinkoff (`stop_orders().post_stop_order`) и
   `PositionManager::place_stop_order`. SL/TP теперь ставятся на стороне
   брокера и переживают рестарт бота (раньше только логировались, `// Stop loss via separate order`).
@@ -27,35 +27,35 @@
   в брокере (раньше TODO/no-op → orphan orders).
 
 #### Конфигурация и документация
-- `trader-bot/config/account.example.json` — шаблон конфига (раньше собирали из README).
-- `models/finbert/MODEL_CARD.md` — карточка ONNX-модели.
-- `training/requirements.lock.txt` — pinned-compatible версии Python-зависимостей.
+- `trader-bot/config/account.example.json` - шаблон конфига (раньше собирали из README).
+- `models/finbert/MODEL_CARD.md` - карточка ONNX-модели.
+- `training/requirements.lock.txt` - pinned-compatible версии Python-зависимостей.
 
 ### Изменено
 
 #### Качество и корректность
-- **Rate limiter Tinkoff** — `try_acquire` теперь корректно обновляет
+- **Rate limiter Tinkoff** - `try_acquire` теперь корректно обновляет
   `last_refill` при каждом успешном acquire (баг: обновлялся только при пустом
   бакете → лимит не работал как token-bucket).
-- **`get_orders` (Tinkoff, PositionManager)** — маппинг реального направления
+- **`get_orders` (Tinkoff, PositionManager)** - маппинг реального направления
   и статуса исполнения из ответа брокера вместо хардкода `Buy`/`New`.
-- **`win_rate` метрика** — теперь обновляется в `record_execution`
+- **`win_rate` метрика** - теперь обновляется в `record_execution`
   (раньше всегда `0.0` в `/metrics`).
-- **`analyze_batch` FinBERT** — конкурентный `spawn_blocking` + `try_join_all`
+- **`analyze_batch` FinBERT** - конкурентный `spawn_blocking` + `try_join_all`
   вместо последовательного цикла (async runtime больше не блокируется).
-- **Дубли order placement** — общий `build_post_order_request` в `PositionManager`.
-- **Дубли key-event extraction** — общий модуль `analysis::key_events`
+- **Дубли order placement** - общий `build_post_order_request` в `PositionManager`.
+- **Дубли key-event extraction** - общий модуль `analysis::key_events`
   (заменил копии в `news.rs` и `finbert.rs`).
 
 #### Python-пайплайн
-- `collect.py` — `ET.fromstring` обёрнут в try/except (malformed RSS больше не
+- `collect.py` - `ET.fromstring` обёрнут в try/except (malformed RSS больше не
   валит весь сбор); rate-limiting (`inter_feed_delay_sec`) между RSS-фидами.
-- `export_onnx.py` — сохраняет tokenizer рядом с ONNX + `MANIFEST.json` с SHA-256
+- `export_onnx.py` - сохраняет tokenizer рядом с ONNX + `MANIFEST.json` с SHA-256
   чексуммами (раньше tokenizer не экспортировался).
-- `train.py` — метрики расширены: Cohen's kappa, ECE (калибровка), per-class F1.
+- `train.py` - метрики расширены: Cohen's kappa, ECE (калибровка), per-class F1.
 
 #### Инфра
-- `.gitignore` — убран `trader-bot/Cargo.lock` (бинарник должен коммитить lock).
+- `.gitignore` - убран `trader-bot/Cargo.lock` (бинарник должен коммитить lock).
 
 ### Исправлено
 - Опечатка `creditional` → `credential` в `README.md` и `GRID_BOT.md`
@@ -63,29 +63,29 @@
 
 ---
 
-## [0.3.0] — 2026-07-21
+## [0.3.0] - 2026-07-21
 
 ### Добавлено
 
 #### FinBERT SFT (Supervised Fine-Tuning)
-- **`training/finbert_sft/`** — Python-пайплайн для дообучения FinBERT
-  - `dataset.py` — загрузка Financial PhraseBank (3 класса sentiment)
-  - `model.py` — загрузка ProsusAI/finbert с classification head
-  - `train.py` — SFT: HuggingFace Trainer, FP16, early stopping, eval по F1
-  - `evaluate.py` — classification report, confusion matrix
-  - `export_onnx.py` — torch.onnx.export → model.onnx с dynamic axes
-  - `config.yaml` — все гиперпараметры обучения
+- **`training/finbert_sft/`** - Python-пайплайн для дообучения FinBERT
+  - `dataset.py` - загрузка Financial PhraseBank (3 класса sentiment)
+  - `model.py` - загрузка ProsusAI/finbert с classification head
+  - `train.py` - SFT: HuggingFace Trainer, FP16, early stopping, eval по F1
+  - `evaluate.py` - classification report, confusion matrix
+  - `export_onnx.py` - torch.onnx.export → model.onnx с dynamic axes
+  - `config.yaml` - все гиперпараметры обучения
 
-- **`trader-bot/src/ml_inference/`** — ONNX-инференс в Rust
-  - `session.rs` — `OrtSessionPool` с hot-reload через `notify`
-  - `nlp.rs` — FinBERT inference: tokenization → ONNX → softmax → sentiment
+- **`trader-bot/src/ml_inference/`** - ONNX-инференс в Rust
+  - `session.rs` - `OrtSessionPool` с hot-reload через `notify`
+  - `nlp.rs` - FinBERT inference: tokenization → ONNX → softmax → sentiment
 
-- **`models/finbert/`** — директория для ONNX-артефактов (gitignored)
+- **`models/finbert/`** - директория для ONNX-артефактов (gitignored)
 
 #### Новые зависимости
-- `ort`, `ndarray`, `tokenizers` — ONNX Runtime для Rust
-- `arc-swap` — lock-free чтение модели (hot-reload)
-- `notify` — отслеживание изменений model.onnx
+- `ort`, `ndarray`, `tokenizers` - ONNX Runtime для Rust
+- `arc-swap` - lock-free чтение модели (hot-reload)
+- `notify` - отслеживание изменений model.onnx
 
 ### Изменено
 
@@ -95,12 +95,12 @@
 - **Layer 3**: Offline Training (Python, PyTorch → ONNX)
 
 #### Документация
-- **README.md** — обновлена архитектура, добавлен раздел FinBERT SFT
-- **docs/OVERVIEW.md** — обновлена структура проекта
+- **README.md** - обновлена архитектура, добавлен раздел FinBERT SFT
+- **docs/OVERVIEW.md** - обновлена структура проекта
 
 ---
 
-## [0.2.0] — 2026-02-22
+## [0.2.0] - 2026-02-22
 
 ### Добавлено
 
@@ -126,10 +126,10 @@
 #### Конфигурация
 - Новый тип стратегии: `StrategyType::Grid`
 - `GridConfig`: Конфигурация Grid стратегии
-  - `lower_price` / `upper_price` — диапазон цен
-  - `grid_levels` — количество уровней
-  - `order_size` — размер ордера в лотах
-  - `grid_ratio` — соотношение buy/sell (0.5 = 50/50)
+  - `lower_price` / `upper_price` - диапазон цен
+  - `grid_levels` - количество уровней
+  - `order_size` - размер ордера в лотах
+  - `grid_ratio` - соотношение buy/sell (0.5 = 50/50)
 
 - Пример конфигурации для SBER Grid бота в `account.json`
 
@@ -156,10 +156,10 @@
 ### Изменено
 
 #### Структура проекта
-- `trader-bot/src/strategy/grid.rs` — Grid стратегия
-- `trader-bot/src/strategy/grid_executor.rs` — Исполнитель
-- `trader-bot/src/strategy/grid_bot.rs` — Основной цикл
-- `trader-bot/src/config/data.rs` — Конфигурация
+- `trader-bot/src/strategy/grid.rs` - Grid стратегия
+- `trader-bot/src/strategy/grid_executor.rs` - Исполнитель
+- `trader-bot/src/strategy/grid_bot.rs` - Основной цикл
+- `trader-bot/src/config/data.rs` - Конфигурация
 
 #### Зависимости
 - Обновлены импорты в `trader-bot/src/main.rs`
@@ -173,7 +173,7 @@
 
 ---
 
-## [0.1.5] — 2026-02-22
+## [0.1.5] - 2026-02-22
 
 ### Добавлено
 
@@ -200,21 +200,21 @@
 
 ---
 
-## [0.1.4] — 2026-02-21
+## [0.1.4] - 2026-02-21
 
 ### Добавлено
 
 #### MarketDataService
-- `get_historical_candles()` — получение свечей из API
-- `get_5min_candles()` — 5-минутные свечи
-- `get_last_price()` — текущая цена
+- `get_historical_candles()` - получение свечей из API
+- `get_5min_candles()` - 5-минутные свечи
+- `get_last_price()` - текущая цена
 - Конвертация HistoricCandle → Candle
 
 #### PortfolioService
-- `get_accounts()` — список счетов
-- `get_portfolio()` — текущий портфель
-- `get_available_balance()` — доступный баланс
-- `get_position()` — позиция по инструменту
+- `get_accounts()` - список счетов
+- `get_portfolio()` - текущий портфель
+- `get_available_balance()` - доступный баланс
+- `get_position()` - позиция по инструменту
 
 #### FundamentalDataService
 - Загрузка фундаментальных данных
@@ -235,7 +235,7 @@
 
 ---
 
-## [0.1.3] — 2026-02-20
+## [0.1.3] - 2026-02-20
 
 ### Добавлено
 
@@ -261,13 +261,13 @@
 ### Изменено
 
 #### TradingAgent
-- `make_decision()` — LLM-решение
-- `make_rule_based_decision()` — rule-based решение
+- `make_decision()` - LLM-решение
+- `make_rule_based_decision()` - rule-based решение
 - Расчет позиции с учетом рисков
 
 ---
 
-## [0.1.2] — 2026-02-19
+## [0.1.2] - 2026-02-19
 
 ### Добавлено
 
@@ -289,7 +289,7 @@
 
 ---
 
-## [0.1.1] — 2026-02-18
+## [0.1.1] - 2026-02-18
 
 ### Добавлено
 
@@ -300,7 +300,7 @@
 
 ---
 
-## [0.1.0] — 2026-02-17
+## [0.1.0] - 2026-02-17
 
 ### Добавлено
 

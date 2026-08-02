@@ -36,7 +36,10 @@ pub fn detect_cisd(candles: &[Candle], swings: &[Swing]) -> Vec<CISDSignal> {
         return signals;
     }
 
-    let current_price = candles.last().unwrap().close;
+    let current_price = match candles.last() {
+        Some(c) => c.close,
+        None => return signals,
+    };
 
     let recent_lows: Vec<&Swing> = swings
         .iter()

@@ -40,7 +40,7 @@ def compute_metrics(eval_pred):
         "cohen_kappa": kappa,
     }
 
-    # Expected Calibration Error (ECE) — the TradingAgent uses confidence scores,
+    # Expected Calibration Error (ECE) - the TradingAgent uses confidence scores,
     # so calibration matters. Bucket softmax confidences into equal-width bins and
     # measure the gap between confidence and accuracy per bin.
     try:

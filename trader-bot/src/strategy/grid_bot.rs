@@ -90,7 +90,7 @@ impl GridBot {
             ))
             .await;
 
-            // Don't place/rebalance orders outside the MOEX session —
+            // Don't place/rebalance orders outside the MOEX session -
             // exchange would reject them anyway and we'd waste API calls.
             if !calendar.is_open_now() {
                 info!("MOEX closed, skipping grid rebalance this tick");

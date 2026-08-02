@@ -179,7 +179,7 @@ impl NewsAnalyzer {
         Sentiment::from_score(score)
     }
 
-    /// Extract key events from news — delegates to the shared `key_events` module
+    /// Extract key events from news - delegates to the shared `key_events` module
     /// (was duplicated here and in `finbert.rs`).
     async fn extract_key_events(&self, articles: &[NewsArticle]) -> Result<Vec<String>> {
         let combined = articles

@@ -1,5 +1,5 @@
 site_name: Market Bot
-site_description: Market Bot — algorithmic trading system documentation
+site_description: Market Bot - algorithmic trading system documentation
 site_author: Market Bot Team
 site_url: https://your-username.gitlab.io/ai-trade-bot/
 
@@ -85,8 +85,11 @@ nav:
   - User Guide:
     - Configuration: user-guide/configuration.md
     - "Broker Setup": user-guide/broker-setup.md
+    - "FAQ": user-guide/faq.md
   - Strategies:
     - "Grid Bot": strategies/grid-bot.md
+    - "AI Strategy": strategies/ai-strategy.md
+    - "Gates Strategy": strategies/gates-strategy.md
   - Developer Guide:
     - "API Documentation": developer-guide/api.md
 
@@ -117,13 +120,12 @@ markdown_extensions:
   - pymdownx.magiclink:
       normalize_issue_symbols: true
       repo_url_shorthand: true
-      user: your-username
+      user: dark0ghost
       repo: ai-trade-bot
   - pymdownx.mark
   - pymdownx.smartsymbols
   - pymdownx.snippets:
-      auto_append:
-        - includes/mkdocs.md
+      auto_append: []
   - pymdownx.superfences:
       custom_fences:
         - name: mermaid
@@ -144,7 +146,6 @@ extra_css:
 
 extra_javascript:
   - javascripts/mathjax.js
-  - https://polyfill.io/v3/polyfill.min.js?features=es6
   - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
 
 extra:

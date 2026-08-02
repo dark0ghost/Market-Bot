@@ -1,12 +1,14 @@
 use crate::analysis::NewsSentiment;
 use crate::analysis::detectors::{CISDSignal, Candle, Displacement, FairValueGap, Swing};
+use async_trait::async_trait;
 
 pub mod gates_impl;
 
 /// A single pass/fail gate in the screening pipeline.
+#[async_trait]
 pub trait Gate: Send + Sync {
     fn name(&self) -> &str;
-    fn evaluate(&self, ctx: &GateContext) -> GateResult;
+    async fn evaluate(&self, ctx: &GateContext) -> GateResult;
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -53,10 +55,10 @@ impl GateContext {
 }
 
 /// Run a sequence of gates. Short-circuits on first Fail.
-pub fn run_gates(gates: &[Box<dyn Gate>], ctx: &GateContext) -> Vec<GateResult> {
+pub async fn run_gates(gates: &[Box<dyn Gate>], ctx: &GateContext) -> Vec<GateResult> {
     let mut results = Vec::new();
     for gate in gates {
-        let result = gate.evaluate(ctx);
+        let result = gate.evaluate(ctx).await;
         let is_pass = result.is_pass();
         results.push(result);
         if !is_pass {
@@ -67,7 +69,7 @@ pub fn run_gates(gates: &[Box<dyn Gate>], ctx: &GateContext) -> Vec<GateResult> 
 }
 
 /// Wrap an LLM query as a veto-only gate.
-/// The LLM is called last and can only reject (Fail) — it cannot force a Pass.
+/// The LLM is called last and can only reject (Fail) - it cannot force a Pass.
 pub struct LlmVetoGate {
     name: String,
     llm: Box<dyn crate::agent::LlmQuery>,
@@ -82,12 +84,13 @@ impl LlmVetoGate {
     }
 }
 
+#[async_trait]
 impl Gate for LlmVetoGate {
     fn name(&self) -> &str {
         &self.name
     }
 
-    fn evaluate(&self, ctx: &GateContext) -> GateResult {
+    async fn evaluate(&self, ctx: &GateContext) -> GateResult {
         let prompt = format!(
             "You are a conservative risk manager. Review this setup and respond ONLY with YES or NO.
 
@@ -111,7 +114,7 @@ Would you veto this trade? Answer YES to reject, NO to allow.",
             ctx.displacements.len(),
         );
 
-        match tokio::runtime::Handle::current().block_on(self.llm.query(prompt)) {
+        match self.llm.query(prompt).await {
             Ok(response) => {
                 let upper = response.trim().to_uppercase();
                 if upper.starts_with("Y") {
@@ -133,40 +136,42 @@ mod tests {
     use super::*;
 
     struct PassGate;
+    #[async_trait]
     impl Gate for PassGate {
         fn name(&self) -> &str {
             "pass"
         }
-        fn evaluate(&self, _: &GateContext) -> GateResult {
+        async fn evaluate(&self, _: &GateContext) -> GateResult {
             GateResult::Pass
         }
     }
 
     struct FailGate;
+    #[async_trait]
     impl Gate for FailGate {
         fn name(&self) -> &str {
             "fail"
         }
-        fn evaluate(&self, _: &GateContext) -> GateResult {
+        async fn evaluate(&self, _: &GateContext) -> GateResult {
             GateResult::Fail("nope".into())
         }
     }
 
-    #[test]
-    fn test_all_pass() {
+    #[tokio::test]
+    async fn test_all_pass() {
         let gates: Vec<Box<dyn Gate>> = vec![Box::new(PassGate), Box::new(PassGate)];
         let ctx = GateContext::new("AAPL");
-        let results = run_gates(&gates, &ctx);
+        let results = run_gates(&gates, &ctx).await;
         assert_eq!(results.len(), 2);
         assert!(results.iter().all(|r| r.is_pass()));
     }
 
-    #[test]
-    fn test_short_circuit_on_fail() {
+    #[tokio::test]
+    async fn test_short_circuit_on_fail() {
         let gates: Vec<Box<dyn Gate>> =
             vec![Box::new(PassGate), Box::new(FailGate), Box::new(PassGate)];
         let ctx = GateContext::new("AAPL");
-        let results = run_gates(&gates, &ctx);
+        let results = run_gates(&gates, &ctx).await;
         assert_eq!(results.len(), 2);
         assert!(results[0].is_pass());
         assert!(!results[1].is_pass());

@@ -11,7 +11,7 @@ pub use fvg::{FairValueGap, detect_fvg, update_fvg_states};
 pub use swings::{Swing, SwingType, detect_swings};
 
 /// Minimal OHLC candle for detector functions.
-/// Pure data — no dependency on t_invest_sdk.
+/// Pure data - no dependency on t_invest_sdk.
 #[derive(Debug, Clone, Copy)]
 pub struct Candle {
     pub open: f64,

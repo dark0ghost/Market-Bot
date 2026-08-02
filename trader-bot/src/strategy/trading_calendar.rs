@@ -1,11 +1,11 @@
-//! MOEX trading calendar — market-hours and holiday awareness.
+//! MOEX trading calendar - market-hours and holiday awareness.
 //!
 //! Default trading session: 10:00–18:45 Moscow time (UTC+3), Mon–Fri.
 //! Holidays are a minimal hardcoded set for the current year; callers may
 //! extend via [`TradingCalendar::with_extra_holidays`].
 //!
 //! Every order path should gate on [`TradingCalendar::is_open`] before placing
-//! a trade — the bot otherwise runs 24/7 and piles up rejected orders on
+//! a trade - the bot otherwise runs 24/7 and piles up rejected orders on
 //! evenings, weekends and holidays.
 
 use chrono::{DateTime, Datelike, TimeZone, Timelike, Utc, Weekday};
@@ -22,7 +22,7 @@ const MSK_OFFSET_HOURS: i64 = 3;
 #[derive(Debug, Clone)]
 pub struct TradingCalendar {
     /// Extra non-trading days (month, day) in UTC date terms of the MSK calendar.
-    /// ponytail: minimal hardcoded holiday set — covers the main MOEX closures.
+    /// ponytail: minimal hardcoded holiday set - covers the main MOEX closures.
     /// Upgrade path: load from an external holidays feed when available.
     holidays: Vec<(u32, u32)>,
 }
@@ -79,7 +79,7 @@ impl TradingCalendar {
     pub fn is_open(&self, at: DateTime<Utc>) -> bool {
         let (_, month, day, hour, minute, _, weekday) = Self::msk_components(at);
 
-        // Weekend — MOEX is closed Sat/Sun.
+        // Weekend - MOEX is closed Sat/Sun.
         if matches!(weekday, Weekday::Sat | Weekday::Sun) {
             return false;
         }
@@ -104,7 +104,7 @@ impl TradingCalendar {
     }
 
     /// Next UTC instant at or after `at` when the market opens.
-    /// Bounded scan — at most ~3 calendar days of iteration.
+    /// Bounded scan - at most ~3 calendar days of iteration.
     pub fn next_open(&self, at: DateTime<Utc>) -> DateTime<Utc> {
         let mut t = at;
         // Scan forward in 1-minute steps until open, capped at 3 days.
@@ -116,7 +116,9 @@ impl TradingCalendar {
             t += chrono::Duration::minutes(1);
         }
         // Fallback: should not happen for a weekly calendar.
-        Utc.timestamp_opt(at.timestamp() + 60 * 60, 0).unwrap()
+        Utc.timestamp_opt(at.timestamp() + 60 * 60, 0)
+            .single()
+            .unwrap_or(at)
     }
 }
 
@@ -124,7 +126,7 @@ impl TradingCalendar {
 mod tests {
     use super::*;
 
-    /// Monday 2026-02-09 09:00 MSK = 06:00 UTC — before open.
+    /// Monday 2026-02-09 09:00 MSK = 06:00 UTC - before open.
     #[test]
     fn monday_before_open_is_closed() {
         let cal = TradingCalendar::default();
@@ -133,7 +135,7 @@ mod tests {
         assert!(!cal.is_open(t));
     }
 
-    /// Monday 2026-02-09 12:00 MSK = 09:00 UTC — within session.
+    /// Monday 2026-02-09 12:00 MSK = 09:00 UTC - within session.
     #[test]
     fn midday_weekday_is_open() {
         let cal = TradingCalendar::default();
@@ -141,7 +143,7 @@ mod tests {
         assert!(cal.is_open(t));
     }
 
-    /// Monday 2026-02-09 19:00 MSK = 16:00 UTC — after close.
+    /// Monday 2026-02-09 19:00 MSK = 16:00 UTC - after close.
     #[test]
     fn after_close_is_closed() {
         let cal = TradingCalendar::default();
@@ -149,7 +151,7 @@ mod tests {
         assert!(!cal.is_open(t));
     }
 
-    /// Saturday — always closed.
+    /// Saturday - always closed.
     #[test]
     fn weekend_is_closed() {
         let cal = TradingCalendar::default();
@@ -158,7 +160,7 @@ mod tests {
         assert!(!cal.is_open(t));
     }
 
-    /// New Year's Day — closed even though it's a Friday in 2026.
+    /// New Year's Day - closed even though it's a Friday in 2026.
     #[test]
     fn new_year_holiday_is_closed() {
         let cal = TradingCalendar::default();
@@ -170,7 +172,7 @@ mod tests {
     #[test]
     fn extra_holidays_added() {
         let cal = TradingCalendar::default().with_extra_holidays(vec![(7, 15)]);
-        // 2026-07-15 12:00 MSK = 09:00 UTC, Wednesday — normally open
+        // 2026-07-15 12:00 MSK = 09:00 UTC, Wednesday - normally open
         let t = Utc.with_ymd_and_hms(2026, 7, 15, 9, 0, 0).unwrap();
         assert!(!cal.is_open(t));
     }

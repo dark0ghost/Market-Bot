@@ -1,12 +1,12 @@
 # Perplexica Integration
 
-Интеграция с **Perplexica** — AI-ориентированной поисковой системой для поиска информации о компаниях, новостей и аналитики.
+Интеграция с **Perplexica** - AI-ориентированной поисковой системой для поиска информации о компаниях, новостей и аналитики.
 
 ## Обзор
 
-[Perplexica](https://github.com/ItzCrazyKns/Perplexica) — это open-source AI-поисковик, который работает на вашем оборудовании и предоставляет точные ответы с цитированием источников.
+[Perplexica](https://github.com/ItzCrazyKns/Perplexica) - это open-source AI-поисковик, который работает на вашем оборудовании и предоставляет точные ответы с цитированием источников.
 
-**Документация API получена через Context7 MCP сервер** — актуальная информация из репозитория GitHub.
+**Документация API получена через Context7 MCP сервер** - актуальная информация из репозитория GitHub.
 
 ## Требования
 
@@ -386,5 +386,5 @@ cargo test -p mcp-client
 
 - [GitHub репозиторий Perplexica](https://github.com/ItzCrazyKns/Perplexica)
 - [Документация API](https://github.com/ItzCrazyKns/Perplexica/tree/master/docs/API)
-- [Context7 MCP Server](https://github.com/upstash/context7) — для получения актуальной документации
+- [Context7 MCP Server](https://github.com/upstash/context7) - для получения актуальной документации
 - [Perplexica Search API Spec](https://github.com/ItzCrazyKns/Perplexica/blob/main/docs/API/SEARCH.md)

@@ -1,9 +1,4 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
 #![allow(async_fn_in_trait)]
-#![allow(clippy::module_inception)]
-#![allow(clippy::too_many_arguments)]
-#![allow(clippy::upper_case_acronyms)]
 
 mod agent;
 mod analysis;
@@ -284,7 +279,7 @@ async fn main() -> Result<()> {
         ) {
             Ok(a) => Arc::new(a),
             Err(e) => {
-                log::error!("Failed to init TradingAgent for {}: {} — skipping", aid, e);
+                log::error!("Failed to init TradingAgent for {}: {} - skipping", aid, e);
                 continue;
             }
         };
@@ -366,7 +361,7 @@ async fn run_grid_account(account: &AccountConfig, ab: &AccountBroker) -> Result
         Some(sdk) => sdk.clone(),
         None => {
             log::warn!(
-                "Grid account {} has no Tinkoff SDK — GridBot requires it",
+                "Grid account {} has no Tinkoff SDK - GridBot requires it",
                 aid
             );
             return Ok(());
@@ -522,27 +517,31 @@ async fn run_ai_account(
         };
 
         let decision = if llm_config_enabled(account) {
-            agent.make_decision(ctx.clone()).await.unwrap_or_else(|e| {
-                log::warn!("LLM error, fallback to rule: {}", e);
-                agent
-                    .make_rule_based_decision(ctx.clone())
-                    .unwrap_or_else(|_| agent::TradingDecision {
-                        ticker: instrument.ticker.clone(),
-                        action: agent::Action::Hold,
-                        confidence: 0.0,
-                        entry_price: None,
-                        position_size_pct: 0.0,
-                        stop_loss: None,
-                        take_profit: None,
-                        rationale: "fallback".into(),
-                        risks: vec![],
-                        time_horizon: agent::TimeHorizon::Medium,
-                        current_position: None,
-                        current_price,
-                    })
-            })
+            match agent.make_decision(ctx.clone()).await {
+                Ok(d) => d,
+                Err(e) => {
+                    log::warn!("LLM error, fallback to rule: {}", e);
+                    agent
+                        .make_rule_based_decision(ctx.clone())
+                        .await
+                        .unwrap_or_else(|_| agent::TradingDecision {
+                            ticker: instrument.ticker.clone(),
+                            action: agent::Action::Hold,
+                            confidence: 0.0,
+                            entry_price: None,
+                            position_size_pct: 0.0,
+                            stop_loss: None,
+                            take_profit: None,
+                            rationale: "fallback".into(),
+                            risks: vec![],
+                            time_horizon: agent::TimeHorizon::Medium,
+                            current_position: None,
+                            current_price,
+                        })
+                }
+            }
         } else {
-            agent.make_rule_based_decision(ctx)?
+            agent.make_rule_based_decision(ctx).await?
         };
 
         log::info!(
@@ -640,7 +639,7 @@ async fn get_candles_for_analysis(
         }
     } else {
         log::warn!(
-            "No SDK for candle data — skipping TA for {}",
+            "No SDK for candle data - skipping TA for {}",
             instrument.ticker
         );
         vec![]
@@ -695,12 +694,12 @@ async fn get_news_for_instrument(
 
 /// Convert a decision into an order quantity (in units/lots).
 ///
-/// * **Buy** — sized by portfolio value: `floor(balance * position_size_pct / price)`,
+/// * **Buy** - sized by portfolio value: `floor(balance * position_size_pct / price)`,
 ///   so a 15% allocation buys as many units as that share of the balance affords at the
 ///   current price (was previously `pct * 100`, which ignored balance and price entirely).
-/// * **Sell** — liquidate the known current position when available; otherwise fall back
+/// * **Sell** - liquidate the known current position when available; otherwise fall back
 ///   to value-based sizing.
-/// * **Hold** — zero.
+/// * **Hold** - zero.
 ///
 /// Returns `0` on non-positive price/balance or a non-positive allocation.
 fn calc_order_quantity(

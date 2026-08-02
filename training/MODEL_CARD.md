@@ -1,4 +1,4 @@
-# FinBERT SFT — Model Card
+# FinBERT SFT - Model Card
 
 This directory holds the ONNX-exported FinBERT sentiment model used by
 `trader-bot` for news sentiment inference (`ml_inference/nlp.rs`).
@@ -30,7 +30,7 @@ ONNX so inference can verify it loads the matching tokenizer.
 
 ## Versioning
 
-No automated version field yet — `model.json` records the base model name and
+No automated version field yet - `model.json` records the base model name and
 opset. Replace the files in this directory to ship a new version; the hot-reload
 watcher in `OrtSessionPool::spawn_watcher` picks up `model.onnx` changes at
 runtime.

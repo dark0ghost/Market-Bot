@@ -1,5 +1,5 @@
-use crate::core::StopOrderKind;
-use crate::execution::position_manager::{OrderAction, OrderResult, PositionManager};
+use crate::core::{OrderAction, StopOrderKind};
+use crate::execution::position_manager::{OrderResult, PositionManager};
 use anyhow::Result;
 
 pub trait ExecutionProvider {
@@ -19,7 +19,7 @@ pub trait ExecutionProvider {
     ) -> Result<OrderResult>;
 
     /// Place a broker-side stop order. Default returns an error for providers
-    /// that don't support native stops — callers fall back to in-memory tracking.
+    /// that don't support native stops - callers fall back to in-memory tracking.
     async fn place_stop_order(
         &self,
         _figi: &str,

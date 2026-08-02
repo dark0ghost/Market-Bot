@@ -34,9 +34,10 @@ impl OrtSessionPool {
 
     pub fn reload(&self) -> Result<()> {
         let new = Self::build_session(&self.model_path, self.num_threads)?;
-        // Build new session first, then swap atomically.
-        // If build_session fails, the old session is preserved.
-        let mut session = self.session.lock().unwrap();
+        let mut session = self
+            .session
+            .lock()
+            .map_err(|e| anyhow::anyhow!("ORT session lock poisoned: {e}"))?;
         *session = new;
         Ok(())
     }
@@ -53,7 +54,10 @@ impl OrtSessionPool {
         let attn = Tensor::from_array((shape, attention_mask))
             .context("ORT create attention_mask tensor")?;
 
-        let mut session = self.session.lock().unwrap();
+        let mut session = self
+            .session
+            .lock()
+            .map_err(|e| anyhow::anyhow!("ORT session lock poisoned: {e}"))?;
         let outputs = session
             .run(ort::inputs! {
                 "input_ids" => in_ids,

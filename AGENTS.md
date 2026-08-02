@@ -1,4 +1,4 @@
-# Market Bot — Agents & Skills
+# Market Bot - Agents & Skills
 
 ## Architecture Overview
 
@@ -49,7 +49,7 @@ Data flow: `WS OrderBook -> features -> ONNX FinBERT -> Decision Engine -> Risk 
 
 ```
 ai-trade-bot/
-├── trader-bot/                  # Rust — trading core
+├── trader-bot/                  # Rust - trading core
 │   ├── src/
 │   │   ├── main.rs              # Entry point, wires everything
 │   │   ├── core/                # Broker-agnostic types & traits
@@ -194,7 +194,7 @@ Commands available to IDE agents:
 | Command | Description |
 |---------|-------------|
 | `analyze` | Deep portfolio analysis with FinBERT sentiment |
-| `scan` | Market scanner — find instruments by volatility/volume/momentum |
+| `scan` | Market scanner - find instruments by volatility/volume/momentum |
 | `backtest` | Run strategy backtest with parameter ranges |
 | `train` | Run FinBERT SFT training pipeline |
 
@@ -221,7 +221,7 @@ claude plugin install finam@finam-skill --scope user
 /add-plugin https://github.com/FinamWeb/finam-skill
 ```
 
-**What it provides:** direct access to Finam Trade API from the IDE — quotes, order book, portfolio, orders, instrument search, and algorithmic trading scripts.
+**What it provides:** direct access to Finam Trade API from the IDE - quotes, order book, portfolio, orders, instrument search, and algorithmic trading scripts.
 
 ## Sub-Agents (Rust, in-process)
 
@@ -247,7 +247,7 @@ impl TradingAgent {
 
 Two decision modes:
 - **LLM-based** (`make_decision`): builds a prompt from context (news sentiment, technical analysis, fundamentals, portfolio state), queries Ollama, and parses the JSON response into a `TradingDecision`
-- **Rule-based** (`make_rule_based_decision`): applies deterministic rules without an LLM call — suitable for fast, low-latency decisions
+- **Rule-based** (`make_rule_based_decision`): applies deterministic rules without an LLM call - suitable for fast, low-latency decisions
 
 ### AnalystAgent
 
@@ -261,10 +261,10 @@ pub struct AnalystAgent {
 ```
 
 Uses an ensemble of predictors:
-- **TechnicalPredictor** — RSI, MACD, Bollinger Bands, volume analysis
-- **LLMPredictor** — Ollama-based fundamental/news reasoning
-- **StatArbPredictor** — statistical arbitrage signals
-- **FundamentalPredictor** — P/E, ROE, D/E, revenue growth
+- **TechnicalPredictor** - RSI, MACD, Bollinger Bands, volume analysis
+- **LLMPredictor** - Ollama-based fundamental/news reasoning
+- **StatArbPredictor** - statistical arbitrage signals
+- **FundamentalPredictor** - P/E, ROE, D/E, revenue growth
 
 The ensemble produces a weighted `AnalystProposal` with action, confidence, and conviction score.
 
@@ -357,7 +357,7 @@ let result: NlpResult = nlp.predict("company reported 30% revenue growth")?;
 let sentiment = result.sentiment_score(); // 0.97
 ```
 
-**Hot-reload:** the ONNX session watches `model.onnx` for changes via `notify` and reloads automatically — no process restart needed.
+**Hot-reload:** the ONNX session watches `model.onnx` for changes via `notify` and reloads automatically - no process restart needed.
 
 **Thread safety:** ONNX inference runs on `spawn_blocking` to avoid blocking the tokio runtime.
 
@@ -435,7 +435,7 @@ Run the Rust binary to verify the exported model loads and produces correct infe
 RUST_LOG=info cargo run -p trader-bot
 ```
 
-The ONNX model is hot-reloaded automatically — just replace `models/finbert/model.onnx` and the bot picks it up without restart.
+The ONNX model is hot-reloaded automatically - just replace `models/finbert/model.onnx` and the bot picks it up without restart.
 
 ### Full Pipeline (Docker GPU)
 
@@ -450,11 +450,11 @@ HF_TOKEN=hf_xxx bash training/pipeline.sh --days 30
 ```
 
 The pipeline script (`training/pipeline.sh`) runs:
-1. `sber_collect.py --days N` — collect Sberbank news
-2. `sber_collect.py --merge` — merge into training set
-3. `train.py` — FinBERT SFT fine-tuning
-4. `evaluate.py` — model evaluation
-5. `export_onnx.py` — export to ONNX
+1. `sber_collect.py --days N` - collect Sberbank news
+2. `sber_collect.py --merge` - merge into training set
+3. `train.py` - FinBERT SFT fine-tuning
+4. `evaluate.py` - model evaluation
+5. `export_onnx.py` - export to ONNX
 
 ## Agent Conventions
 

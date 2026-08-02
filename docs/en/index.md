@@ -5,7 +5,7 @@ hide:
 
 # Market Bot Documentation
 
-Welcome to the Market Bot documentation — a comprehensive algorithmic trading system for the Moscow Exchange.
+Welcome to the Market Bot documentation - a comprehensive algorithmic trading system for the Moscow Exchange.
 
 ## Quick Start
 
@@ -30,20 +30,20 @@ cargo run -p trader-bot
 
 ### Getting Started
 
-- **[What is Market Bot?](getting-started/what-is.md)** — Feature overview
-- **[Quick Start](getting-started/quickstart.md)** — Installation and launch
+- **[What is Market Bot?](getting-started/what-is.md)** - Feature overview
+- **[Quick Start](getting-started/quickstart.md)** - Installation and launch
 
 ### User Guide
 
-- **[Configuration](user-guide/configuration.md)** — Bot configuration
+- **[Configuration](user-guide/configuration.md)** - Bot configuration
 
 ### Developer Guide
 
-- **[API Documentation](developer-guide/api.md)** — API reference
+- **[API Documentation](developer-guide/api.md)** - API reference
 
 ### Strategies
 
-- **[Grid Bot](strategies/grid-bot.md)** — Grid trading
+- **[Grid Bot](strategies/grid-bot.md)** - Grid trading
 
 ## Features
 
@@ -58,12 +58,12 @@ cargo run -p trader-bot
 
 ## Support
 
-- [GitHub Issues](https://github.com/dark0ghost/ai-trader-bot/issues) — Report a bug
-- [GitHub Issues](https://github.com/dark0ghost/ai-trader-bot/issues) — Report a bug
+- [GitHub Issues](https://github.com/dark0ghost/ai-trader-bot/issues) - Report a bug
+- [GitHub Issues](https://github.com/dark0ghost/ai-trader-bot/issues) - Report a bug
 
 ## License
 
-MIT License — see [LICENSE](../../LICENSE)
+MIT License - see [LICENSE](../../LICENSE)
 
 ---
 

@@ -101,15 +101,15 @@ def fetch_rss(url: str, timeout: int) -> list[dict]:
         resp = requests.get(url, headers=headers, timeout=timeout)
         resp.raise_for_status()
     except requests.RequestException as e:
-        logger.warning(f"RSS fetch failed: {url} — {e}")
+        logger.warning(f"RSS fetch failed: {url} - {e}")
         return []
 
     items = []
-    # Malformed/invalid XML must not crash the whole collection run — skip the feed.
+    # Malformed/invalid XML must not crash the whole collection run - skip the feed.
     try:
         root = ET.fromstring(resp.content)
     except ET.ParseError as e:
-        logger.warning(f"RSS parse failed (malformed XML): {url} — {e}")
+        logger.warning(f"RSS parse failed (malformed XML): {url} - {e}")
         return []
     for item in root.iter("item"):
         title = (item.findtext("title") or "").strip()

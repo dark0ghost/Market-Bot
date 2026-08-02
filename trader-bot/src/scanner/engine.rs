@@ -131,7 +131,7 @@ impl SignalScanner {
             candles: vec![],
         };
 
-        let decision = self.agent.make_rule_based_decision(context).ok();
+        let decision = self.agent.make_rule_based_decision(context).await.ok();
 
         ScanResult {
             ticker: ticker.to_string(),

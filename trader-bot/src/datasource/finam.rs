@@ -117,10 +117,9 @@ impl FinamDataSource {
 
     fn headers(&self) -> reqwest::header::HeaderMap {
         let mut h = reqwest::header::HeaderMap::new();
-        h.insert(
-            reqwest::header::AUTHORIZATION,
-            format!("Bearer {}", self.token).parse().unwrap(),
-        );
+        if let Ok(val) = format!("Bearer {}", self.token).parse() {
+            h.insert(reqwest::header::AUTHORIZATION, val);
+        }
         h
     }
 }

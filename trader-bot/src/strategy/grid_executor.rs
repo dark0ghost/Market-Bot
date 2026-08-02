@@ -1,4 +1,5 @@
-use crate::execution::position_manager::{OrderAction, OrderResult, PositionManager};
+use crate::core::{OrderAction, OrderStatus};
+use crate::execution::position_manager::{OrderResult, PositionManager};
 use crate::strategy::grid::{GridLevel, GridState, GridStrategy, OrderSide};
 use anyhow::Result;
 use log::{error, info, warn};
@@ -237,7 +238,7 @@ impl GridExecutor {
         self.grid_state.as_ref()
     }
 
-    /// Stop Grid bot — cancel every live broker order, then drop state.
+    /// Stop Grid bot - cancel every live broker order, then drop state.
     pub async fn stop_grid(&mut self) -> Result<()> {
         info!("Stopping Grid bot, cancelling all orders...");
 
@@ -303,7 +304,7 @@ mod tests {
             action: OrderAction::Buy,
             quantity: 10,
             price: Some(150.50),
-            status: crate::execution::position_manager::OrderStatus::New,
+            status: OrderStatus::New,
             created_at: chrono::Utc::now(),
             message: "Test".to_string(),
         };

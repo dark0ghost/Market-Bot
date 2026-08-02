@@ -2,7 +2,7 @@
 
 ## MockBroker
 
-In-memory broker for backtesting and integration testing. All state lives in `Arc<Mutex<MockState>>` — no network calls.
+In-memory broker for backtesting and integration testing. All state lives in `Arc<Mutex<MockState>>` - no network calls.
 
 **What it's for:** testing strategies without real money or API keys. You seed it with candles and prices, then run decisions against it. Every order fills instantly at current price. Useful in unit tests and CI.
 
@@ -35,7 +35,7 @@ Configured via `api_key` and optional `secret_key`. Account type `"tinkoff"` in 
 
 ## FinamBroker
 
-REST/JSON broker over `https://api.finam.ru`. No SDK — raw `reqwest` calls.
+REST/JSON broker over `https://api.finam.ru`. No SDK - raw `reqwest` calls.
 
 | Feature | Status |
 |---------|--------|
