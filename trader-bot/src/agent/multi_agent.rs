@@ -2,13 +2,16 @@ use crate::agent::DecisionMemory;
 use crate::agent::PredictionTracker;
 use crate::agent::{Action, DecisionContext};
 use crate::analysis::regime::MarketRegime;
+use crate::ml_inference::nlp::FinBertInference;
 use crate::provider::prediction::EnsemblePredictor;
+use crate::provider::prediction::finbert::FinBertPredictor;
 use crate::provider::prediction::fundamental::FundamentalPredictor;
 use crate::provider::prediction::llm::LlmPredictor;
 use crate::provider::prediction::stat_arb::StatArbPredictor;
 use crate::provider::prediction::technical::TechnicalPredictor;
 use crate::provider::prediction::{Prediction, PredictionContext};
 use anyhow::Result;
+use std::sync::Arc;
 
 #[derive(Debug, Clone)]
 pub struct AnalystProposal {
@@ -46,7 +49,11 @@ pub struct AnalystAgent {
 }
 
 impl AnalystAgent {
-    pub fn new(llm_provider: crate::mcp::ollama::OllamaProvider, model_name: &str) -> Self {
+    pub fn new(
+        llm_provider: crate::mcp::ollama::OllamaProvider,
+        model_name: &str,
+        finbert: Arc<FinBertInference>,
+    ) -> Self {
         let tracker = PredictionTracker::new();
         let providers = vec![
             crate::provider::prediction::PredictionProviderKind::Technical(
@@ -61,6 +68,9 @@ impl AnalystAgent {
             )),
             crate::provider::prediction::PredictionProviderKind::Fundamental(
                 FundamentalPredictor::new(),
+            ),
+            crate::provider::prediction::PredictionProviderKind::FinBert(
+                FinBertPredictor::new(finbert),
             ),
         ];
         AnalystAgent {
@@ -192,11 +202,12 @@ impl SupervisorAgent {
     pub fn new(
         llm_provider: crate::mcp::ollama::OllamaProvider,
         model_name: &str,
+        finbert: Arc<FinBertInference>,
         max_position_pct: f64,
         max_drawdown_pct: f64,
     ) -> Self {
         SupervisorAgent {
-            analyst: AnalystAgent::new(llm_provider, model_name),
+            analyst: AnalystAgent::new(llm_provider, model_name, finbert),
             risk: RiskAgent::new(max_position_pct, max_drawdown_pct),
         }
     }

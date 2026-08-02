@@ -1,3 +1,4 @@
+pub mod finbert;
 pub mod fundamental;
 pub mod llm;
 pub mod stat_arb;
@@ -57,6 +58,7 @@ pub enum PredictionProviderKind {
     Llm(llm::LlmPredictor),
     StatArb(stat_arb::StatArbPredictor),
     Fundamental(fundamental::FundamentalPredictor),
+    FinBert(finbert::FinBertPredictor),
 }
 
 impl PredictionProviderKind {
@@ -66,6 +68,7 @@ impl PredictionProviderKind {
             PredictionProviderKind::Llm(_) => "llm",
             PredictionProviderKind::StatArb(_) => "stat_arb",
             PredictionProviderKind::Fundamental(_) => "fundamental",
+            PredictionProviderKind::FinBert(_) => "finbert",
         }
     }
 
@@ -75,6 +78,7 @@ impl PredictionProviderKind {
             PredictionProviderKind::Llm(_) => 0.35,
             PredictionProviderKind::StatArb(_) => 0.15,
             PredictionProviderKind::Fundamental(_) => 0.20,
+            PredictionProviderKind::FinBert(_) => 0.20,
         }
     }
 
@@ -84,6 +88,7 @@ impl PredictionProviderKind {
             PredictionProviderKind::Llm(p) => p.predict(ctx).await,
             PredictionProviderKind::StatArb(p) => p.predict(ctx).await,
             PredictionProviderKind::Fundamental(p) => p.predict(ctx).await,
+            PredictionProviderKind::FinBert(p) => p.predict(ctx).await,
         }
     }
 }
@@ -110,10 +115,10 @@ impl EnsemblePredictor {
         for regime in [Trending, Ranging, Volatile, Quiet] {
             let n = self.providers.len();
             let w: Vec<f64> = match regime {
-                Trending => vec![0.35, 0.30, 0.10, 0.25],
-                Ranging => vec![0.20, 0.25, 0.35, 0.20],
-                Volatile => vec![0.15, 0.45, 0.25, 0.15],
-                Quiet => vec![0.30, 0.25, 0.20, 0.25],
+                Trending => vec![0.30, 0.25, 0.10, 0.20, 0.15],
+                Ranging => vec![0.18, 0.20, 0.30, 0.17, 0.15],
+                Volatile => vec![0.12, 0.35, 0.20, 0.13, 0.20],
+                Quiet => vec![0.25, 0.20, 0.15, 0.20, 0.20],
             };
             let w = if w.len() == n {
                 w
