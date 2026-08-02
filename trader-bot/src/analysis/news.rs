@@ -179,32 +179,15 @@ impl NewsAnalyzer {
         Sentiment::from_score(score)
     }
 
-    /// Extract key events from news
+    /// Extract key events from news — delegates to the shared `key_events` module
+    /// (was duplicated here and in `finbert.rs`).
     async fn extract_key_events(&self, articles: &[NewsArticle]) -> Result<Vec<String>> {
-        // LLM analysis will be here for extracting key events
-        // For example: "reconversion", "dividends", "financial reports"
-        let mut events = Vec::new();
-
-        for article in articles {
-            let title_lower = article.title.to_lowercase();
-
-            if title_lower.contains("reconversion") || title_lower.contains("conversion") {
-                events.push("Stock reconversion".to_string());
-            }
-            if title_lower.contains("dividend") {
-                events.push("Dividend payments".to_string());
-            }
-            if title_lower.contains("report") || title_lower.contains("financial result") {
-                events.push("Financial reporting".to_string());
-            }
-            if title_lower.contains("sanction") || title_lower.contains("restrict") {
-                events.push("Sanctions pressure".to_string());
-            }
-        }
-
-        events.sort();
-        events.dedup();
-        Ok(events)
+        let combined = articles
+            .iter()
+            .map(|a| a.title.clone())
+            .collect::<Vec<_>>()
+            .join(" ");
+        Ok(crate::analysis::key_events::extract_key_events(&combined))
     }
 }
 

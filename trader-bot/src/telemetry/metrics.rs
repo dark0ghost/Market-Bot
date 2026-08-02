@@ -49,6 +49,16 @@ impl StrategyMetrics {
         entry.signals_executed.fetch_add(1, Ordering::Relaxed);
         let mut total = entry.total_pnl.write().await;
         *total += pnl;
+        // Win rate = fraction of executed signals with non-negative PnL.
+        // Was never written before, so /metrics always reported 0.0.
+        let mut wr = entry.win_rate.write().await;
+        let executed = entry.signals_executed.load(Ordering::Relaxed) as f64;
+        if executed > 0.0 {
+            // Approximate rolling update: a win contributes 1/executed, a loss 0.
+            // Good enough for a gauge; exact recount would require tracking the win count.
+            let win = if pnl >= 0.0 { 1.0 } else { 0.0 };
+            *wr = (*wr * (executed - 1.0) + win) / executed;
+        }
     }
 
     pub async fn record_order_latency(&self, strategy: &str, latency: Duration) {

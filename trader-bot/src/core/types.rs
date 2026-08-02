@@ -100,6 +100,30 @@ pub struct OrderRequest {
     pub client_order_id: Option<String>,
 }
 
+/// Stop order kind: StopLoss or TakeProfit (broker-side).
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+pub enum StopOrderKind {
+    StopLoss,
+    TakeProfit,
+}
+
+/// Broker-side stop order request. For a long position: StopLoss direction = Sell,
+/// stop_price below current; TakeProfit direction = Sell, stop_price above current.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StopOrderRequest {
+    pub instrument: String,
+    /// Direction of the child order triggered when stop_price is hit.
+    pub action: OrderAction,
+    pub kind: StopOrderKind,
+    pub quantity: i32,
+    /// Activation price (stop price).
+    pub stop_price: f64,
+    /// Optional limit price for stop-limit orders; if None a market order is used.
+    pub price: Option<f64>,
+    pub account_id: String,
+    pub client_order_id: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OrderResponse {
     pub order_id: String,

@@ -21,6 +21,8 @@ pub struct GridExecutor {
     figi: String,
     /// Order size in lots
     order_size: u32,
+    /// Mapping level_index -> live broker order_id, so we can cancel by level.
+    level_order_ids: std::collections::HashMap<u32, String>,
 }
 
 impl GridExecutor {
@@ -38,6 +40,7 @@ impl GridExecutor {
             grid_state: None,
             figi,
             order_size,
+            level_order_ids: std::collections::HashMap::new(),
         }
     }
 
@@ -59,6 +62,8 @@ impl GridExecutor {
                         "Order placed: level={}, price={:.2}, side={:?}",
                         level.level_index, level.price, level.order_type
                     );
+                    self.level_order_ids
+                        .insert(level.level_index, order_result.order_id.clone());
                     active_orders.push(level.level_index);
                     results.push(GridOrderResult {
                         level_index: level.level_index,
@@ -84,7 +89,7 @@ impl GridExecutor {
         Ok(results)
     }
 
-    /// Place order at level
+    /// Place order at level and record the resulting broker order_id.
     async fn place_grid_order(&self, level: &GridLevel) -> Result<OrderResult> {
         let action = match level.order_type {
             OrderSide::Buy => OrderAction::Buy,
@@ -146,7 +151,9 @@ impl GridExecutor {
                 && !state.filled_orders.contains(&level.level_index)
             {
                 match self.place_grid_order(&level).await {
-                    Ok(_) => {
+                    Ok(order_result) => {
+                        self.level_order_ids
+                            .insert(level.level_index, order_result.order_id);
                         placed += 1;
                     }
                     Err(e) => {
@@ -173,10 +180,14 @@ impl GridExecutor {
         })
     }
 
-    /// Cancel order by level index
-    async fn cancel_order_by_level(&self, _level_index: u32) -> Result<()> {
-        // TODO: Need to store mapping level_index -> order_id
-        // Placeholder for now
+    /// Cancel the live broker order mapped to a grid level.
+    async fn cancel_order_by_level(&mut self, level_index: u32) -> Result<()> {
+        let Some(order_id) = self.level_order_ids.get(&level_index).cloned() else {
+            warn!("No mapped order_id for level {}, skipping cancel", level_index);
+            return Ok(());
+        };
+        self.position_manager.cancel_order(&order_id).await?;
+        self.level_order_ids.remove(&level_index);
         Ok(())
     }
 
@@ -203,7 +214,9 @@ impl GridExecutor {
                 };
 
                 match self.place_grid_order(&opposite_level).await {
-                    Ok(_) => {
+                    Ok(order_result) => {
+                        self.level_order_ids
+                            .insert(opposite_level.level_index, order_result.order_id);
                         info!(
                             "Order filled (level {:?}), placed opposite {:?}",
                             level.order_type, opposite_side
@@ -224,13 +237,22 @@ impl GridExecutor {
         self.grid_state.as_ref()
     }
 
-    /// Stop Grid bot - cancel all orders
+    /// Stop Grid bot — cancel every live broker order, then drop state.
     pub async fn stop_grid(&mut self) -> Result<()> {
         info!("Stopping Grid bot, cancelling all orders...");
 
-        // TODO: Cancel all active orders
-
+        // Cancel every mapped live order. Collect first to avoid borrow issues.
+        let order_ids: Vec<String> = self.level_order_ids.values().cloned().collect();
+        let mut cancelled = 0;
+        for order_id in &order_ids {
+            match self.position_manager.cancel_order(order_id).await {
+                Ok(_) => cancelled += 1,
+                Err(e) => warn!("Failed to cancel order {}: {}", order_id, e),
+            }
+        }
+        self.level_order_ids.clear();
         self.grid_state = None;
+        info!("Grid stopped, cancelled {} orders", cancelled);
 
         Ok(())
     }

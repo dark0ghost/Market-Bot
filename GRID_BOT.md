@@ -34,7 +34,7 @@ Grid Trading Bot — это стратегия автоматической то
 ```json
 {
   "type": "trading",
-  "creditional": {
+  "credential": {
     "token": "YOUR_API_TOKEN"
   },
   "accounts": [
@@ -133,7 +133,7 @@ https://www.tbank.ru/invest/settings/
 Добавьте токен в `trader-bot/config/account.json`:
 ```json
 {
-  "creditional": {
+  "credential": {
     "token": "YOUR_TOKEN_HERE"
   }
 }

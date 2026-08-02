@@ -22,12 +22,17 @@ impl FinBertInference {
             .map(|n| n.get())
             .unwrap_or(4);
 
-        let session = Arc::new(OrtSessionPool::new(
-            onnx_path.to_str().unwrap(),
-            num_threads,
-        )?);
+        let onnx_str = onnx_path
+            .to_str()
+            .ok_or_else(|| anyhow::anyhow!("Model path contains invalid UTF-8: {:?}", onnx_path))?;
 
-        let tokenizer = Tokenizer::from_file(tokenizer_path.to_str().unwrap())
+        let session = Arc::new(OrtSessionPool::new(onnx_str, num_threads)?);
+
+        let tokenizer_str = tokenizer_path
+            .to_str()
+            .ok_or_else(|| anyhow::anyhow!("Tokenizer path contains invalid UTF-8: {:?}", tokenizer_path))?;
+
+        let tokenizer = Tokenizer::from_file(tokenizer_str)
             .map_err(|e| anyhow::anyhow!("Tokenizer load failed: {e}"))?;
 
         Ok(Self {
@@ -39,8 +44,15 @@ impl FinBertInference {
 
     pub fn enable_hot_reload(self: Arc<Self>, model_dir: &str) {
         let path = Path::new(model_dir).join("model.onnx");
-        let s = self.session.clone();
-        s.spawn_watcher(path.to_str().unwrap());
+        if let Some(path_str) = path.to_str() {
+            let s = self.session.clone();
+            s.spawn_watcher(path_str);
+        } else {
+            log::warn!(
+                "Skipping hot-reload watcher: model path contains invalid UTF-8: {:?}",
+                path
+            );
+        }
     }
 
     fn tokenize(&self, text: &str) -> Result<(Vec<i64>, Vec<i64>)> {
@@ -90,7 +102,7 @@ impl FinBertInference {
             .iter()
             .cloned()
             .enumerate()
-            .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
+            .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
             .map(|(i, _)| i)
             .unwrap_or(1);
         (idx, probs[idx])

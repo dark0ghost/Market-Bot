@@ -219,7 +219,7 @@ impl Gate for SentimentGate {
                 "sentiment {:.2} < {:.2}",
                 s.sentiment_score, self.min_score
             )),
-            None => GateResult::Pass, // no news = no veto
+            None => GateResult::Fail("no sentiment data (fail-close)".into()),
         }
     }
 }
@@ -301,6 +301,14 @@ mod tests {
             key_events: vec![],
         });
         assert!(gate.evaluate(&ctx).is_pass());
+    }
+
+    #[test]
+    fn test_sentiment_gate_fail_on_missing_data() {
+        // Fail-close: no sentiment data should reject the trade
+        let gate = SentimentGate::new(0.3);
+        let ctx = GateContext::new("AAPL");
+        assert!(!gate.evaluate(&ctx).is_pass());
     }
 
     #[test]

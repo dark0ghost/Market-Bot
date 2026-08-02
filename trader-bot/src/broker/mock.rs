@@ -2,7 +2,8 @@ use anyhow::Result;
 use async_trait::async_trait;
 use chrono::Utc;
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
 use crate::core::*;
 
@@ -36,13 +37,13 @@ impl MockBroker {
         }
     }
 
-    pub fn set_candles(&self, instrument: &str, candles: Vec<Candle>) {
-        let mut state = self.state.lock().unwrap();
+    pub async fn set_candles(&self, instrument: &str, candles: Vec<Candle>) {
+        let mut state = self.state.lock().await;
         state.candles_map.insert(instrument.to_string(), candles);
     }
 
-    pub fn set_price(&self, instrument: &str, price: f64) {
-        let mut state = self.state.lock().unwrap();
+    pub async fn set_price(&self, instrument: &str, price: f64) {
+        let mut state = self.state.lock().await;
         state.price_map.insert(instrument.to_string(), price);
 
         if let Some(pos) = state.positions.get_mut(instrument) {
@@ -51,16 +52,16 @@ impl MockBroker {
         }
     }
 
-    pub fn set_position(&self, instrument: &str, quantity: i32, avg_price: f64) {
-        let current_price = self
-            .state
-            .lock()
-            .unwrap()
-            .price_map
-            .get(instrument)
-            .copied()
-            .unwrap_or(avg_price);
-        let mut state = self.state.lock().unwrap();
+    pub async fn set_position(&self, instrument: &str, quantity: i32, avg_price: f64) {
+        let current_price = {
+            let state = self.state.lock().await;
+            state
+                .price_map
+                .get(instrument)
+                .copied()
+                .unwrap_or(avg_price)
+        };
+        let mut state = self.state.lock().await;
         state.positions.insert(
             instrument.to_string(),
             PositionView {
@@ -96,7 +97,7 @@ impl Broker for MockBroker {
         _interval: CandleInterval,
         _count: u32,
     ) -> Result<Vec<Candle>> {
-        let state = self.state.lock().unwrap();
+        let state = self.state.lock().await;
         Ok(state
             .candles_map
             .get(instrument)
@@ -105,7 +106,7 @@ impl Broker for MockBroker {
     }
 
     async fn last_price(&self, instrument: &str) -> Result<f64> {
-        let state = self.state.lock().unwrap();
+        let state = self.state.lock().await;
         state
             .price_map
             .get(instrument)
@@ -139,7 +140,7 @@ impl Broker for MockBroker {
     }
 
     async fn place_order(&self, request: OrderRequest) -> Result<OrderResponse> {
-        let mut state = self.state.lock().unwrap();
+        let mut state = self.state.lock().await;
         let price = request
             .price
             .or_else(|| state.price_map.get(&request.instrument).copied())
@@ -232,18 +233,18 @@ impl Broker for MockBroker {
     }
 
     async fn cancel_order(&self, order_id: &str) -> Result<()> {
-        let mut state = self.state.lock().unwrap();
+        let mut state = self.state.lock().await;
         state.orders.retain(|o| o.order_id != order_id);
         Ok(())
     }
 
     async fn get_orders(&self, _instrument: Option<&str>) -> Result<Vec<OrderResponse>> {
-        let state = self.state.lock().unwrap();
+        let state = self.state.lock().await;
         Ok(state.orders.clone())
     }
 
     async fn get_order_status(&self, order_id: &str) -> Result<OrderStatus> {
-        let state = self.state.lock().unwrap();
+        let state = self.state.lock().await;
         Ok(state
             .orders
             .iter()
@@ -253,7 +254,7 @@ impl Broker for MockBroker {
     }
 
     async fn portfolio(&self) -> Result<PortfolioView> {
-        let state = self.state.lock().unwrap();
+        let state = self.state.lock().await;
         let positions: Vec<PositionView> = state.positions.values().cloned().collect();
         let total_value = positions.iter().map(|p| p.total_value).sum::<f64>() + state.balance;
         let total_pnl = positions.iter().map(|p| p.pnl).sum();
@@ -269,12 +270,12 @@ impl Broker for MockBroker {
     }
 
     async fn balance(&self) -> Result<f64> {
-        let state = self.state.lock().unwrap();
+        let state = self.state.lock().await;
         Ok(state.balance)
     }
 
     async fn position(&self, instrument: &str) -> Result<Option<PositionView>> {
-        let state = self.state.lock().unwrap();
+        let state = self.state.lock().await;
         Ok(state.positions.get(instrument).cloned())
     }
 

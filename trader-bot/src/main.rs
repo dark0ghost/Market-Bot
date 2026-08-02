@@ -53,6 +53,7 @@ use execution::risk_gate;
 use crate::mcp::ollama::OllamaProvider;
 use strategy::{
     AiStrategy, GridBot, GridBotConfig, GridStrategy, IntervalStrategy, StrategyRegistry,
+    TradingCalendar,
 };
 
 // ─── Broker Initialization ───────────────────────────────────────────
@@ -560,6 +561,14 @@ async fn run_ai_account(
             .map(|c| c.min_confidence)
             .unwrap_or(0.6);
         if decision.action != agent::Action::Hold && decision.confidence >= min_confidence {
+            // Market-hours gate: never place orders outside the MOEX session.
+            if !TradingCalendar::default().is_open_now() {
+                log::warn!(
+                    "[{}] Order skipped: MOEX is closed (outside trading hours/holiday)",
+                    instrument.ticker
+                );
+                continue;
+            }
             // Hard pre-trade risk gate (open-positions limit, balance reserve).
             let exec_price = decision.entry_price.unwrap_or(decision.current_price);
             let qty = calc_order_quantity(
@@ -579,6 +588,8 @@ async fn run_ai_account(
                 available_balance: balance,
                 open_positions,
                 order_value: qty as f64 * exec_price,
+                daily_pnl: 0.0,
+                daily_starting_balance: balance.max(1.0),
             };
             match risk_gate::evaluate_pre_trade(&risk_input, account.risk_management.as_ref()) {
                 risk_gate::PreTradeCheck::Allow => {
@@ -760,7 +771,60 @@ async fn execute_via_broker(
     };
     match broker.place_order(request).await {
         Ok(resp) => log::info!("Order placed: {:?}", resp),
-        Err(e) => log::error!("Order error: {}", e),
+        Err(e) => {
+            log::error!("Order error: {}", e);
+            return Ok(());
+        }
+    }
+
+    // Place broker-side SL/TP so stops survive a crash. Direction closes the position:
+    // a Buy is closed by a Sell stop, a Sell by a Buy stop.
+    let close_action = match decision.action {
+        agent::Action::Buy => OrderAction::Sell,
+        agent::Action::Sell => OrderAction::Buy,
+        agent::Action::Hold => return Ok(()),
+    };
+    if let Some(sl) = decision.stop_loss {
+        if let Err(e) = broker
+            .place_stop_order(StopOrderRequest {
+                instrument: decision.ticker.clone(),
+                action: close_action.clone(),
+                kind: StopOrderKind::StopLoss,
+                quantity: qty,
+                stop_price: sl,
+                price: Some(sl),
+                account_id: broker.account_id().to_string(),
+                client_order_id: None,
+            })
+            .await
+        {
+            log::warn!(
+                "[{}] Broker stop-loss rejected (in-memory fallback active): {}",
+                decision.ticker,
+                e
+            );
+        }
+    }
+    if let Some(tp) = decision.take_profit {
+        if let Err(e) = broker
+            .place_stop_order(StopOrderRequest {
+                instrument: decision.ticker.clone(),
+                action: close_action,
+                kind: StopOrderKind::TakeProfit,
+                quantity: qty,
+                stop_price: tp,
+                price: Some(tp),
+                account_id: broker.account_id().to_string(),
+                client_order_id: None,
+            })
+            .await
+        {
+            log::warn!(
+                "[{}] Broker take-profit rejected (in-memory fallback active): {}",
+                decision.ticker,
+                e
+            );
+        }
     }
     Ok(())
 }

@@ -105,7 +105,7 @@ flowchart TB
 # Вариант 1: В конфиге
 # Отредактируйте trader-bot/config/account.json
 {
-  "creditional": {
+  "credential": {
     "token": "YOUR_TOKEN_HERE"
   }
 }
@@ -140,7 +140,7 @@ RUST_LOG=info cargo run -p trader-bot
 ```json
 {
   "type": "trading",
-  "creditional": { "token": "..." },
+  "credential": { "token": "..." },
   "accounts": [
     {
       "account_id": "main",

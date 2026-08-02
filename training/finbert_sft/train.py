@@ -17,7 +17,11 @@ with open("training/finbert_sft/config.yaml") as f:
 
 
 def compute_metrics(eval_pred):
-    from sklearn.metrics import accuracy_score, precision_recall_fscore_support
+    from sklearn.metrics import (
+        accuracy_score,
+        cohen_kappa_score,
+        precision_recall_fscore_support,
+    )
     import numpy as np
 
     logits, labels = eval_pred
@@ -26,7 +30,48 @@ def compute_metrics(eval_pred):
         labels, predictions, average="weighted"
     )
     acc = accuracy_score(labels, predictions)
-    return {"accuracy": acc, "f1": f1, "precision": precision, "recall": recall}
+    kappa = cohen_kappa_score(labels, predictions)
+
+    metrics = {
+        "accuracy": acc,
+        "f1": f1,
+        "precision": precision,
+        "recall": recall,
+        "cohen_kappa": kappa,
+    }
+
+    # Expected Calibration Error (ECE) — the TradingAgent uses confidence scores,
+    # so calibration matters. Bucket softmax confidences into equal-width bins and
+    # measure the gap between confidence and accuracy per bin.
+    try:
+        probs = _softmax(logits)
+        confidences = np.max(probs, axis=-1)
+        n_bins = 10
+        bin_edges = np.linspace(0.0, 1.0, n_bins + 1)
+        ece = 0.0
+        n = len(labels)
+        for i in range(n_bins):
+            lo, hi = bin_edges[i], bin_edges[i + 1]
+            mask = (confidences > lo) & (confidences <= hi)
+            if mask.sum() == 0:
+                continue
+            bin_acc = (predictions[mask] == labels[mask]).mean()
+            bin_conf = confidences[mask].mean()
+            ece += (mask.sum() / n) * abs(bin_conf - bin_acc)
+        metrics["ece"] = float(ece)
+    except Exception as e:  # calibration is diagnostic, never fatal
+        logger.warning(f"ECE computation skipped: {e}")
+
+    return metrics
+
+
+def _softmax(x):
+    import numpy as np
+
+    x = np.asarray(x, dtype=np.float64)
+    x = x - x.max(axis=-1, keepdims=True)
+    e = np.exp(x)
+    return e / e.sum(axis=-1, keepdims=True)
 
 
 def train():

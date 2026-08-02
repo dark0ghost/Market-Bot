@@ -2,6 +2,7 @@ pub mod detectors;
 pub mod finbert;
 pub mod fundamental;
 pub mod fundamental_data;
+pub mod key_events;
 pub mod news;
 pub mod news_llm;
 pub mod regime;

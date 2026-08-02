@@ -3,7 +3,7 @@ resolver = "2"
 members = ["trader-bot"]
 
 [workspace.package]
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Market Bot Contributors"]
 edition = "2024"
 description = "Algorithmic trading bot with multi-broker support, multi-strategy pipeline, LLM integration, and ML inference"

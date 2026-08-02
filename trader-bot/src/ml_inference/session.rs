@@ -6,7 +6,7 @@ use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 pub struct OrtSessionPool {
-    session: Mutex<Session>,
+    session: Arc<Mutex<Session>>,
     model_path: String,
     num_threads: usize,
 }
@@ -15,7 +15,7 @@ impl OrtSessionPool {
     pub fn new(model_path: &str, num_threads: usize) -> Result<Self> {
         let session = Self::build_session(model_path, num_threads)?;
         Ok(Self {
-            session: Mutex::new(session),
+            session: Arc::new(Mutex::new(session)),
             model_path: model_path.to_string(),
             num_threads,
         })
@@ -34,7 +34,10 @@ impl OrtSessionPool {
 
     pub fn reload(&self) -> Result<()> {
         let new = Self::build_session(&self.model_path, self.num_threads)?;
-        *self.session.lock().unwrap() = new;
+        // Build new session first, then swap atomically.
+        // If build_session fails, the old session is preserved.
+        let mut session = self.session.lock().unwrap();
+        *session = new;
         Ok(())
     }
 

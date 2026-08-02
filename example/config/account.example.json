@@ -1,0 +1,76 @@
+{
+  "type": "trading_config",
+  "mode": "sandbox",
+  "credential": {
+    "token": "YOUR_TINKOFF_API_TOKEN",
+    "additional_keys": [
+      {
+        "broker": "finam",
+        "api_key": "YOUR_FINAM_API_KEY",
+        "secret_key": null,
+        "extra": null
+      }
+    ]
+  },
+  "accounts": [
+    {
+      "account_id": "YOUR_ACCOUNT_ID",
+      "broker": "tinkoff",
+      "instruments": [
+        {
+          "figi": "BBG004730N88",
+          "ticker": "SBER",
+          "name": "Сбербанк",
+          "enabled": true,
+          "max_position_pct": 0.15,
+          "analysis_config": {
+            "check_news": true,
+            "technical_analysis": true,
+            "fundamental_analysis": false,
+            "news_sources": ["tinkoff", "investing"],
+            "technical_indicators": ["rsi", "macd", "bollinger"],
+            "fundamental_metrics": []
+          }
+        }
+      ],
+      "strategy": {
+        "strategy": "ai",
+        "parameters": {
+          "interval_size": "5m",
+          "days_back_to_consider": 30,
+          "quantity_limit": 100,
+          "check_interval": 300,
+          "grid_config": null,
+          "pairs_config": null,
+          "ai_config": {
+            "use_llm": true,
+            "use_finbert": false,
+            "min_confidence": 0.6,
+            "force_regime": null,
+            "memory_path": "data/memory.json"
+          }
+        }
+      },
+      "risk_management": {
+        "max_loss_pct": 5.0,
+        "take_profit_pct": 10.0,
+        "stop_loss_pct": 3.0,
+        "max_open_positions": 3,
+        "min_balance_reserve": 1000.0
+      }
+    }
+  ],
+  "llm_config": {
+    "model": "fin-expert",
+    "host": "http://localhost",
+    "port": 11434
+  },
+  "dashboard": {
+    "enabled": true,
+    "port": 8080
+  },
+  "sandbox": {
+    "open_account": false,
+    "pay_in_amount": 100000.0
+  }
+}

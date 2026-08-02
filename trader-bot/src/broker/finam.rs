@@ -253,9 +253,15 @@ impl FinamBroker {
 
     fn headers(&self) -> reqwest::header::HeaderMap {
         let mut h = reqwest::header::HeaderMap::new();
+        let auth_value = format!("Bearer {}", self.token);
         h.insert(
             reqwest::header::AUTHORIZATION,
-            format!("Bearer {}", self.token).parse().unwrap(),
+            auth_value
+                .parse()
+                .unwrap_or_else(|e| {
+                    log::error!("Failed to parse authorization header: {:?}, using fallback", e);
+                    reqwest::header::HeaderValue::from_static("Bearer invalid")
+                }),
         );
         h
     }

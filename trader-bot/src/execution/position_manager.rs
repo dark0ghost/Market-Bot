@@ -3,7 +3,9 @@ use anyhow::Result;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use t_invest_sdk::TInvestSdk;
-use t_invest_sdk::api::{GetOrdersRequest, OrderDirection, OrderType, PostOrderRequest};
+use t_invest_sdk::api::{
+    GetOrdersRequest, OrderDirection, OrderExecutionReportStatus, OrderType, PostOrderRequest,
+};
 
 /// Order action
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -41,6 +43,43 @@ pub struct PositionManager {
     account_id: String,
 }
 
+/// Build a Tinkoff `PostOrderRequest` — single source of truth for order placement
+/// (was duplicated in `place_limit_order`, `place_market_order`, and `main.rs`).
+#[allow(deprecated)]
+fn build_post_order_request(
+    figi: &str,
+    action: OrderAction,
+    quantity: i32,
+    price: Option<f64>,
+    order_type: OrderType,
+    account_id: &str,
+) -> PostOrderRequest {
+    let direction = match action {
+        OrderAction::Buy => OrderDirection::Buy,
+        OrderAction::Sell => OrderDirection::Sell,
+    };
+    PostOrderRequest {
+        figi: Some(figi.to_string()),
+        quantity: quantity as i64,
+        price: price.map(|p| t_invest_sdk::api::Quotation {
+            units: p as i64,
+            nano: ((p.fract() * 1_000_000_000.0) as i32),
+        }),
+        direction: direction as i32,
+        account_id: account_id.to_string(),
+        order_type: order_type as i32,
+        order_id: format!(
+            "order_{}_{}",
+            Utc::now().timestamp_nanos_opt().unwrap_or(0),
+            std::process::id()
+        ),
+        instrument_id: figi.to_string(),
+        confirm_margin_trade: false,
+        time_in_force: 0,
+        price_type: 0,
+    }
+}
+
 impl PositionManager {
     pub fn new(sdk: TInvestSdk, account_id: String) -> Self {
         PositionManager { sdk, account_id }
@@ -54,28 +93,14 @@ impl PositionManager {
         quantity: i32,
         price: f64,
     ) -> Result<OrderResult> {
-        let direction = match action {
-            OrderAction::Buy => OrderDirection::Buy,
-            OrderAction::Sell => OrderDirection::Sell,
-        };
-
-        #[allow(deprecated)]
-        let request = PostOrderRequest {
-            figi: Some(figi.to_string()),
-            quantity: quantity as i64,
-            price: Some(t_invest_sdk::api::Quotation {
-                units: price as i64,
-                nano: ((price.fract() * 1_000_000_000.0) as i32),
-            }),
-            direction: direction as i32,
-            account_id: self.account_id.clone(),
-            order_type: OrderType::Limit as i32,
-            order_id: format!("order_{}", Utc::now().timestamp()).to_string(),
-            instrument_id: figi.to_string(),
-            confirm_margin_trade: false,
-            time_in_force: 0,
-            price_type: 0,
-        };
+        let request = build_post_order_request(
+            figi,
+            action.clone(),
+            quantity,
+            Some(price),
+            OrderType::Limit,
+            &self.account_id,
+        );
 
         let response = self.sdk.orders().post_order(request).await?;
         let order_response = response.into_inner();
@@ -99,25 +124,8 @@ impl PositionManager {
         action: OrderAction,
         quantity: i32,
     ) -> Result<OrderResult> {
-        let direction = match action {
-            OrderAction::Buy => OrderDirection::Buy,
-            OrderAction::Sell => OrderDirection::Sell,
-        };
-
-        #[allow(deprecated)]
-        let request = PostOrderRequest {
-            figi: Some(figi.to_string()),
-            quantity: quantity as i64,
-            price: None,
-            direction: direction as i32,
-            account_id: self.account_id.clone(),
-            order_type: OrderType::Market as i32,
-            order_id: format!("order_{}", Utc::now().timestamp()).to_string(),
-            instrument_id: figi.to_string(),
-            confirm_margin_trade: false,
-            time_in_force: 0,
-            price_type: 0,
-        };
+        let request =
+            build_post_order_request(figi, action.clone(), quantity, None, OrderType::Market, &self.account_id);
 
         let response = self.sdk.orders().post_order(request).await?;
         let order_response = response.into_inner();
@@ -134,6 +142,86 @@ impl PositionManager {
         })
     }
 
+    /// Place a broker-side stop order (StopLoss or TakeProfit). Tinkoff executes it
+    /// server-side, so the stop survives a bot crash — unlike an in-memory stop.
+    pub async fn place_stop_order(
+        &self,
+        figi: &str,
+        action: OrderAction,
+        quantity: i32,
+        stop_price: f64,
+        limit_price: Option<f64>,
+        kind: crate::core::StopOrderKind,
+    ) -> Result<OrderResult> {
+        use t_invest_sdk::api::*;
+
+        let direction = match action {
+            OrderAction::Buy => StopOrderDirection::Buy,
+            OrderAction::Sell => StopOrderDirection::Sell,
+        };
+        let stop_order_type = match kind {
+            crate::core::StopOrderKind::StopLoss => StopOrderType::StopLoss,
+            crate::core::StopOrderKind::TakeProfit => StopOrderType::TakeProfit,
+        };
+
+        #[allow(deprecated)]
+        let req = PostStopOrderRequest {
+            figi: Some(figi.to_string()),
+            quantity: quantity as i64,
+            price: limit_price.map(|p| Quotation {
+                units: p as i64,
+                nano: ((p.fract() * 1_000_000_000.0) as i32),
+            }),
+            stop_price: Some(Quotation {
+                units: stop_price as i64,
+                nano: ((stop_price.fract() * 1_000_000_000.0) as i32),
+            }),
+            direction: direction as i32,
+            account_id: self.account_id.clone(),
+            expiration_type: StopOrderExpirationType::GoodTillCancel as i32,
+            stop_order_type: stop_order_type as i32,
+            expire_date: None,
+            instrument_id: figi.to_string(),
+            exchange_order_type: 0,
+            take_profit_type: 0,
+            trailing_data: None,
+            price_type: 0,
+            order_id: format!(
+                "stop_{}_{}",
+                Utc::now().timestamp_nanos_opt().unwrap_or(0),
+                std::process::id()
+            ),
+            confirm_margin_trade: false,
+            instant_execution: None,
+        };
+
+        let response = self.sdk.stop_orders().post_stop_order(req).await?;
+        let r = response.into_inner();
+
+        Ok(OrderResult {
+            order_id: r.stop_order_id,
+            figi: figi.to_string(),
+            action,
+            quantity,
+            price: limit_price,
+            status: OrderStatus::New,
+            created_at: Utc::now(),
+            message: format!("Stop {:?} placed", kind),
+        })
+    }
+
+    /// Cancel an order by its broker-assigned id.
+    pub async fn cancel_order(&self, order_id: &str) -> Result<()> {
+        use t_invest_sdk::api::CancelOrderRequest;
+        let req = CancelOrderRequest {
+            account_id: self.account_id.clone(),
+            order_id: order_id.to_string(),
+            order_id_type: Some(0),
+        };
+        self.sdk.orders().cancel_order(req).await?;
+        Ok(())
+    }
+
     /// Get order list
     pub async fn get_orders(&self) -> Result<Vec<OrderResult>> {
         let request = GetOrdersRequest {
@@ -146,19 +234,44 @@ impl PositionManager {
 
         let mut results = Vec::new();
         for order in orders_response.orders {
+            // Map the real direction instead of hardcoding Buy.
+            let action = match OrderDirection::try_from(order.direction)
+                .unwrap_or(OrderDirection::Unspecified)
+            {
+                OrderDirection::Sell => OrderAction::Sell,
+                _ => OrderAction::Buy,
+            };
+            // Map the real execution status instead of hardcoding New.
+            let status = map_tinkoff_status(order.execution_report_status);
             results.push(OrderResult {
                 order_id: order.order_id,
                 figi: order.figi,
-                action: OrderAction::Buy,
-                quantity: order.lots_executed as i32,
+                action,
+                quantity: order.lots_requested as i32,
                 price: None,
-                status: OrderStatus::New,
+                status,
                 created_at: Utc::now(),
                 message: "Order from list".to_string(),
             });
         }
 
         Ok(results)
+    }
+}
+
+/// Map a Tinkoff `OrderExecutionReportStatus` into our `OrderStatus`.
+fn map_tinkoff_status(status: i32) -> OrderStatus {
+    match OrderExecutionReportStatus::try_from(status)
+        .unwrap_or(OrderExecutionReportStatus::ExecutionReportStatusUnspecified)
+    {
+        OrderExecutionReportStatus::ExecutionReportStatusFill => OrderStatus::Filled,
+        OrderExecutionReportStatus::ExecutionReportStatusRejected => OrderStatus::Rejected,
+        OrderExecutionReportStatus::ExecutionReportStatusCancelled => OrderStatus::Cancelled,
+        OrderExecutionReportStatus::ExecutionReportStatusNew => OrderStatus::New,
+        OrderExecutionReportStatus::ExecutionReportStatusPartiallyfill => {
+            OrderStatus::PartiallyFilled
+        }
+        OrderExecutionReportStatus::ExecutionReportStatusUnspecified => OrderStatus::New,
     }
 }
 
@@ -215,14 +328,16 @@ impl<E: ExecutionProvider> TradingExecutor<E> {
                             .await?;
                         results.push(order_result);
 
-                        if let Some(sl_price) = decision.stop_loss {
-                            log::info!(
-                                "Placing Stop Loss: {} lots at price {:.2}",
-                                quantity,
-                                sl_price
-                            );
-                            // Stop loss via separate order
-                        }
+                        // Place broker-side SL/TP so stops survive a crash.
+                        // A long BUY is protected by a Sell stop: SL below entry, TP above.
+                        self.place_protection_orders(
+                            instrument_uid,
+                            OrderAction::Sell,
+                            quantity,
+                            decision.stop_loss,
+                            decision.take_profit,
+                        )
+                        .await;
                     } else {
                         log::warn!("Calculated lot count is 0");
                     }
@@ -248,6 +363,16 @@ impl<E: ExecutionProvider> TradingExecutor<E> {
                             .place_limit_order(instrument_uid, OrderAction::Sell, quantity, price)
                             .await?;
                         results.push(order_result);
+
+                        // A short SELL is protected by a Buy stop: SL above entry, TP below.
+                        self.place_protection_orders(
+                            instrument_uid,
+                            OrderAction::Buy,
+                            quantity,
+                            decision.stop_loss,
+                            decision.take_profit,
+                        )
+                        .await;
                     }
                 } else {
                     log::warn!("Cannot sell: current position not specified");
@@ -259,6 +384,69 @@ impl<E: ExecutionProvider> TradingExecutor<E> {
         }
 
         Ok(results)
+    }
+
+    /// Place broker-side StopLoss and TakeProfit for the given (already filled) entry.
+    /// Errors are logged, not propagated — a failed stop placement must not roll back the entry,
+    /// but the caller's in-memory tracker still keeps a fallback stop.
+    async fn place_protection_orders(
+        &self,
+        instrument_uid: &str,
+        close_action: OrderAction,
+        quantity: i32,
+        stop_loss: Option<f64>,
+        take_profit: Option<f64>,
+    ) {
+        if let Some(sl_price) = stop_loss {
+            log::info!(
+                "Placing Stop Loss: {} lots @ {:.2} ({:?})",
+                quantity,
+                sl_price,
+                close_action
+            );
+            if let Err(e) = self
+                .executor
+                .place_stop_order(
+                    instrument_uid,
+                    close_action.clone(),
+                    quantity,
+                    sl_price,
+                    Some(sl_price), // stop-limit at the same price
+                    crate::core::StopOrderKind::StopLoss,
+                )
+                .await
+            {
+                log::warn!(
+                    "Broker-side stop-loss rejected (in-memory fallback active): {}",
+                    e
+                );
+            }
+        }
+        if let Some(tp_price) = take_profit {
+            log::info!(
+                "Placing Take Profit: {} lots @ {:.2} ({:?})",
+                quantity,
+                tp_price,
+                close_action
+            );
+            if let Err(e) = self
+                .executor
+                .place_stop_order(
+                    instrument_uid,
+                    close_action,
+                    quantity,
+                    tp_price,
+                    Some(tp_price),
+                    crate::core::StopOrderKind::TakeProfit,
+                )
+                .await
+            {
+                log::warn!(
+                    "Broker-side take-profit rejected (in-memory fallback active): {}",
+                    e
+                );
+            }
+        }
     }
 
     /// Calculate number of lots to buy

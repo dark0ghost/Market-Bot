@@ -2,6 +2,67 @@
 
 Все изменения в проекте Market Bot.
 
+## [Unreleased] — 2026-07-31
+
+### Добавлено
+
+#### Торговый календарь MOEX
+- **`trader-bot/src/strategy/trading_calendar.rs`** — `TradingCalendar`:
+  проверка торговых часов MOEX (10:00–18:45 МСК), выходных и праздников.
+  Гейт перед каждым ордером в `run_ai_account` и в цикле `GridBot` —
+  бот больше не шлёт ордера 24/7.
+
+#### Broker-side Stop-Loss / Take-Profit
+- `StopOrderRequest` / `StopOrderKind` в `core::types`, метод
+  `place_stop_order` в `Broker` trait (дефолт — error для брокеров без поддержки).
+- Реализация для Tinkoff (`stop_orders().post_stop_order`) и
+  `PositionManager::place_stop_order`. SL/TP теперь ставятся на стороне
+  брокера и переживают рестарт бота (раньше только логировались, `// Stop loss via separate order`).
+- `TradingExecutor::execute_decision` и `execute_via_broker` в `main.rs`
+  выставляют SL/TP через брокер, с in-memory fallback в трекере при ошибке.
+
+#### Crash recovery для Grid
+- `GridExecutor` хранит mapping `level_index → order_id`.
+  `cancel_order_by_level` и `stop_grid` теперь реально отменяют ордера
+  в брокере (раньше TODO/no-op → orphan orders).
+
+#### Конфигурация и документация
+- `trader-bot/config/account.example.json` — шаблон конфига (раньше собирали из README).
+- `models/finbert/MODEL_CARD.md` — карточка ONNX-модели.
+- `training/requirements.lock.txt` — pinned-compatible версии Python-зависимостей.
+
+### Изменено
+
+#### Качество и корректность
+- **Rate limiter Tinkoff** — `try_acquire` теперь корректно обновляет
+  `last_refill` при каждом успешном acquire (баг: обновлялся только при пустом
+  бакете → лимит не работал как token-bucket).
+- **`get_orders` (Tinkoff, PositionManager)** — маппинг реального направления
+  и статуса исполнения из ответа брокера вместо хардкода `Buy`/`New`.
+- **`win_rate` метрика** — теперь обновляется в `record_execution`
+  (раньше всегда `0.0` в `/metrics`).
+- **`analyze_batch` FinBERT** — конкурентный `spawn_blocking` + `try_join_all`
+  вместо последовательного цикла (async runtime больше не блокируется).
+- **Дубли order placement** — общий `build_post_order_request` в `PositionManager`.
+- **Дубли key-event extraction** — общий модуль `analysis::key_events`
+  (заменил копии в `news.rs` и `finbert.rs`).
+
+#### Python-пайплайн
+- `collect.py` — `ET.fromstring` обёрнут в try/except (malformed RSS больше не
+  валит весь сбор); rate-limiting (`inter_feed_delay_sec`) между RSS-фидами.
+- `export_onnx.py` — сохраняет tokenizer рядом с ONNX + `MANIFEST.json` с SHA-256
+  чексуммами (раньше tokenizer не экспортировался).
+- `train.py` — метрики расширены: Cohen's kappa, ECE (калибровка), per-class F1.
+
+#### Инфра
+- `.gitignore` — убран `trader-bot/Cargo.lock` (бинарник должен коммитить lock).
+
+### Исправлено
+- Опечатка `creditional` → `credential` в `README.md` и `GRID_BOT.md`
+  (задокументированный конфиг не парсился serde).
+
+---
+
 ## [0.3.0] — 2026-07-21
 
 ### Добавлено
