@@ -5,7 +5,7 @@
 
 use crate::client::MarketDataService;
 use crate::config::GridConfig;
-use crate::strategy::{GridExecutor, GridStrategy};
+use crate::strategy::{GridExecutor, GridStrategy, TradingCalendar};
 use anyhow::Result;
 use log::{error, info, warn};
 use t_invest_sdk::TInvestSdk;
@@ -83,11 +83,19 @@ impl GridBot {
         self.executor = Some(executor);
 
         // Main monitoring loop
+        let calendar = TradingCalendar::default();
         loop {
             tokio::time::sleep(tokio::time::Duration::from_secs(
                 self.config.check_interval_secs,
             ))
             .await;
+
+            // Don't place/rebalance orders outside the MOEX session -
+            // exchange would reject them anyway and we'd waste API calls.
+            if !calendar.is_open_now() {
+                info!("MOEX closed, skipping grid rebalance this tick");
+                continue;
+            }
 
             if let Some(ref mut executor) = self.executor {
                 // Get new price

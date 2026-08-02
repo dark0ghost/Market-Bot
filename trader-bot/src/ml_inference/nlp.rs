@@ -1,16 +1,20 @@
 use anyhow::Result;
+use std::collections::HashMap;
+use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tokenizers::Tokenizer;
 
 use super::session::OrtSessionPool;
 
 const LABELS: [&str; 3] = ["negative", "neutral", "positive"];
+const MAX_CACHE_SIZE: usize = 512;
 
 pub struct FinBertInference {
     session: Arc<OrtSessionPool>,
     tokenizer: Tokenizer,
     max_length: usize,
+    cache: Mutex<HashMap<u64, NlpResult>>,
 }
 
 impl FinBertInference {
@@ -22,25 +26,38 @@ impl FinBertInference {
             .map(|n| n.get())
             .unwrap_or(4);
 
-        let session = Arc::new(OrtSessionPool::new(
-            onnx_path.to_str().unwrap(),
-            num_threads,
-        )?);
+        let onnx_str = onnx_path
+            .to_str()
+            .ok_or_else(|| anyhow::anyhow!("Model path contains invalid UTF-8: {:?}", onnx_path))?;
 
-        let tokenizer = Tokenizer::from_file(tokenizer_path.to_str().unwrap())
+        let session = Arc::new(OrtSessionPool::new(onnx_str, num_threads)?);
+
+        let tokenizer_str = tokenizer_path
+            .to_str()
+            .ok_or_else(|| anyhow::anyhow!("Tokenizer path contains invalid UTF-8: {:?}", tokenizer_path))?;
+
+        let tokenizer = Tokenizer::from_file(tokenizer_str)
             .map_err(|e| anyhow::anyhow!("Tokenizer load failed: {e}"))?;
 
         Ok(Self {
             session,
             tokenizer,
             max_length: 128,
+            cache: Mutex::new(HashMap::new()),
         })
     }
 
     pub fn enable_hot_reload(self: Arc<Self>, model_dir: &str) {
         let path = Path::new(model_dir).join("model.onnx");
-        let s = self.session.clone();
-        s.spawn_watcher(path.to_str().unwrap());
+        if let Some(path_str) = path.to_str() {
+            let s = self.session.clone();
+            s.spawn_watcher(path_str);
+        } else {
+            log::warn!(
+                "Skipping hot-reload watcher: model path contains invalid UTF-8: {:?}",
+                path
+            );
+        }
     }
 
     fn tokenize(&self, text: &str) -> Result<(Vec<i64>, Vec<i64>)> {
@@ -65,6 +82,11 @@ impl FinBertInference {
     }
 
     pub fn predict(&self, text: &str) -> Result<NlpResult> {
+        let hash = self.hash_text(text);
+        if let Some(cached) = self.cache.lock().unwrap().get(&hash) {
+            return Ok(cached.clone());
+        }
+
         let (input_ids, attention_mask) = self.tokenize(text)?;
         let logits = self
             .session
@@ -74,11 +96,27 @@ impl FinBertInference {
         let (idx, confidence) = Self::softmax(&scores);
         let label = LABELS[idx].to_string();
 
-        Ok(NlpResult {
+        let result = NlpResult {
             label,
             confidence,
             scores,
-        })
+        };
+
+        let mut cache = self.cache.lock().unwrap();
+        if cache.len() >= MAX_CACHE_SIZE {
+            if let Some(&oldest_key) = cache.keys().next() {
+                cache.remove(&oldest_key);
+            }
+        }
+        cache.insert(hash, result.clone());
+
+        Ok(result)
+    }
+
+    fn hash_text(&self, text: &str) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        text.hash(&mut hasher);
+        hasher.finish()
     }
 
     fn softmax(scores: &[f32; 3]) -> (usize, f32) {
@@ -90,7 +128,7 @@ impl FinBertInference {
             .iter()
             .cloned()
             .enumerate()
-            .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
+            .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
             .map(|(i, _)| i)
             .unwrap_or(1);
         (idx, probs[idx])
@@ -106,10 +144,18 @@ pub struct NlpResult {
 
 impl NlpResult {
     pub fn sentiment_score(&self) -> f32 {
-        match self.label.as_str() {
-            "positive" => self.confidence,
-            "negative" => -self.confidence,
-            _ => 0.0,
-        }
+        self.scores[2] - self.scores[0]
+    }
+
+    pub fn probability_positive(&self) -> f32 {
+        self.scores[2]
+    }
+
+    pub fn probability_negative(&self) -> f32 {
+        self.scores[0]
+    }
+
+    pub fn probability_neutral(&self) -> f32 {
+        self.scores[1]
     }
 }

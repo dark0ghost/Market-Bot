@@ -1,6 +1,7 @@
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use futures::stream::iter;
+use futures::StreamExt;
 use std::collections::HashMap;
 use t_invest_sdk::TInvestSdk;
 use t_invest_sdk::api::{
@@ -78,68 +79,94 @@ impl MarketDataStream {
 
     pub async fn run(&mut self) -> Result<()> {
         let mut client = self.sdk.market_data_stream();
-        let mut subs_candles = SubscribeCandlesRequest {
-            subscription_action: SubscriptionAction::Subscribe as i32,
-            instruments: vec![],
-            waiting_close: false,
-            candle_source_type: None,
-        };
-
-        for (figi, intervals) in &self.subscriptions {
-            for &interval in intervals {
-                #[allow(deprecated)]
-                subs_candles.instruments.push(CandleInstrument {
-                    figi: figi.clone(),
-                    interval: interval as i32,
-                    instrument_id: figi.clone(),
-                });
-            }
-        }
-
-        let request = tonic::Request::new(iter(vec![
-            MarketDataRequest {
-                payload: Some(
-                    t_invest_sdk::api::market_data_request::Payload::SubscribeCandlesRequest(
-                        subs_candles,
-                    ),
-                ),
-            },
-            MarketDataRequest {
-                payload: Some(
-                    t_invest_sdk::api::market_data_request::Payload::PingSettings(
-                        api::PingDelaySettings {
-                            ping_delay_ms: Some(30000),
-                        },
-                    ),
-                ),
-            },
-        ]));
-
-        let response = client.market_data_stream(request).await?;
-        let stream = response.into_inner();
         let tx = self.event_tx.clone();
+        let max_retries = 10;
+        let mut retry_count: u32 = 0;
 
-        tokio::spawn(async move {
-            use tokio_stream::StreamExt;
+        loop {
+            let mut subs_candles = SubscribeCandlesRequest {
+                subscription_action: SubscriptionAction::Subscribe as i32,
+                instruments: vec![],
+                waiting_close: false,
+                candle_source_type: None,
+            };
 
-            let mut stream = stream;
+            for (figi, intervals) in &self.subscriptions {
+                for &interval in intervals {
+                    #[allow(deprecated)]
+                    subs_candles.instruments.push(CandleInstrument {
+                        figi: figi.clone(),
+                        interval: interval as i32,
+                        instrument_id: figi.clone(),
+                    });
+                }
+            }
 
-            while let Some(item) = stream.next().await {
-                match item {
-                    Ok(response) => {
+            let request = tonic::Request::new(iter(vec![
+                MarketDataRequest {
+                    payload: Some(
+                        t_invest_sdk::api::market_data_request::Payload::SubscribeCandlesRequest(
+                            subs_candles,
+                        ),
+                    ),
+                },
+                MarketDataRequest {
+                    payload: Some(
+                        t_invest_sdk::api::market_data_request::Payload::PingSettings(
+                            api::PingDelaySettings {
+                                ping_delay_ms: Some(30000),
+                            },
+                        ),
+                    ),
+                },
+            ]));
+
+            log::info!("Connecting to market data stream...");
+            let response = match client.market_data_stream(request).await {
+                Ok(r) => r,
+                Err(e) => {
+                    retry_count += 1;
+                    if retry_count > max_retries {
+                        log::error!("Max reconnection retries ({}) reached, giving up: {}", max_retries, e);
+                        return Err(anyhow::anyhow!("Max reconnection retries reached: {}", e));
+                    }
+                    let backoff_ms = 1000 * 2u64.pow(retry_count.saturating_sub(1));
+                    log::warn!("Stream connection failed, retrying in {}ms ({}/{}): {}", backoff_ms, retry_count, max_retries, e);
+                    tokio::time::sleep(std::time::Duration::from_millis(backoff_ms)).await;
+                    continue;
+                }
+            };
+
+            let mut stream = response.into_inner();
+            retry_count = 0; // Reset on successful connection
+            log::info!("Market data stream connected, waiting for events...");
+
+            // Process events until an error occurs
+            loop {
+                match tokio::time::timeout(
+                    std::time::Duration::from_secs(60),
+                    stream.next()
+                ).await {
+                    Ok(Some(Ok(response))) => {
                         if let Some(payload) = response.payload {
                             handle_market_response(payload, &tx).await;
                         }
                     }
-                    Err(e) => {
-                        log::error!("Market data stream error: {}", e);
+                    Ok(Some(Err(e))) => {
+                        log::error!("Market data stream error: {}, reconnecting...", e);
+                        break; // Break to outer loop for reconnection
+                    }
+                    Ok(None) => {
+                        log::warn!("Market data stream ended unexpectedly, reconnecting...");
                         break;
+                    }
+                    Err(_) => {
+                        // Timeout - stream is idle, keep it alive with a ping
+                        log::debug!("Stream timeout, keeping connection alive...");
                     }
                 }
             }
-        });
-
-        Ok(())
+        }
     }
 }
 

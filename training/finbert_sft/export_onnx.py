@@ -66,6 +66,25 @@ def export_to_onnx():
         json.dump(metadata, f, indent=2)
     logger.info(f"Metadata saved to {meta_path}")
 
+    # Persist the tokenizer alongside the ONNX model so inference loads the
+    # exact tokenizer used at export time - mismatched tokenizers silently skew
+    # predictions. Also record checksums for model + tokenizer files.
+    tokenizer_dir = Path(ONNX_PATH).parent / "tokenizer"
+    tokenizer.save_pretrained(tokenizer_dir)
+    logger.info(f"Tokenizer saved to {tokenizer_dir}")
+
+    import hashlib
+    checksums = {}
+    for p in [Path(ONNX_PATH), *sorted(tokenizer_dir.glob("*"))]:
+        if p.is_file():
+            checksums[str(p.relative_to(Path(ONNX_PATH).parent))] = hashlib.sha256(
+                p.read_bytes()
+            ).hexdigest()
+    manifest_path = Path(ONNX_PATH).parent / "MANIFEST.json"
+    with open(manifest_path, "w") as f:
+        json.dump({"files": checksums, "metadata": metadata}, f, indent=2)
+    logger.info(f"Checksum manifest saved to {manifest_path}")
+
     import onnx
     onnx_model = onnx.load(ONNX_PATH)
     onnx.checker.check_model(onnx_model)

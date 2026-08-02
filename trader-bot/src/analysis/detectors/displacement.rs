@@ -13,7 +13,7 @@ pub struct Displacement {
     pub size_ratio: f64,
 }
 
-/// Detect displacement — candles significantly larger than the recent average.
+/// Detect displacement - candles significantly larger than the recent average.
 pub fn detect_displacement(
     candles: &[Candle],
     lookback: usize,

@@ -45,4 +45,3 @@ training/data_collected/
 /training/finbert_sft/data
 /training/finbert_sft/data_backup
 .vscode/
-trader-bot/Cargo.lock

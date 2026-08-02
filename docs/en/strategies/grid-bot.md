@@ -304,4 +304,4 @@ reserve = total_buy_capital * 1.5
 
 ## Next Steps
 
-- **[API Documentation](../developer-guide/api.md)** — API reference
+- **[API Documentation](../developer-guide/api.md)** - API reference

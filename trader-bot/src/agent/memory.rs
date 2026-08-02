@@ -95,35 +95,43 @@ impl DecisionMemory {
             path: Some(path.clone()),
         };
         if path.exists() {
-            mem.load(&path)?;
+            let json = std::fs::read_to_string(&path)
+                .with_context(|| format!("Failed to read memory from {:?}", path))?;
+            let records: VecDeque<DecisionRecord> =
+                serde_json::from_str(&json).context("Failed to deserialize decision memory")?;
+            mem.records = records;
         }
         Ok(mem)
     }
 
-    pub fn add(&mut self, record: DecisionRecord) -> Result<()> {
+    pub async fn add(&mut self, record: DecisionRecord) -> Result<()> {
         if self.records.len() >= self.max_records {
             self.records.pop_front();
         }
         self.records.push_back(record);
         if let Some(ref path) = self.path {
-            self.save(path)?;
+            self.save(path).await?;
         }
         Ok(())
     }
 
-    pub fn save(&self, path: impl AsRef<Path>) -> Result<()> {
+    pub async fn save(&self, path: impl AsRef<Path>) -> Result<()> {
         if let Some(parent) = path.as_ref().parent() {
-            std::fs::create_dir_all(parent).context("Failed to create memory directory")?;
+            tokio::fs::create_dir_all(parent)
+                .await
+                .context("Failed to create memory directory")?;
         }
         let json = serde_json::to_string_pretty(&self.records)
             .context("Failed to serialize decision memory")?;
-        std::fs::write(path.as_ref(), &json)
+        tokio::fs::write(path.as_ref(), &json)
+            .await
             .with_context(|| format!("Failed to write memory to {:?}", path.as_ref()))?;
         Ok(())
     }
 
-    pub fn load(&mut self, path: impl AsRef<Path>) -> Result<()> {
-        let json = std::fs::read_to_string(path.as_ref())
+    pub async fn load(&mut self, path: impl AsRef<Path>) -> Result<()> {
+        let json = tokio::fs::read_to_string(path.as_ref())
+            .await
             .with_context(|| format!("Failed to read memory from {:?}", path.as_ref()))?;
         let records: VecDeque<DecisionRecord> =
             serde_json::from_str(&json).context("Failed to deserialize decision memory")?;
@@ -229,16 +237,16 @@ mod tests {
         assert_eq!(mem.total_trades(), 0);
     }
 
-    #[test]
-    fn test_add_record() {
+    #[tokio::test]
+    async fn test_add_record() {
         let mut mem = DecisionMemory::new(100);
         let record = DecisionRecord::new("AAPL", Action::Buy, 0.8, 150.0, None, "bullish", "test");
-        mem.add(record).unwrap();
+        mem.add(record).await.unwrap();
         assert_eq!(mem.total_trades(), 1);
     }
 
-    #[test]
-    fn test_max_records_respected() {
+    #[tokio::test]
+    async fn test_max_records_respected() {
         let mut mem = DecisionMemory::new(10);
         for i in 0..15 {
             let record = DecisionRecord::new(
@@ -250,13 +258,13 @@ mod tests {
                 "test",
                 "test",
             );
-            mem.add(record).unwrap();
+            mem.add(record).await.unwrap();
         }
         assert_eq!(mem.total_trades(), 10);
     }
 
-    #[test]
-    fn test_persistence_roundtrip() {
+    #[tokio::test]
+    async fn test_persistence_roundtrip() {
         let dir = std::env::temp_dir().join("test_decision_memory");
         let _ = std::fs::remove_dir_all(&dir);
         let path = dir.join("memory.json");
@@ -265,7 +273,7 @@ mod tests {
             let mut mem = DecisionMemory::with_persistence(100, &path).unwrap();
             let record =
                 DecisionRecord::new("AAPL", Action::Buy, 0.8, 150.0, None, "bullish", "test");
-            mem.add(record).unwrap();
+            mem.add(record).await.unwrap();
         }
 
         {
@@ -335,44 +343,42 @@ mod tests {
         assert!(record.r_multiple.is_none());
     }
 
-    #[test]
-    fn test_win_rate() {
+    #[tokio::test]
+    async fn test_win_rate() {
         let mut mem = DecisionMemory::new(100);
         for i in 0..10 {
             let mut record = DecisionRecord::new("AAPL", Action::Buy, 0.8, 100.0, None, "", "test");
             record.close(if i < 6 { 110.0 } else { 90.0 });
-            mem.add(record).unwrap();
+            mem.add(record).await.unwrap();
         }
         assert!((mem.win_rate(10) - 0.6).abs() < 0.01);
     }
 
-    #[test]
-    fn test_avg_r() {
+    #[tokio::test]
+    async fn test_avg_r() {
         let mut mem = DecisionMemory::new(100);
         for i in 0..10 {
             let mut record =
                 DecisionRecord::new("AAPL", Action::Buy, 0.8, 100.0, Some(90.0), "", "test");
             record.close(if i < 6 { 120.0 } else { 85.0 });
-            mem.add(record).unwrap();
+            mem.add(record).await.unwrap();
         }
-        // Win: (120-100)/10 = 2R, Loss: (85-100)/10 = -1.5R, avg = (6*2 + 4*(-1.5))/10 = 0.6
         assert!((mem.avg_r(10) - 0.6).abs() < 0.01);
     }
 
-    #[test]
-    fn test_profit_factor() {
+    #[tokio::test]
+    async fn test_profit_factor() {
         let mut mem = DecisionMemory::new(100);
         for _i in 0..5 {
             let mut w =
                 DecisionRecord::new("AAPL", Action::Buy, 0.8, 100.0, Some(90.0), "", "test");
             w.close(120.0);
-            mem.add(w).unwrap();
+            mem.add(w).await.unwrap();
             let mut l =
                 DecisionRecord::new("AAPL", Action::Buy, 0.8, 100.0, Some(90.0), "", "test");
             l.close(85.0);
-            mem.add(l).unwrap();
+            mem.add(l).await.unwrap();
         }
-        // Win R: 2.0, Loss R: -1.5, PF = (5*2) / (5*1.5) = 1.33
         assert!((mem.profit_factor(10) - 1.333).abs() < 0.01);
     }
 }

@@ -1,23 +1,6 @@
 use std::collections::VecDeque;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-pub enum MarketRegime {
-    Trending,
-    Ranging,
-    Volatile,
-    Quiet,
-}
-
-impl MarketRegime {
-    pub const fn weight_adjustment(&self) -> f64 {
-        match self {
-            MarketRegime::Trending => 1.2,
-            MarketRegime::Ranging => 1.0,
-            MarketRegime::Volatile => 0.7,
-            MarketRegime::Quiet => 0.9,
-        }
-    }
-}
+pub use crate::core::MarketRegime;
 
 pub struct RegimeDetector {
     prices: VecDeque<f64>,

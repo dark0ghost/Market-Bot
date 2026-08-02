@@ -220,8 +220,8 @@ mod tests {
         .unwrap()
     }
 
-    #[test]
-    fn test_rule_based_buy_signal() {
+    #[tokio::test]
+    async fn test_rule_based_buy_signal() {
         let agent = make_agent();
         let ctx = DecisionContext {
             ticker: "SBER".to_string(),
@@ -286,6 +286,7 @@ mod tests {
 
         let decision = agent
             .make_rule_based_decision(ctx)
+            .await
             .expect("Rule-based decision failed");
         assert_eq!(decision.action, Action::Buy);
         assert!(decision.confidence > 0.5);
@@ -294,8 +295,8 @@ mod tests {
         assert!(decision.position_size_pct > 0.0);
     }
 
-    #[test]
-    fn test_rule_based_sell_signal() {
+    #[tokio::test]
+    async fn test_rule_based_sell_signal() {
         let agent = make_agent();
         let ctx = DecisionContext {
             ticker: "SBER".to_string(),
@@ -357,6 +358,7 @@ mod tests {
 
         let decision = agent
             .make_rule_based_decision(ctx)
+            .await
             .expect("Rule-based decision failed");
         assert_eq!(decision.action, Action::Sell);
         assert!(decision.confidence > 0.5);
@@ -364,8 +366,8 @@ mod tests {
         assert!(decision.take_profit.is_some());
     }
 
-    #[test]
-    fn test_rule_based_hold_signal() {
+    #[tokio::test]
+    async fn test_rule_based_hold_signal() {
         let agent = make_agent();
         let ctx = DecisionContext {
             ticker: "TTECH".to_string(),
@@ -434,12 +436,13 @@ mod tests {
 
         let decision = agent
             .make_rule_based_decision(ctx)
+            .await
             .expect("Rule-based decision failed");
         assert_eq!(decision.action, Action::Hold);
     }
 
-    #[test]
-    fn test_rule_based_strong_buy_overrides_hold() {
+    #[tokio::test]
+    async fn test_rule_based_strong_buy_overrides_hold() {
         let agent = make_agent();
         let ctx = DecisionContext {
             ticker: "T".to_string(),
@@ -475,13 +478,14 @@ mod tests {
 
         let decision = agent
             .make_rule_based_decision(ctx)
+            .await
             .expect("Rule-based decision failed");
         assert_eq!(decision.action, Action::Buy);
         assert!(decision.confidence >= 0.6);
     }
 
-    #[test]
-    fn test_position_size_calculation() {
+    #[tokio::test]
+    async fn test_position_size_calculation() {
         let agent = make_agent();
         let ctx = DecisionContext {
             ticker: "TEST".to_string(),
@@ -507,13 +511,14 @@ mod tests {
 
         let decision = agent
             .make_rule_based_decision(ctx)
+            .await
             .expect("Rule-based decision failed");
         assert!(decision.position_size_pct >= 0.0);
         assert!(decision.position_size_pct <= 0.1);
     }
 
-    #[test]
-    fn test_stop_loss_take_profit_levels() {
+    #[tokio::test]
+    async fn test_stop_loss_take_profit_levels() {
         let agent = make_agent();
         let ctx = DecisionContext {
             ticker: "SBER".to_string(),
@@ -562,6 +567,7 @@ mod tests {
 
         let decision = agent
             .make_rule_based_decision(ctx)
+            .await
             .expect("Rule-based decision failed");
         assert_eq!(decision.action, Action::Buy);
         let (sl, tp) = (decision.stop_loss.unwrap(), decision.take_profit.unwrap());
@@ -582,8 +588,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_decision_scoring_confidence_bounds() {
+    #[tokio::test]
+    async fn test_decision_scoring_confidence_bounds() {
         let agent = make_agent();
         let ctx = DecisionContext {
             ticker: "TEST".to_string(),
@@ -639,6 +645,7 @@ mod tests {
 
         let decision = agent
             .make_rule_based_decision(ctx)
+            .await
             .expect("Rule-based decision failed");
         assert!(
             decision.confidence >= 0.05 && decision.confidence <= 0.95,

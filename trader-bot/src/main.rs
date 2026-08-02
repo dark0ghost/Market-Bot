@@ -1,9 +1,4 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
 #![allow(async_fn_in_trait)]
-#![allow(clippy::module_inception)]
-#![allow(clippy::too_many_arguments)]
-#![allow(clippy::upper_case_acronyms)]
 
 mod agent;
 mod analysis;
@@ -53,6 +48,7 @@ use execution::risk_gate;
 use crate::mcp::ollama::OllamaProvider;
 use strategy::{
     AiStrategy, GridBot, GridBotConfig, GridStrategy, IntervalStrategy, StrategyRegistry,
+    TradingCalendar,
 };
 
 // ─── Broker Initialization ───────────────────────────────────────────
@@ -283,7 +279,7 @@ async fn main() -> Result<()> {
         ) {
             Ok(a) => Arc::new(a),
             Err(e) => {
-                log::error!("Failed to init TradingAgent for {}: {} — skipping", aid, e);
+                log::error!("Failed to init TradingAgent for {}: {} - skipping", aid, e);
                 continue;
             }
         };
@@ -365,7 +361,7 @@ async fn run_grid_account(account: &AccountConfig, ab: &AccountBroker) -> Result
         Some(sdk) => sdk.clone(),
         None => {
             log::warn!(
-                "Grid account {} has no Tinkoff SDK — GridBot requires it",
+                "Grid account {} has no Tinkoff SDK - GridBot requires it",
                 aid
             );
             return Ok(());
@@ -521,27 +517,31 @@ async fn run_ai_account(
         };
 
         let decision = if llm_config_enabled(account) {
-            agent.make_decision(ctx.clone()).await.unwrap_or_else(|e| {
-                log::warn!("LLM error, fallback to rule: {}", e);
-                agent
-                    .make_rule_based_decision(ctx.clone())
-                    .unwrap_or_else(|_| agent::TradingDecision {
-                        ticker: instrument.ticker.clone(),
-                        action: agent::Action::Hold,
-                        confidence: 0.0,
-                        entry_price: None,
-                        position_size_pct: 0.0,
-                        stop_loss: None,
-                        take_profit: None,
-                        rationale: "fallback".into(),
-                        risks: vec![],
-                        time_horizon: agent::TimeHorizon::Medium,
-                        current_position: None,
-                        current_price,
-                    })
-            })
+            match agent.make_decision(ctx.clone()).await {
+                Ok(d) => d,
+                Err(e) => {
+                    log::warn!("LLM error, fallback to rule: {}", e);
+                    agent
+                        .make_rule_based_decision(ctx.clone())
+                        .await
+                        .unwrap_or_else(|_| agent::TradingDecision {
+                            ticker: instrument.ticker.clone(),
+                            action: agent::Action::Hold,
+                            confidence: 0.0,
+                            entry_price: None,
+                            position_size_pct: 0.0,
+                            stop_loss: None,
+                            take_profit: None,
+                            rationale: "fallback".into(),
+                            risks: vec![],
+                            time_horizon: agent::TimeHorizon::Medium,
+                            current_position: None,
+                            current_price,
+                        })
+                }
+            }
         } else {
-            agent.make_rule_based_decision(ctx)?
+            agent.make_rule_based_decision(ctx).await?
         };
 
         log::info!(
@@ -560,6 +560,14 @@ async fn run_ai_account(
             .map(|c| c.min_confidence)
             .unwrap_or(0.6);
         if decision.action != agent::Action::Hold && decision.confidence >= min_confidence {
+            // Market-hours gate: never place orders outside the MOEX session.
+            if !TradingCalendar::default().is_open_now() {
+                log::warn!(
+                    "[{}] Order skipped: MOEX is closed (outside trading hours/holiday)",
+                    instrument.ticker
+                );
+                continue;
+            }
             // Hard pre-trade risk gate (open-positions limit, balance reserve).
             let exec_price = decision.entry_price.unwrap_or(decision.current_price);
             let qty = calc_order_quantity(
@@ -579,6 +587,8 @@ async fn run_ai_account(
                 available_balance: balance,
                 open_positions,
                 order_value: qty as f64 * exec_price,
+                daily_pnl: 0.0,
+                daily_starting_balance: balance.max(1.0),
             };
             match risk_gate::evaluate_pre_trade(&risk_input, account.risk_management.as_ref()) {
                 risk_gate::PreTradeCheck::Allow => {
@@ -629,7 +639,7 @@ async fn get_candles_for_analysis(
         }
     } else {
         log::warn!(
-            "No SDK for candle data — skipping TA for {}",
+            "No SDK for candle data - skipping TA for {}",
             instrument.ticker
         );
         vec![]
@@ -684,12 +694,12 @@ async fn get_news_for_instrument(
 
 /// Convert a decision into an order quantity (in units/lots).
 ///
-/// * **Buy** — sized by portfolio value: `floor(balance * position_size_pct / price)`,
+/// * **Buy** - sized by portfolio value: `floor(balance * position_size_pct / price)`,
 ///   so a 15% allocation buys as many units as that share of the balance affords at the
 ///   current price (was previously `pct * 100`, which ignored balance and price entirely).
-/// * **Sell** — liquidate the known current position when available; otherwise fall back
+/// * **Sell** - liquidate the known current position when available; otherwise fall back
 ///   to value-based sizing.
-/// * **Hold** — zero.
+/// * **Hold** - zero.
 ///
 /// Returns `0` on non-positive price/balance or a non-positive allocation.
 fn calc_order_quantity(
@@ -760,7 +770,60 @@ async fn execute_via_broker(
     };
     match broker.place_order(request).await {
         Ok(resp) => log::info!("Order placed: {:?}", resp),
-        Err(e) => log::error!("Order error: {}", e),
+        Err(e) => {
+            log::error!("Order error: {}", e);
+            return Ok(());
+        }
+    }
+
+    // Place broker-side SL/TP so stops survive a crash. Direction closes the position:
+    // a Buy is closed by a Sell stop, a Sell by a Buy stop.
+    let close_action = match decision.action {
+        agent::Action::Buy => OrderAction::Sell,
+        agent::Action::Sell => OrderAction::Buy,
+        agent::Action::Hold => return Ok(()),
+    };
+    if let Some(sl) = decision.stop_loss {
+        if let Err(e) = broker
+            .place_stop_order(StopOrderRequest {
+                instrument: decision.ticker.clone(),
+                action: close_action.clone(),
+                kind: StopOrderKind::StopLoss,
+                quantity: qty,
+                stop_price: sl,
+                price: Some(sl),
+                account_id: broker.account_id().to_string(),
+                client_order_id: None,
+            })
+            .await
+        {
+            log::warn!(
+                "[{}] Broker stop-loss rejected (in-memory fallback active): {}",
+                decision.ticker,
+                e
+            );
+        }
+    }
+    if let Some(tp) = decision.take_profit {
+        if let Err(e) = broker
+            .place_stop_order(StopOrderRequest {
+                instrument: decision.ticker.clone(),
+                action: close_action,
+                kind: StopOrderKind::TakeProfit,
+                quantity: qty,
+                stop_price: tp,
+                price: Some(tp),
+                account_id: broker.account_id().to_string(),
+                client_order_id: None,
+            })
+            .await
+        {
+            log::warn!(
+                "[{}] Broker take-profit rejected (in-memory fallback active): {}",
+                decision.ticker,
+                e
+            );
+        }
     }
     Ok(())
 }

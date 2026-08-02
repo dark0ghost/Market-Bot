@@ -51,21 +51,21 @@ Market Data ─┬─ Technical Analysis (RSI, MACD, Bollinger, Volume)
 
 ## Technical Analysis Inputs
 
-- **RSI** — oversold/overbought thresholds
-- **MACD** — line, signal, histogram for crossovers
-- **Bollinger Bands** — bandwidth, position within bands
-- **Volume** — unusual volume detection, volume ratio
-- **Support/Resistance** — key price levels
-- **Trend** — bullish/bearish/sideways
+- **RSI** - oversold/overbought thresholds
+- **MACD** - line, signal, histogram for crossovers
+- **Bollinger Bands** - bandwidth, position within bands
+- **Volume** - unusual volume detection, volume ratio
+- **Support/Resistance** - key price levels
+- **Trend** - bullish/bearish/sideways
 
 ## Risk Management
 
 Embedded in the decision pipeline:
 
-- **Position Sizing** — confidence-based, adjusted for proximity to resistance
-- **Stop Loss / Take Profit** — configurable percentages via `RiskManagementConfig`
-- **Max Drawdown** — global limit
-- **Max Open Positions** — prevents overexposure
+- **Position Sizing** - confidence-based, adjusted for proximity to resistance
+- **Stop Loss / Take Profit** - configurable percentages via `RiskManagementConfig`
+- **Max Drawdown** - global limit
+- **Max Open Positions** - prevents overexposure
 
 ## Decision Memory
 
@@ -73,6 +73,6 @@ All decisions are recorded to `DecisionMemory` (RAM + optional JSON persistence)
 
 ## Refs
 
-- `trader-bot/src/strategy/ai.rs` — Strategy implementation
-- `trader-bot/src/agent/trading_agent.rs` — TradingAgent (decision logic)
-- `trader-bot/src/agent/memory.rs` — DecisionMemory
+- `trader-bot/src/strategy/ai.rs` - Strategy implementation
+- `trader-bot/src/agent/trading_agent.rs` - TradingAgent (decision logic)
+- `trader-bot/src/agent/memory.rs` - DecisionMemory

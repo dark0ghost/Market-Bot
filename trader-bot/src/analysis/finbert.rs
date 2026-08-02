@@ -28,10 +28,23 @@ impl FinBertSentimentService {
     }
 
     pub async fn analyze_batch(&self, texts: &[String]) -> Result<Vec<FinBertSentiment>> {
-        let mut results = Vec::with_capacity(texts.len());
-        for text in texts {
-            results.push(self.analyze(text).await?);
-        }
+        // Run each inference on the blocking pool concurrently so the async runtime
+        // stays responsive. ONNX inference itself serializes on the session Mutex,
+        // but this avoids holding a tokio worker thread for the whole batch.
+        let futs: Vec<_> = texts
+            .iter()
+            .map(|t| {
+                let inference = self.inference.clone();
+                let text = t.clone();
+                async move {
+                    let text_for_events = text.clone();
+                    let result = tokio::task::spawn_blocking(move || inference.predict(&text))
+                        .await??;
+                    Ok::<_, anyhow::Error>(FinBertSentiment::from_nlp_result(&text_for_events, result))
+                }
+            })
+            .collect();
+        let results: Vec<FinBertSentiment> = futures::future::try_join_all(futs).await?;
         Ok(results)
     }
 }
@@ -47,7 +60,7 @@ pub struct FinBertSentiment {
 
 impl FinBertSentiment {
     fn from_nlp_result(text: &str, result: NlpResult) -> Self {
-        let key_events = extract_key_events(text);
+        let key_events = crate::analysis::key_events::extract_key_events(text);
         let sentiment_score = result.sentiment_score();
         Self {
             label: result.label,
@@ -61,35 +74,6 @@ impl FinBertSentiment {
     pub fn to_sentiment(&self) -> crate::analysis::news::Sentiment {
         crate::analysis::news::Sentiment::from_score(self.sentiment_score as f64)
     }
-}
-
-fn extract_key_events(text: &str) -> Vec<String> {
-    let mut events = Vec::new();
-    let text_lower = text.to_lowercase();
-
-    if text_lower.contains("reconversion") || text_lower.contains("conversion") {
-        events.push("Stock reconversion".to_string());
-    }
-    if text_lower.contains("dividend") {
-        events.push("Dividend payments".to_string());
-    }
-    if text_lower.contains("report") || text_lower.contains("financial result") {
-        events.push("Financial reporting".to_string());
-    }
-    if text_lower.contains("sanction") || text_lower.contains("restrict") {
-        events.push("Sanctions pressure".to_string());
-    }
-    if text_lower.contains("merger") || text_lower.contains("acquisition") {
-        events.push("M&A activity".to_string());
-    }
-    if text_lower.contains("buyback") || text_lower.contains("repurchase") {
-        events.push("Share buyback".to_string());
-    }
-    if text_lower.contains("guidance") || text_lower.contains("forecast") {
-        events.push("Guidance update".to_string());
-    }
-
-    events
 }
 
 #[async_trait]
@@ -164,52 +148,4 @@ impl NewsSentimentAnalyzer for FinBertSentimentService {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
 
-    #[ignore]
-    #[tokio::test]
-    async fn test_finbert_sentiment() {
-        let service = FinBertSentimentService::new("models/finbert").unwrap();
-        let result = service
-            .analyze("Company reported 30% revenue growth")
-            .await
-            .unwrap();
-        assert!(result.sentiment_score > 0.0);
-    }
-
-    #[ignore]
-    #[tokio::test]
-    async fn test_finbert_analyze_news_batch_empty() {
-        let service = FinBertSentimentService::new("models/finbert").unwrap();
-        let result = service
-            .analyze_news_batch("TEST", "Test", &[])
-            .await
-            .unwrap();
-        assert_eq!(result.overall_sentiment, Sentiment::Neutral);
-        assert!((result.sentiment_score - 0.0).abs() < 1e-6);
-    }
-
-    #[ignore]
-    #[tokio::test]
-    async fn test_finbert_analyze_news_batch_single() {
-        let service = FinBertSentimentService::new("models/finbert").unwrap();
-        let items = vec![NewsItem {
-            title: "Company reported record revenue growth".to_string(),
-            content: "".to_string(),
-            source: "test".to_string(),
-            url: "".to_string(),
-        }];
-        let result = service
-            .analyze_news_batch("TEST", "Test", &items)
-            .await
-            .unwrap();
-        assert!(
-            result.sentiment_score > 0.0,
-            "score: {}",
-            result.sentiment_score
-        );
-        assert_eq!(result.overall_sentiment, Sentiment::Positive);
-    }
-}

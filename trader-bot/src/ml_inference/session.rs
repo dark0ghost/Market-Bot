@@ -6,7 +6,7 @@ use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 pub struct OrtSessionPool {
-    session: Mutex<Session>,
+    session: Arc<Mutex<Session>>,
     model_path: String,
     num_threads: usize,
 }
@@ -15,7 +15,7 @@ impl OrtSessionPool {
     pub fn new(model_path: &str, num_threads: usize) -> Result<Self> {
         let session = Self::build_session(model_path, num_threads)?;
         Ok(Self {
-            session: Mutex::new(session),
+            session: Arc::new(Mutex::new(session)),
             model_path: model_path.to_string(),
             num_threads,
         })
@@ -34,7 +34,11 @@ impl OrtSessionPool {
 
     pub fn reload(&self) -> Result<()> {
         let new = Self::build_session(&self.model_path, self.num_threads)?;
-        *self.session.lock().unwrap() = new;
+        let mut session = self
+            .session
+            .lock()
+            .map_err(|e| anyhow::anyhow!("ORT session lock poisoned: {e}"))?;
+        *session = new;
         Ok(())
     }
 
@@ -50,7 +54,10 @@ impl OrtSessionPool {
         let attn = Tensor::from_array((shape, attention_mask))
             .context("ORT create attention_mask tensor")?;
 
-        let mut session = self.session.lock().unwrap();
+        let mut session = self
+            .session
+            .lock()
+            .map_err(|e| anyhow::anyhow!("ORT session lock poisoned: {e}"))?;
         let outputs = session
             .run(ort::inputs! {
                 "input_ids" => in_ids,

@@ -112,5 +112,5 @@ graph TD
 
 ## Next Steps
 
-- **[Quick Start](quickstart.md)** — Installation and launch
-- **[Configuration](../user-guide/configuration.md)** — Bot setup
+- **[Quick Start](quickstart.md)** - Installation and launch
+- **[Configuration](../user-guide/configuration.md)** - Bot setup

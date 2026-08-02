@@ -101,11 +101,16 @@ def fetch_rss(url: str, timeout: int) -> list[dict]:
         resp = requests.get(url, headers=headers, timeout=timeout)
         resp.raise_for_status()
     except requests.RequestException as e:
-        logger.warning(f"RSS fetch failed: {url} — {e}")
+        logger.warning(f"RSS fetch failed: {url} - {e}")
         return []
 
     items = []
-    root = ET.fromstring(resp.content)
+    # Malformed/invalid XML must not crash the whole collection run - skip the feed.
+    try:
+        root = ET.fromstring(resp.content)
+    except ET.ParseError as e:
+        logger.warning(f"RSS parse failed (malformed XML): {url} - {e}")
+        return []
     for item in root.iter("item"):
         title = (item.findtext("title") or "").strip()
         desc = (item.findtext("description") or "").strip()
@@ -185,6 +190,8 @@ def label_sentiment(text: str, label_retries: int = 3) -> tuple[Optional[str], f
 
 def collect_from_rss(dedup: DedupStore, max_samples: int) -> list[Sample]:
     samples = []
+    # Be polite between feeds to avoid hammering sources / getting rate-limited.
+    inter_feed_delay = CONFIG["collection"].get("inter_feed_delay_sec", 2)
     for feed in CONFIG["rss_feeds"]:
         logger.info(f"Fetching RSS: {feed['name']}")
         items = fetch_rss(feed["url"], CONFIG["collection"]["request_timeout"])
@@ -195,6 +202,7 @@ def collect_from_rss(dedup: DedupStore, max_samples: int) -> list[Sample]:
             if dedup.is_new(sample):
                 samples.append(sample)
         logger.info(f"  → {len(items)} items from {feed['name']}")
+        time.sleep(inter_feed_delay)
     return samples
 
 

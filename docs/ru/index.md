@@ -5,7 +5,7 @@ hide:
 
 # Market Bot Documentation
 
-Добро пожаловать в документацию Market Bot — комплексной торговой системы с поддержкой множества стратегий (AI, Grid, Gates) и брокеров для Московской биржи.
+Добро пожаловать в документацию Market Bot - комплексной торговой системы с поддержкой множества стратегий (AI, Grid, Gates) и брокеров для Московской биржи.
 
 ## 🚀 Быстрый старт
 
@@ -30,20 +30,20 @@ cargo run -p trader-bot
 
 ### Для начинающих
 
-- **[Что такое Market Bot?](getting-started/what-is.md)** — Обзор возможностей
-- **[Быстрый старт](getting-started/quickstart.md)** — Установка и запуск
+- **[Что такое Market Bot?](getting-started/what-is.md)** - Обзор возможностей
+- **[Быстрый старт](getting-started/quickstart.md)** - Установка и запуск
 
 ### Для пользователей
 
-- **[Конфигурация](user-guide/configuration.md)** — Настройка бота
+- **[Конфигурация](user-guide/configuration.md)** - Настройка бота
 
 ### Для разработчиков
 
-- **[API документация](developer-guide/api.md)** — API референс
+- **[API документация](developer-guide/api.md)** - API референс
 
 ### Стратегии
 
-- **[Grid Bot](strategies/grid-bot.md)** — Сеточная торговля
+- **[Grid Bot](strategies/grid-bot.md)** - Сеточная торговля
 
 ## 📊 Возможности
 
@@ -58,11 +58,11 @@ cargo run -p trader-bot
 
 ## 🆘 Поддержка
 
-- [GitHub Issues](https://github.com/dark0ghost/ai-trader-bot/issues) — Сообщить об ошибке
+- [GitHub Issues](https://github.com/dark0ghost/ai-trader-bot/issues) - Сообщить об ошибке
 
 ## 📝 Лицензия
 
-MIT License — см. [LICENSE](../LICENSE)
+MIT License - см. [LICENSE](../LICENSE)
 
 ---
 

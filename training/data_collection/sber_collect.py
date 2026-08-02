@@ -1,5 +1,5 @@
 """
-Universal MOEX data collector — candles + RSS + Perplexica → labeled training set.
+Universal MOEX data collector - candles + RSS + Perplexica → labeled training set.
 
 Usage:
     # Collect for T-Technologies, last 180 days
@@ -163,7 +163,7 @@ def fetch_rss(url: str, timeout: int, keywords: list[str]) -> list[dict]:
         resp = requests.get(url, headers=headers, timeout=timeout)
         resp.raise_for_status()
     except requests.RequestException as e:
-        logger.warning(f"RSS fetch failed: {url} — {e}")
+        logger.warning(f"RSS fetch failed: {url} - {e}")
         return []
 
     items = []

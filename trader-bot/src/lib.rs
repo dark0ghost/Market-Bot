@@ -1,9 +1,4 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
 #![allow(async_fn_in_trait)]
-#![allow(clippy::module_inception)]
-#![allow(clippy::too_many_arguments)]
-#![allow(clippy::upper_case_acronyms)]
 
 pub mod agent;
 pub mod analysis;
@@ -50,10 +45,10 @@ pub mod logging;
 
 pub use analysis::{NewsArticle, NewsSentiment, Sentiment};
 pub use backtest::{BacktestConfig, BacktestResult, backtest_grid, run_backtest};
+pub use core::{OrderAction, OrderStatus};
 pub use error::{BotError, NewsAnalysisError, OrderError, StrategyError};
 pub use execution::{
-    OrderAction, OrderResult, OrderStatus, PositionManager, SignalRecord, TradeJournal,
-    TradeRecord, TradingExecutor,
+    OrderResult, PositionManager, SignalRecord, TradeJournal, TradeRecord, TradingExecutor,
 };
 pub use strategy::{GridLevel, GridState, GridStrategy, OrderSide};
 

@@ -3,6 +3,7 @@ use crate::analysis::detectors::{
     Candle, detect_cisd, detect_displacement, detect_fvg, detect_swings, update_fvg_states,
 };
 use crate::strategy::gates::{Gate, GateContext, GateResult};
+use async_trait::async_trait;
 
 // ─── Regime Gate ──────────────────────────────────────────────────────
 
@@ -20,12 +21,13 @@ impl RegimeGate {
     }
 }
 
+#[async_trait]
 impl Gate for RegimeGate {
     fn name(&self) -> &str {
         &self.name
     }
 
-    fn evaluate(&self, ctx: &GateContext) -> GateResult {
+    async fn evaluate(&self, ctx: &GateContext) -> GateResult {
         match &ctx.market_regime {
             Some(regime) if self.allowed_regimes.iter().any(|a| a == regime) => GateResult::Pass,
             Some(regime) => GateResult::Fail(format!("regime {} not allowed", regime)),
@@ -50,12 +52,13 @@ impl TrendGate {
     }
 }
 
+#[async_trait]
 impl Gate for TrendGate {
     fn name(&self) -> &str {
         &self.name
     }
 
-    fn evaluate(&self, ctx: &GateContext) -> GateResult {
+    async fn evaluate(&self, ctx: &GateContext) -> GateResult {
         match &ctx.trend {
             Some(trend) if self.allowed_trends.iter().any(|a| a == trend) => GateResult::Pass,
             Some(trend) => GateResult::Fail(format!("trend {} not allowed", trend)),
@@ -68,7 +71,6 @@ impl Gate for TrendGate {
 
 pub struct SwingCheckGate {
     name: String,
-    /// Minimum number of swing highs/lows to consider the market "active"
     min_swings: usize,
 }
 
@@ -81,12 +83,13 @@ impl SwingCheckGate {
     }
 }
 
+#[async_trait]
 impl Gate for SwingCheckGate {
     fn name(&self) -> &str {
         &self.name
     }
 
-    fn evaluate(&self, ctx: &GateContext) -> GateResult {
+    async fn evaluate(&self, ctx: &GateContext) -> GateResult {
         if ctx.swings.len() >= self.min_swings {
             GateResult::Pass
         } else {
@@ -103,7 +106,6 @@ impl Gate for SwingCheckGate {
 
 pub struct FvgGate {
     name: String,
-    /// Require at least this many unconsumed FVGs
     min_fvgs: usize,
 }
 
@@ -116,12 +118,13 @@ impl FvgGate {
     }
 }
 
+#[async_trait]
 impl Gate for FvgGate {
     fn name(&self) -> &str {
         &self.name
     }
 
-    fn evaluate(&self, ctx: &GateContext) -> GateResult {
+    async fn evaluate(&self, ctx: &GateContext) -> GateResult {
         let active: Vec<_> = ctx
             .fvgs
             .iter()
@@ -143,12 +146,13 @@ impl Gate for FvgGate {
 
 pub struct CisdGate;
 
+#[async_trait]
 impl Gate for CisdGate {
     fn name(&self) -> &str {
         "cisd"
     }
 
-    fn evaluate(&self, ctx: &GateContext) -> GateResult {
+    async fn evaluate(&self, ctx: &GateContext) -> GateResult {
         if ctx.cisd_signals.is_empty() {
             GateResult::Fail("no CISD signal".into())
         } else {
@@ -173,12 +177,13 @@ impl DisplacementGate {
     }
 }
 
+#[async_trait]
 impl Gate for DisplacementGate {
     fn name(&self) -> &str {
         &self.name
     }
 
-    fn evaluate(&self, ctx: &GateContext) -> GateResult {
+    async fn evaluate(&self, ctx: &GateContext) -> GateResult {
         if ctx.displacements.len() >= self.min_displacements {
             GateResult::Pass
         } else {
@@ -207,19 +212,20 @@ impl SentimentGate {
     }
 }
 
+#[async_trait]
 impl Gate for SentimentGate {
     fn name(&self) -> &str {
         &self.name
     }
 
-    fn evaluate(&self, ctx: &GateContext) -> GateResult {
+    async fn evaluate(&self, ctx: &GateContext) -> GateResult {
         match &ctx.sentiment {
             Some(s) if s.sentiment_score >= self.min_score => GateResult::Pass,
             Some(s) => GateResult::Fail(format!(
                 "sentiment {:.2} < {:.2}",
                 s.sentiment_score, self.min_score
             )),
-            None => GateResult::Pass, // no news = no veto
+            None => GateResult::Fail("no sentiment data (fail-close)".into()),
         }
     }
 }
@@ -272,24 +278,24 @@ mod tests {
         v
     }
 
-    #[test]
-    fn test_regime_gate_pass() {
+    #[tokio::test]
+    async fn test_regime_gate_pass() {
         let gate = RegimeGate::new(&["trending"]);
         let mut ctx = GateContext::new("AAPL");
         ctx.market_regime = Some("trending".into());
-        assert!(gate.evaluate(&ctx).is_pass());
+        assert!(gate.evaluate(&ctx).await.is_pass());
     }
 
-    #[test]
-    fn test_regime_gate_fail() {
+    #[tokio::test]
+    async fn test_regime_gate_fail() {
         let gate = RegimeGate::new(&["trending"]);
         let mut ctx = GateContext::new("AAPL");
         ctx.market_regime = Some("volatile".into());
-        assert!(!gate.evaluate(&ctx).is_pass());
+        assert!(!gate.evaluate(&ctx).await.is_pass());
     }
 
-    #[test]
-    fn test_sentiment_gate_pass() {
+    #[tokio::test]
+    async fn test_sentiment_gate_pass() {
         let gate = SentimentGate::new(0.3);
         let mut ctx = GateContext::new("AAPL");
         ctx.sentiment = Some(NewsSentiment {
@@ -300,11 +306,18 @@ mod tests {
             articles: vec![],
             key_events: vec![],
         });
-        assert!(gate.evaluate(&ctx).is_pass());
+        assert!(gate.evaluate(&ctx).await.is_pass());
     }
 
-    #[test]
-    fn test_build_context_runs_detectors() {
+    #[tokio::test]
+    async fn test_sentiment_gate_fail_on_missing_data() {
+        let gate = SentimentGate::new(0.3);
+        let ctx = GateContext::new("AAPL");
+        assert!(!gate.evaluate(&ctx).await.is_pass());
+    }
+
+    #[tokio::test]
+    async fn test_build_context_runs_detectors() {
         let candles = dummy_candles(30);
         let ctx = build_gate_context("AAPL", &candles, 100.0, None, None, None);
         assert!(

@@ -22,6 +22,13 @@ pub trait Broker: Send + Sync {
     async fn liquidity(&self, instrument: &str, depth: u32) -> Result<LiquidityInfo>;
 
     async fn place_order(&self, request: OrderRequest) -> Result<OrderResponse>;
+    /// Place a broker-side stop order (StopLoss / TakeProfit).
+    ///
+    /// Default impl returns an error - brokers that don't support native stop orders
+    /// (e.g. Mock) opt out, and callers must keep an in-memory stop as a fallback.
+    async fn place_stop_order(&self, _request: StopOrderRequest) -> Result<OrderResponse> {
+        Err(anyhow::anyhow!("broker {} does not support native stop orders", self.name()))
+    }
     async fn cancel_order(&self, order_id: &str) -> Result<()>;
     async fn get_orders(&self, instrument: Option<&str>) -> Result<Vec<OrderResponse>>;
     async fn get_order_status(&self, order_id: &str) -> Result<OrderStatus>;
@@ -65,12 +72,23 @@ pub trait Strategy: Send + Sync {
 
 // ─── Market Regime ───────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum MarketRegime {
     Trending,
     Ranging,
     Volatile,
     Quiet,
+}
+
+impl MarketRegime {
+    pub const fn weight_adjustment(&self) -> f64 {
+        match self {
+            MarketRegime::Trending => 1.2,
+            MarketRegime::Ranging => 1.0,
+            MarketRegime::Volatile => 0.7,
+            MarketRegime::Quiet => 0.9,
+        }
+    }
 }
 
 // ─── Optimizer Types ─────────────────────────────────────────────────

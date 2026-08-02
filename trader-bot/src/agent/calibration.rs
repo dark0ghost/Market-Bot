@@ -1,5 +1,5 @@
 use crate::agent::Action;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 
 #[derive(Debug, Clone)]
 pub struct CalibrationBin {
@@ -52,7 +52,7 @@ impl CalibrationBin {
 pub struct PredictionTracker {
     provider_results: HashMap<String, ProviderStats>,
     calibration_bins: Vec<CalibrationBin>,
-    recent_predictions: Vec<PredictionRecord>,
+    recent_predictions: VecDeque<PredictionRecord>,
     max_recent: usize,
 }
 
@@ -84,7 +84,7 @@ impl PredictionTracker {
         PredictionTracker {
             provider_results: HashMap::new(),
             calibration_bins: Self::default_bins(),
-            recent_predictions: Vec::new(),
+            recent_predictions: VecDeque::new(),
             max_recent: 1000,
         }
     }
@@ -130,7 +130,7 @@ impl PredictionTracker {
             bin.record_prediction(&action, correct, confidence);
         }
 
-        self.recent_predictions.push(PredictionRecord {
+        self.recent_predictions.push_back(PredictionRecord {
             provider: provider.to_string(),
             confidence,
             conviction,
@@ -139,7 +139,7 @@ impl PredictionTracker {
             actual_pnl: pnl,
         });
         if self.recent_predictions.len() > self.max_recent {
-            self.recent_predictions.remove(0);
+            self.recent_predictions.pop_front();
         }
     }
 

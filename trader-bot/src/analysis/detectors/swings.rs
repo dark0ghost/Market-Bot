@@ -175,7 +175,7 @@ mod tests {
                 volume: 0.0,
             },
         ];
-        // Index 3 has low=95, sides have lows 97 and 96 — both higher → swing low
+        // Index 3 has low=95, sides have lows 97 and 96 - both higher → swing low
         let swings = detect_swings(&candles, 2);
         let lows: Vec<_> = swings
             .iter()

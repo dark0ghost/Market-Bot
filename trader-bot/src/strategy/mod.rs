@@ -8,6 +8,7 @@ pub mod pairs;
 pub mod registry;
 pub mod stat_arb;
 pub mod strategy;
+pub mod trading_calendar;
 
 pub use ai::AiStrategy;
 pub use gates::*;
@@ -19,3 +20,4 @@ pub use pairs::{PairAction, PairConfig, PairSignal, PairsTrader};
 pub use registry::StrategyRegistry;
 pub use stat_arb::{StatArbConfig, StatArbSignal, StatisticalArbitrage};
 pub use strategy::Strategy;
+pub use trading_calendar::TradingCalendar;

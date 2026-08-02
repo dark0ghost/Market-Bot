@@ -127,13 +127,13 @@ impl TradingAgent {
         let llm_response = self.llm_query.query(prompt).await?;
         let decision = self.parse_llm_response(&llm_response, &context)?;
 
-        self.record_decision(&decision, "llm");
+        self.record_decision(&decision, "llm").await;
 
         Ok(decision)
     }
 
     /// Fast decision without LLM (rule-based)
-    pub fn make_rule_based_decision(&self, context: DecisionContext) -> Result<TradingDecision> {
+    pub async fn make_rule_based_decision(&self, context: DecisionContext) -> Result<TradingDecision> {
         let mut action = Action::Hold;
         let mut confidence = 0.5;
         let mut rationale_parts = Vec::new();
@@ -296,7 +296,7 @@ impl TradingAgent {
             current_price: context.current_price,
         };
 
-        self.record_decision(&decision, "rule-based");
+        self.record_decision(&decision, "rule-based").await;
 
         Ok(decision)
     }
@@ -338,11 +338,12 @@ impl TradingAgent {
         };
 
         // Account for available balance
-        let _max_affordable = if context.current_price > 0.0 {
+        let max_affordable = if context.current_price > 0.0 {
             (context.available_balance * (1.0 - 0.1)) / context.current_price // 10% reserve
         } else {
             0.0
         };
+        let _ = max_affordable; // Reserved for future position capping logic
 
         // Return share, not exceeding limits
         adjusted_size.min(context.max_position_pct)
@@ -397,7 +398,7 @@ impl TradingAgent {
     }
 
     /// Record a decision into dual memory (RAM + flash)
-    fn record_decision(&self, decision: &TradingDecision, provider: &str) {
+    async fn record_decision(&self, decision: &TradingDecision, provider: &str) {
         if decision.action == Action::Hold {
             return;
         }
@@ -411,7 +412,7 @@ impl TradingAgent {
                 &decision.rationale,
                 provider,
             );
-            let _ = memory.add(record);
+            let _ = memory.add(record).await;
         }
     }
 
@@ -805,7 +806,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_make_decision_partial_json_still_works() {
-        // JSON is embedded in markdown text — common LLM output
+        // JSON is embedded in markdown text - common LLM output
         let md = r#"Here is my analysis:
 
 ```json

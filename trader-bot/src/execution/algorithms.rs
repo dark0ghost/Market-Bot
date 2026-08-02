@@ -1,4 +1,5 @@
-use crate::execution::position_manager::{OrderAction, OrderResult};
+use crate::core::OrderAction;
+use crate::execution::position_manager::OrderResult;
 use crate::provider::ExecutionProvider;
 use anyhow::Result;
 use chrono::Utc;

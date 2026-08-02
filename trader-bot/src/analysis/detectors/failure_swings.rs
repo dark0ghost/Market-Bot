@@ -7,7 +7,7 @@ pub struct FailureSwing {
     pub swing_type: SwingType,
 }
 
-/// Detect failure swings — clusters of swing highs/lows at similar price levels.
+/// Detect failure swings - clusters of swing highs/lows at similar price levels.
 /// Multiple touching of the same level = stronger draw on liquidity.
 pub fn detect_failure_swings(swings: &[Swing], tolerance_pct: f64) -> Vec<FailureSwing> {
     let mut clusters: Vec<FailureSwing> = Vec::new();
