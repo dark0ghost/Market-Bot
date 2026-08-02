@@ -1,0 +1,21 @@
+# Pinned-compatible dependency ranges for reproducible training runs.
+# Pin major.minor (allow patch) instead of open-ended `>=` so a future
+# major release can't silently break the pipeline. For a fully frozen
+# environment run `pip freeze > requirements.lock.txt` on a known-good install.
+
+torch>=2.0.0,<3.0
+transformers>=4.30.0,<5.0
+datasets>=2.12.0,<3.0
+optimum>=1.12.0,<2.0
+onnx>=1.14.0,<2.0
+onnxruntime>=1.15.0,<2.0
+scikit-learn>=1.2.0,<2.0
+evaluate>=0.4.0,<1.0
+accelerate>=0.20.0,<2.0
+pandas>=2.0.0,<3.0
+numpy>=1.24.0,<3.0
+tqdm>=4.65.0,<5.0
+pyyaml>=6.0,<7.0
+requests>=2.31.0,<3.0
+feedparser>=6.0.10,<7.0
+lxml>=4.9.0,<6.0
