@@ -47,8 +47,9 @@ impl MockBroker {
         state.price_map.insert(instrument.to_string(), price);
 
         if let Some(pos) = state.positions.get_mut(instrument) {
-            pos.current_price = price;
-            pos.pnl = (price - pos.average_price) * pos.quantity as f64;
+            pos.current_price = f64_to_decimal(price);
+            pos.pnl =
+                f64_to_decimal((price - decimal_to_f64(pos.average_price)) * pos.quantity as f64);
         }
     }
 
@@ -67,15 +68,15 @@ impl MockBroker {
             PositionView {
                 instrument: instrument.to_string(),
                 quantity,
-                average_price: avg_price,
-                current_price,
-                pnl: (current_price - avg_price) * quantity as f64,
-                pnl_pct: if avg_price > 0.0 {
+                average_price: f64_to_decimal(avg_price),
+                current_price: f64_to_decimal(current_price),
+                pnl: f64_to_decimal((current_price - avg_price) * quantity as f64),
+                pnl_pct: f64_to_decimal(if avg_price > 0.0 {
                     (current_price - avg_price) / avg_price * 100.0
                 } else {
                     0.0
-                },
-                total_value: current_price * quantity as f64,
+                }),
+                total_value: f64_to_decimal(current_price * quantity as f64),
             },
         );
     }
@@ -143,6 +144,7 @@ impl Broker for MockBroker {
         let mut state = self.state.lock().await;
         let price = request
             .price
+            .map(decimal_to_f64)
             .or_else(|| state.price_map.get(&request.instrument).copied())
             .unwrap_or(100.0);
 
@@ -154,8 +156,8 @@ impl Broker for MockBroker {
             action: request.action.clone(),
             quantity: request.quantity,
             filled_quantity: request.quantity,
-            price: Some(price),
-            avg_fill_price: Some(price),
+            price: Some(f64_to_decimal(price)),
+            avg_fill_price: Some(f64_to_decimal(price)),
             status: OrderStatus::Filled,
             created_at: Utc::now(),
             message: "Mock fill".to_string(),
@@ -170,7 +172,7 @@ impl Broker for MockBroker {
                     let avg = state
                         .positions
                         .get(&request.instrument)
-                        .map(|p| p.average_price)
+                        .map(|p| decimal_to_f64(p.average_price))
                         .unwrap_or(0.0);
                     let total_qty = state
                         .positions
@@ -188,11 +190,11 @@ impl Broker for MockBroker {
                         PositionView {
                             instrument: request.instrument.clone(),
                             quantity: new_qty,
-                            average_price: new_avg,
-                            current_price: price,
-                            pnl: 0.0,
-                            pnl_pct: 0.0,
-                            total_value: price * new_qty as f64,
+                            average_price: f64_to_decimal(new_avg),
+                            current_price: f64_to_decimal(price),
+                            pnl: f64_to_decimal(0.0),
+                            pnl_pct: f64_to_decimal(0.0),
+                            total_value: f64_to_decimal(price * new_qty as f64),
                         },
                     );
                 }
@@ -205,7 +207,8 @@ impl Broker for MockBroker {
                         && p.quantity >= request.quantity
                     {
                         let remaining = p.quantity - request.quantity;
-                        let pnl = (price - p.average_price) * request.quantity as f64;
+                        let avg = decimal_to_f64(p.average_price);
+                        let pnl = (price - avg) * request.quantity as f64;
                         state.balance += cost;
                         if remaining > 0 {
                             state.positions.insert(
@@ -214,10 +217,14 @@ impl Broker for MockBroker {
                                     instrument: request.instrument.clone(),
                                     quantity: remaining,
                                     average_price: p.average_price,
-                                    current_price: price,
-                                    pnl,
-                                    pnl_pct: (price - p.average_price) / p.average_price * 100.0,
-                                    total_value: price * remaining as f64,
+                                    current_price: f64_to_decimal(price),
+                                    pnl: f64_to_decimal(pnl),
+                                    pnl_pct: f64_to_decimal(if avg > 0.0 {
+                                        (price - avg) / avg * 100.0
+                                    } else {
+                                        0.0
+                                    }),
+                                    total_value: f64_to_decimal(price * remaining as f64),
                                 },
                             );
                         } else {
@@ -256,13 +263,14 @@ impl Broker for MockBroker {
     async fn portfolio(&self) -> Result<PortfolioView> {
         let state = self.state.lock().await;
         let positions: Vec<PositionView> = state.positions.values().cloned().collect();
-        let total_value = positions.iter().map(|p| p.total_value).sum::<f64>() + state.balance;
+        let total_value = positions.iter().map(|p| p.total_value).sum::<Decimal>()
+            + f64_to_decimal(state.balance);
         let total_pnl = positions.iter().map(|p| p.pnl).sum();
 
         Ok(PortfolioView {
             account_id: self.account_id.clone(),
-            total_balance: state.balance,
-            available_balance: state.balance,
+            total_balance: f64_to_decimal(state.balance),
+            available_balance: f64_to_decimal(state.balance),
             positions,
             total_pnl,
             total_value,

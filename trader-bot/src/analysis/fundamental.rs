@@ -101,6 +101,7 @@ impl FundamentalAnalyzer {
     }
 
     /// Analyze fundamental metrics
+    #[allow(clippy::too_many_arguments)]
     pub fn analyze(
         &self,
         ticker: &str,

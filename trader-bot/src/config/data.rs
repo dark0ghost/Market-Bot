@@ -32,9 +32,34 @@ pub struct Credential {
     pub additional_keys: Option<Vec<BrokerCredential>>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum BrokerType {
+    #[default]
+    Tinkoff,
+    Finam,
+    Mock,
+}
+
+impl BrokerType {
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            BrokerType::Tinkoff => "tinkoff",
+            BrokerType::Finam => "finam",
+            BrokerType::Mock => "mock",
+        }
+    }
+}
+
+impl std::fmt::Display for BrokerType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct BrokerCredential {
-    pub broker: String,
+    pub broker: BrokerType,
     pub api_key: String,
     pub secret_key: Option<String>,
     pub extra: Option<std::collections::HashMap<String, String>>,
@@ -47,14 +72,14 @@ pub struct AccountConfig {
     pub account_id: Option<String>,
     /// Broker for this account (default "tinkoff")
     #[serde(default = "default_broker")]
-    pub broker: String,
+    pub broker: BrokerType,
     pub instruments: Vec<InstrumentConfig>,
     pub strategy: StrategyConfig,
     pub risk_management: Option<RiskManagementConfig>,
 }
 
-fn default_broker() -> String {
-    "tinkoff".to_string()
+const fn default_broker() -> BrokerType {
+    BrokerType::Tinkoff
 }
 
 /// Instrument configuration
@@ -413,5 +438,27 @@ mod tests {
     fn no_config_flag_returns_none() {
         let args = vec!["trader-bot".to_string(), "--other".to_string()];
         assert_eq!(config_arg_from_args(args), None);
+    }
+
+    #[test]
+    fn broker_type_parses_lowercase_strings() {
+        for (json, expected) in [
+            ("\"tinkoff\"", BrokerType::Tinkoff),
+            ("\"finam\"", BrokerType::Finam),
+            ("\"mock\"", BrokerType::Mock),
+        ] {
+            let parsed: BrokerType = serde_json::from_str(json).unwrap();
+            assert_eq!(parsed, expected);
+        }
+        // Unknown broker string must error rather than silently map.
+        assert!(serde_json::from_str::<BrokerType>("\"alor\"").is_err());
+    }
+
+    #[test]
+    fn broker_type_serializes_lowercase() {
+        assert_eq!(
+            serde_json::to_string(&BrokerType::Finam).unwrap(),
+            "\"finam\""
+        );
     }
 }

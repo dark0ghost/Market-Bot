@@ -3,23 +3,13 @@ use crate::analysis::fundamental::{
     GrowthMetrics, IndustryAverages, ProfitabilityMetrics, ValuationMetrics,
 };
 use anyhow::Result;
-use reqwest::Client;
-use std::time::Duration;
 
 /// Service for collecting fundamental data
-pub struct FundamentalDataService {
-    client: Client,
-}
+pub struct FundamentalDataService;
 
 impl FundamentalDataService {
     pub fn new() -> Self {
-        let client = Client::builder()
-            .timeout(Duration::from_secs(10))
-            .user_agent("AI-Trading-Bot/1.0")
-            .build()
-            .unwrap_or_default();
-
-        FundamentalDataService { client }
+        FundamentalDataService
     }
 
     /// Get fundamental data by ticker

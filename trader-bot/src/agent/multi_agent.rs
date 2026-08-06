@@ -64,14 +64,14 @@ impl AnalystAgent {
                 model_name,
             )),
             crate::provider::prediction::PredictionProviderKind::StatArb(StatArbPredictor::new(
-                2.0, 0.5, 20,
+                2.0, 20,
             )),
             crate::provider::prediction::PredictionProviderKind::Fundamental(
                 FundamentalPredictor::new(),
             ),
-            crate::provider::prediction::PredictionProviderKind::FinBert(
-                FinBertPredictor::new(finbert),
-            ),
+            crate::provider::prediction::PredictionProviderKind::FinBert(FinBertPredictor::new(
+                finbert,
+            )),
         ];
         AnalystAgent {
             ensemble: EnsemblePredictor::new(providers, tracker),
@@ -114,17 +114,11 @@ impl AnalystAgent {
 
 pub struct RiskAgent {
     max_position_pct: f64,
-    max_drawdown_pct: f64,
-    var_confidence: f64,
 }
 
 impl RiskAgent {
-    pub fn new(max_position_pct: f64, max_drawdown_pct: f64) -> Self {
-        RiskAgent {
-            max_position_pct,
-            max_drawdown_pct,
-            var_confidence: 0.95,
-        }
+    pub fn new(max_position_pct: f64, _max_drawdown_pct: f64) -> Self {
+        RiskAgent { max_position_pct }
     }
 
     pub fn assess(&self, proposal: &AnalystProposal, ctx: &DecisionContext) -> RiskAssessment {

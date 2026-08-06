@@ -78,7 +78,7 @@ impl RateLimiter {
             let last = self.last_refill.load(Ordering::Acquire);
             let tokens = self.tokens.load(Ordering::Acquire);
 
-            let elapsed = if now > last { now - last } else { 0 };
+            let elapsed = now.saturating_sub(last);
             // Refill is measured from `last` since the last time we consumed a token.
             let refilled = (elapsed as f64 * self.refill_rate / 1_000_000.0) as u64;
             let updated_tokens = tokens.saturating_add(refilled).min(self.max_tokens);
@@ -338,9 +338,12 @@ impl Broker for TinkoffBroker {
         let req = PostOrderRequest {
             figi: Some(request.instrument.clone()),
             quantity: request.quantity as i64,
-            price: request.price.map(|p| Quotation {
-                units: p as i64,
-                nano: ((p.fract() * 1_000_000_000.0) as i32),
+            price: request.price.map(|p| {
+                let v = decimal_to_f64(p);
+                Quotation {
+                    units: v as i64,
+                    nano: ((v.fract() * 1_000_000_000.0) as i32),
+                }
             }),
             direction: direction as i32,
             account_id: self.account_id.clone(),
@@ -434,13 +437,19 @@ impl Broker for TinkoffBroker {
             figi: Some(request.instrument.clone()),
             quantity: request.quantity as i64,
             // Limit price for the child order; None ⇒ market child order.
-            price: request.price.map(|p| Quotation {
-                units: p as i64,
-                nano: ((p.fract() * 1_000_000_000.0) as i32),
+            price: request.price.map(|p| {
+                let v = decimal_to_f64(p);
+                Quotation {
+                    units: v as i64,
+                    nano: ((v.fract() * 1_000_000_000.0) as i32),
+                }
             }),
-            stop_price: Some(Quotation {
-                units: request.stop_price as i64,
-                nano: ((request.stop_price.fract() * 1_000_000_000.0) as i32),
+            stop_price: Some({
+                let v = decimal_to_f64(request.stop_price);
+                Quotation {
+                    units: v as i64,
+                    nano: ((v.fract() * 1_000_000_000.0) as i32),
+                }
             }),
             direction: direction as i32,
             account_id: self.account_id.clone(),
@@ -452,9 +461,13 @@ impl Broker for TinkoffBroker {
             take_profit_type: 0,
             trailing_data: None,
             price_type: 0,
-            order_id: request
-                .client_order_id
-                .unwrap_or_else(|| format!("stop_{}_{}", Utc::now().timestamp_nanos_opt().unwrap_or(0), std::process::id())),
+            order_id: request.client_order_id.unwrap_or_else(|| {
+                format!(
+                    "stop_{}_{}",
+                    Utc::now().timestamp_nanos_opt().unwrap_or(0),
+                    std::process::id()
+                )
+            }),
             confirm_margin_trade: false,
             instant_execution: None,
         };
@@ -494,32 +507,38 @@ impl Broker for TinkoffBroker {
 
         let mut positions = Vec::new();
         for pos in &info.positions {
+            let average = pos.average_position_price;
+            let current = pos.current_price;
+            let quantity = pos.quantity as f64;
             positions.push(PositionView {
                 instrument: pos.uid.clone(),
                 quantity: pos.quantity as i32,
-                average_price: pos.average_position_price,
-                current_price: pos.current_price,
-                pnl: (pos.current_price - pos.average_position_price) * pos.quantity as f64,
-                pnl_pct: if pos.average_position_price > 0.0 {
-                    (pos.current_price - pos.average_position_price) / pos.average_position_price
-                        * 100.0
+                average_price: f64_to_decimal(average),
+                current_price: f64_to_decimal(current),
+                pnl: f64_to_decimal((current - average) * quantity),
+                pnl_pct: f64_to_decimal(if average > 0.0 {
+                    (current - average) / average * 100.0
                 } else {
                     0.0
-                },
-                total_value: pos.current_price * pos.quantity as f64,
+                }),
+                total_value: f64_to_decimal(current * quantity),
             });
         }
 
-        let total_value = positions.iter().map(|p| p.total_value).sum::<f64>() + info.total_amount;
+        let total_value = positions
+            .iter()
+            .map(|p| decimal_to_f64(p.total_value))
+            .sum::<f64>()
+            + info.total_amount;
         let total_pnl = positions.iter().map(|p| p.pnl).sum();
 
         Ok(PortfolioView {
             account_id: self.account_id.clone(),
-            total_balance: info.total_amount,
-            available_balance: ps.get_available_balance().await.unwrap_or(0.0),
+            total_balance: f64_to_decimal(info.total_amount),
+            available_balance: f64_to_decimal(ps.get_available_balance().await.unwrap_or(0.0)),
             positions,
             total_pnl,
-            total_value,
+            total_value: f64_to_decimal(total_value),
         })
     }
 
@@ -532,18 +551,20 @@ impl Broker for TinkoffBroker {
         match ps.get_position(instrument).await? {
             Some(p) => {
                 let current_price = self.last_price(instrument).await.unwrap_or(0.0);
+                let average = p.average_price;
+                let quantity = p.quantity as f64;
                 Ok(Some(PositionView {
                     instrument: instrument.to_string(),
                     quantity: p.quantity,
-                    average_price: p.average_price,
-                    current_price,
-                    pnl: (current_price - p.average_price) * p.quantity as f64,
-                    pnl_pct: if p.average_price > 0.0 {
-                        (current_price - p.average_price) / p.average_price * 100.0
+                    average_price: f64_to_decimal(average),
+                    current_price: f64_to_decimal(current_price),
+                    pnl: f64_to_decimal((current_price - average) * quantity),
+                    pnl_pct: f64_to_decimal(if average > 0.0 {
+                        (current_price - average) / average * 100.0
                     } else {
                         0.0
-                    },
-                    total_value: current_price * p.quantity as f64,
+                    }),
+                    total_value: f64_to_decimal(current_price * quantity),
                 }))
             }
             None => Ok(None),

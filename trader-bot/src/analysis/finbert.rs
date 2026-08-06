@@ -38,9 +38,12 @@ impl FinBertSentimentService {
                 let text = t.clone();
                 async move {
                     let text_for_events = text.clone();
-                    let result = tokio::task::spawn_blocking(move || inference.predict(&text))
-                        .await??;
-                    Ok::<_, anyhow::Error>(FinBertSentiment::from_nlp_result(&text_for_events, result))
+                    let result =
+                        tokio::task::spawn_blocking(move || inference.predict(&text)).await??;
+                    Ok::<_, anyhow::Error>(FinBertSentiment::from_nlp_result(
+                        &text_for_events,
+                        result,
+                    ))
                 }
             })
             .collect();
@@ -147,5 +150,3 @@ impl NewsSentimentAnalyzer for FinBertSentimentService {
         })
     }
 }
-
-

@@ -31,8 +31,6 @@ pub struct SignalRecord {
 }
 
 pub struct TradeJournal {
-    trades_file: PathBuf,
-    signals_file: PathBuf,
     trades_writer: Option<csv::Writer<File>>,
     signals_writer: Option<csv::Writer<File>>,
 }
@@ -59,8 +57,6 @@ impl TradeJournal {
         );
 
         Ok(TradeJournal {
-            trades_file: trades_path,
-            signals_file: signals_path,
             trades_writer: Some(trades_writer),
             signals_writer: Some(signals_writer),
         })

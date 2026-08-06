@@ -6,17 +6,12 @@ use std::collections::HashMap;
 #[derive(Debug, Clone)]
 pub struct StatArbPredictor {
     z_entry: f64,
-    z_exit: f64,
     lookback: usize,
 }
 
 impl StatArbPredictor {
-    pub fn new(z_entry: f64, z_exit: f64, lookback: usize) -> Self {
-        StatArbPredictor {
-            z_entry,
-            z_exit,
-            lookback,
-        }
+    pub fn new(z_entry: f64, lookback: usize) -> Self {
+        StatArbPredictor { z_entry, lookback }
     }
 
     pub async fn predict(&self, ctx: &PredictionContext) -> Result<Prediction> {

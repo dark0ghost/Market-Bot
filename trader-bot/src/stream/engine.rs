@@ -1,7 +1,7 @@
 use anyhow::Result;
 use chrono::{DateTime, Utc};
-use futures::stream::iter;
 use futures::StreamExt;
+use futures::stream::iter;
 use std::collections::HashMap;
 use t_invest_sdk::TInvestSdk;
 use t_invest_sdk::api::{
@@ -127,11 +127,21 @@ impl MarketDataStream {
                 Err(e) => {
                     retry_count += 1;
                     if retry_count > max_retries {
-                        log::error!("Max reconnection retries ({}) reached, giving up: {}", max_retries, e);
+                        log::error!(
+                            "Max reconnection retries ({}) reached, giving up: {}",
+                            max_retries,
+                            e
+                        );
                         return Err(anyhow::anyhow!("Max reconnection retries reached: {}", e));
                     }
                     let backoff_ms = 1000 * 2u64.pow(retry_count.saturating_sub(1));
-                    log::warn!("Stream connection failed, retrying in {}ms ({}/{}): {}", backoff_ms, retry_count, max_retries, e);
+                    log::warn!(
+                        "Stream connection failed, retrying in {}ms ({}/{}): {}",
+                        backoff_ms,
+                        retry_count,
+                        max_retries,
+                        e
+                    );
                     tokio::time::sleep(std::time::Duration::from_millis(backoff_ms)).await;
                     continue;
                 }
@@ -143,10 +153,8 @@ impl MarketDataStream {
 
             // Process events until an error occurs
             loop {
-                match tokio::time::timeout(
-                    std::time::Duration::from_secs(60),
-                    stream.next()
-                ).await {
+                match tokio::time::timeout(std::time::Duration::from_secs(60), stream.next()).await
+                {
                     Ok(Some(Ok(response))) => {
                         if let Some(payload) = response.payload {
                             handle_market_response(payload, &tx).await;

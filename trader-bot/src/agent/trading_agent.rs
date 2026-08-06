@@ -99,7 +99,6 @@ pub struct CurrentPosition {
 /// LLM-based trading agent
 pub struct TradingAgent {
     llm_query: Box<dyn LlmQuery>,
-    model_name: String,
     /// Dual persistence: RAM + flash (JSON file)
     pub memory: Arc<RwLock<DecisionMemory>>,
 }
@@ -107,7 +106,7 @@ pub struct TradingAgent {
 impl TradingAgent {
     pub fn new(
         llm_query: Box<dyn LlmQuery>,
-        model_name: String,
+        _model_name: String,
         memory_path: Option<PathBuf>,
     ) -> Result<Self> {
         let memory = match memory_path {
@@ -116,7 +115,6 @@ impl TradingAgent {
         };
         Ok(TradingAgent {
             llm_query,
-            model_name,
             memory: Arc::new(RwLock::new(memory)),
         })
     }
@@ -133,7 +131,10 @@ impl TradingAgent {
     }
 
     /// Fast decision without LLM (rule-based)
-    pub async fn make_rule_based_decision(&self, context: DecisionContext) -> Result<TradingDecision> {
+    pub async fn make_rule_based_decision(
+        &self,
+        context: DecisionContext,
+    ) -> Result<TradingDecision> {
         let mut action = Action::Hold;
         let mut confidence = 0.5;
         let mut rationale_parts = Vec::new();
@@ -402,17 +403,38 @@ impl TradingAgent {
         if decision.action == Action::Hold {
             return;
         }
-        if let Ok(mut memory) = self.memory.write() {
-            let record = DecisionRecord::new(
-                &decision.ticker,
-                decision.action.clone(),
-                decision.confidence,
-                decision.current_price,
-                decision.stop_loss,
-                &decision.rationale,
-                provider,
-            );
-            let _ = memory.add(record).await;
+        let record = DecisionRecord::new(
+            &decision.ticker,
+            decision.action.clone(),
+            decision.confidence,
+            decision.current_price,
+            decision.stop_loss,
+            &decision.rationale,
+            provider,
+        );
+
+        // Serialize to JSON under the lock, then write the file outside of it
+        // so the lock is never held across an await point.
+        let payload = {
+            let mut memory = match self.memory.write() {
+                Ok(m) => m,
+                Err(_) => return,
+            };
+            memory.add_sync(record);
+            let path = memory.path().cloned();
+            match &path {
+                Some(p) => serde_json::to_string_pretty(&memory.records())
+                    .ok()
+                    .map(|json| (p.clone(), json)),
+                None => None,
+            }
+        };
+
+        if let Some((path, json)) = payload
+            && let Some(parent) = path.parent()
+            && tokio::fs::create_dir_all(parent).await.is_ok()
+        {
+            let _ = tokio::fs::write(&path, json).await;
         }
     }
 

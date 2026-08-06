@@ -8,7 +8,6 @@ flowchart TB
         AG[Agent Core]
         AG -->|reads| CLAUDE[CLAUDE.md]
         AG -->|reads| AGENTS[AGENTS.md]
-        AG -->|calls| SKILLS[skills/trade-api/]
     end
 
     subgraph TradeBotSubAgents["Trading Sub-Agents (in-process Rust)"]
@@ -16,23 +15,20 @@ flowchart TB
         SA[SupervisorAgent<br/>Risk & validation]
         AA[AnalystAgent<br/>Market analysis]
         RA[RiskAgent<br/>Exposure checks]
-        CA[CalibrationAgent<br/>Param tuning]
-        MA[MemoryAgent<br/>Context persistence]
+        CAL[PredictionTracker<br/>Confidence calibration]
+        MEM[DecisionMemory<br/>Context persistence]
     end
 
     subgraph ML_Inference["ML Inference"]
         FINBERT[FinBERT ONNX<br/>Sentiment NLP]
-        TS[Time-Series ONNX<br/>Price prediction]
     end
 
-    subgraph Skills["Skills / Plugins"]
-        FINAM_SKILL[finam-skill<br/>trade-api]
+    subgraph LLM_Backends["LLM Backends"]
         PERPLEXICA[Perplexica<br/>Context search]
         OLLAMA[Ollama<br/>LLM analysis]
     end
 
     AG -->|trader-bot build/test| TA
-    AG -->|finam-skill install| FINAM_SKILL
     TA --> FINBERT
     TA --> PERPLEXICA
     TA --> OLLAMA
@@ -41,35 +37,38 @@ flowchart TB
 
 The system is structured as a multi-agent architecture with three layers:
 
-- **IDE AI Agent** (Claude Code / Cursor / Codex) orchestrates development tasks via skill plugins
+- **IDE AI Agent** (Claude Code / Cursor / Codex) orchestrates development tasks
 - **Trading Sub-Agents** (in-process Rust) form the runtime decision pipeline: AnalystAgent collects signals, SupervisorAgent validates risk, TradingAgent executes decisions
-- **ML Inference** runs ONNX models (FinBERT for sentiment, time-series for price prediction) loaded in-process with hot-reload support
+- **ML Inference** runs the FinBERT ONNX model (news sentiment) loaded in-process with hot-reload support
 
 Data flow: `WS OrderBook -> features -> ONNX FinBERT -> Decision Engine -> Risk -> Execution`
 
 ```
 ai-trade-bot/
-├── trader-bot/                  # Rust - trading core
+├── trader-bot/                  # Rust - trading core (workspace member)
 │   ├── src/
 │   │   ├── main.rs              # Entry point, wires everything
-│   │   ├── core/                # Broker-agnostic types & traits
-│   │   ├── agent/               # TradingAgent, SupervisorAgent, AnalystAgent, RiskAgent
+│   │   ├── lib.rs               # Library root (mods + re-exports)
+│   │   ├── core/                # Broker-agnostic types & traits (Decimal money)
+│   │   ├── agent/               # TradingAgent, AnalystAgent, SupervisorAgent, RiskAgent
+│   │   ├── provider/prediction/ # Technical/Llm/StatArb/Fundamental/FinBert predictors
 │   │   ├── broker/              # Tinkoff, Mock, Finam implementations
 │   │   ├── datasource/          # Tinkoff, Finam data sources
 │   │   ├── ml_inference/        # ONNX (FinBERT NLP) with hot-reload
-│   │   ├── strategy/            # Grid, Interval, Momentum, etc.
-│   │   ├── execution/           # Order management
-│   │   ├── config/              # Config loading
-│   │   └── api/                 # Axum dashboard
-│   └── config/account.json
-├── mcp-client/                  # LLM integration (Ollama)
+│   │   ├── strategy/            # Grid, Interval, Ai, StatArb, pairs, trading calendar
+│   │   ├── execution/           # Position manager/tracker, risk gate, journal
+│   │   ├── mcp/                 # Ollama + Perplexica LLM backends
+│   │   ├── api/                 # Axum dashboard
+│   │   └── config/              # Config loading (BrokerType enum)
+│   └── config/account.json      # Broker credentials
 ├── training/
 │   ├── finbert_sft/             # FinBERT SFT pipeline (PyTorch -> ONNX)
 │   ├── data_collection/         # RSS + Perplexica -> Ollama labeling
 │   └── pipeline.sh              # Full end-to-end training pipeline
 ├── models/finbert/              # ONNX artifacts (model.onnx, tokenizer.json)
 ├── scripts/download_model.sh    # Download pre-trained model from HF Hub
-└── skills/trade-api/            # IDE skill: analyze, scan, backtest, train
+├── example/config/              # Account config example
+└── docs/                        # MkDocs site source
 ```
 
 ## Project Setup
@@ -89,7 +88,6 @@ cd ai-trade-bot
 
 # Build the Rust workspace
 cargo build -p trader-bot
-cargo build -p mcp-client
 ```
 
 ### Python Dependencies (Training)
@@ -133,7 +131,6 @@ cargo build
 
 # Build specific crate
 cargo build -p trader-bot
-cargo build -p mcp-client
 ```
 
 ### Test
@@ -185,28 +182,7 @@ cargo build --release -p trader-bot
 
 ## Available Skills
 
-### trade-api (built-in)
-
-**Location:** `skills/trade-api/SKILL.md`
-
-Commands available to IDE agents:
-
-| Command | Description |
-|---------|-------------|
-| `analyze` | Deep portfolio analysis with FinBERT sentiment |
-| `scan` | Market scanner - find instruments by volatility/volume/momentum |
-| `backtest` | Run strategy backtest with parameter ranges |
-| `train` | Run FinBERT SFT training pipeline |
-
-```bash
-# In Claude Code:
-/ai-trade-bot:scan
-# Find MOEX stocks with volume >500M and growth >5% over the last week
-
-# In Cursor:
-/ai-trade-bot:analyze
-# Analyze portfolio, show risks
-```
+Skills are provided via IDE plugins - none are bundled inside this repository.
 
 ### finam-skill (external)
 
@@ -232,11 +208,9 @@ Main decision-making agent. Collects signals from AnalystAgent, validates throug
 ```rust
 // trader-bot/src/agent/trading_agent.rs
 pub struct TradingAgent {
-    llm: OllamaProvider,
-    memory: DecisionMemory,
-    analyst: AnalystAgent,
-    supervisor: SupervisorAgent,
-    calibrator: CalibrationAgent,
+    llm_query: Box<dyn LlmQuery>,
+    /// Dual persistence: RAM + flash (JSON file)
+    pub memory: Arc<RwLock<DecisionMemory>>,
 }
 
 impl TradingAgent {
@@ -262,9 +236,10 @@ pub struct AnalystAgent {
 
 Uses an ensemble of predictors:
 - **TechnicalPredictor** - RSI, MACD, Bollinger Bands, volume analysis
-- **LLMPredictor** - Ollama-based fundamental/news reasoning
+- **LlmPredictor** - Ollama-based fundamental/news reasoning
 - **StatArbPredictor** - statistical arbitrage signals
 - **FundamentalPredictor** - P/E, ROE, D/E, revenue growth
+- **FinBertPredictor** - FinBERT news sentiment
 
 The ensemble produces a weighted `AnalystProposal` with action, confidence, and conviction score.
 
@@ -292,16 +267,17 @@ Validates signals before execution:
 - Historical win-rate weighting
 - Open positions limit
 
-### MemoryAgent
+### DecisionMemory
 
-Persists all decisions and their outcomes in `DecisionMemory`. Used for:
+Persists all decisions and their outcomes. Used for:
 
 - Few-shot examples in LLM prompts
-- Confidence calibration (CalibrationAgent)
+- Confidence calibration (PredictionTracker)
 - Historical error analysis
 - Win-rate tracking per provider
 
 ```rust
+// trader-bot/src/agent/memory.rs
 pub struct DecisionMemory {
     records: VecDeque<DecisionRecord>,
     max_records: usize,
@@ -310,11 +286,12 @@ pub struct DecisionMemory {
 
 Tracks for each record: ticker, action, conviction, entry/exit price, PnL, provider name, success flag.
 
-### CalibrationAgent
+### PredictionTracker (calibration)
 
 Confidence score calibration on historical data. Corrects overconfidence/underconfidence bias via Platt scaling.
 
 ```rust
+// trader-bot/src/agent/calibration.rs
 pub struct PredictionTracker {
     provider_results: HashMap<String, ProviderStats>,
     calibration_bins: Vec<CalibrationBin>,  // 10 bins from 0.0 to 1.0
@@ -468,12 +445,4 @@ The pipeline script (`training/pipeline.sh`) runs:
 | **Edition** | Rust edition 2024 |
 | **Broker trait** | `crate::core::traits::Broker` |
 | **Config** | `trader-bot/config/account.json` loaded via serde JSON |
-
-## Plugin Manifests
-
-| Platform | File |
-|----------|------|
-| Claude Code | `.claude-plugin/plugin.json` |
-| Cursor | `.cursor-plugin/plugin.json` |
-| Codex | `.codex-plugin/plugin.json` |
-| Marketplace registry | `.agents/plugins/marketplace.json` |
+| **Money** | `Decimal` (rust_decimal) on broker-facing order/portfolio fields; `f64` for market data & analysis |

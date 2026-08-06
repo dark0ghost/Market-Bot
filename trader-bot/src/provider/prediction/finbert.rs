@@ -93,7 +93,7 @@ impl FinBertPredictor {
         let avg_confidence = total_confidence / count;
 
         let conviction = (avg_pos - avg_neg) as f64;
-        let sentiment_score = conviction;
+        let _sentiment_score = conviction;
 
         features.insert("finbert_pos".into(), avg_pos);
         features.insert("finbert_neg".into(), avg_neg);
@@ -135,5 +135,3 @@ impl FinBertPredictor {
         })
     }
 }
-
-

@@ -1,7 +1,32 @@
 use chrono::{DateTime, Utc};
+pub use rust_decimal::Decimal;
+use rust_decimal::prelude::{FromPrimitive, ToPrimitive};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::collections::HashMap;
+
+// ─── Money helpers ───────────────────────────────────────────────────
+//
+// Broker-facing money fields (order prices, balances, position values) use
+// `Decimal` to avoid floating-point drift on money. Market-data prices (OHLCV,
+// order book) stay as `f64` since they feed indicator math. These helpers do
+// the boundary conversions.
+
+/// Convert an `f64` into `Decimal` for broker-facing money fields.
+/// Non-finite values (NaN/inf) fall back to zero.
+pub fn f64_to_decimal(v: f64) -> Decimal {
+    Decimal::from_f64(v).unwrap_or_default()
+}
+
+/// Convert a `Decimal` money value back to `f64` for internal analysis math.
+pub fn decimal_to_f64(d: Decimal) -> f64 {
+    d.to_f64().unwrap_or_default()
+}
+
+/// Parse a `Decimal` from a broker API money string, falling back to zero.
+pub fn decimal_from_str(s: &str) -> Decimal {
+    s.trim().parse().unwrap_or_default()
+}
 
 // ─── Market Data Types ───────────────────────────────────────────────
 
@@ -95,7 +120,7 @@ pub struct OrderRequest {
     pub action: OrderAction,
     pub order_type: OrderType,
     pub quantity: i32,
-    pub price: Option<f64>,
+    pub price: Option<Decimal>,
     pub account_id: String,
     pub client_order_id: Option<String>,
 }
@@ -117,9 +142,9 @@ pub struct StopOrderRequest {
     pub kind: StopOrderKind,
     pub quantity: i32,
     /// Activation price (stop price).
-    pub stop_price: f64,
+    pub stop_price: Decimal,
     /// Optional limit price for stop-limit orders; if None a market order is used.
-    pub price: Option<f64>,
+    pub price: Option<Decimal>,
     pub account_id: String,
     pub client_order_id: Option<String>,
 }
@@ -132,8 +157,8 @@ pub struct OrderResponse {
     pub action: OrderAction,
     pub quantity: i32,
     pub filled_quantity: i32,
-    pub price: Option<f64>,
-    pub avg_fill_price: Option<f64>,
+    pub price: Option<Decimal>,
+    pub avg_fill_price: Option<Decimal>,
     pub status: OrderStatus,
     pub created_at: DateTime<Utc>,
     pub message: String,
@@ -145,21 +170,21 @@ pub struct OrderResponse {
 pub struct PositionView {
     pub instrument: String,
     pub quantity: i32,
-    pub average_price: f64,
-    pub current_price: f64,
-    pub pnl: f64,
-    pub pnl_pct: f64,
-    pub total_value: f64,
+    pub average_price: Decimal,
+    pub current_price: Decimal,
+    pub pnl: Decimal,
+    pub pnl_pct: Decimal,
+    pub total_value: Decimal,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PortfolioView {
     pub account_id: String,
-    pub total_balance: f64,
-    pub available_balance: f64,
+    pub total_balance: Decimal,
+    pub available_balance: Decimal,
     pub positions: Vec<PositionView>,
-    pub total_pnl: f64,
-    pub total_value: f64,
+    pub total_pnl: Decimal,
+    pub total_value: Decimal,
 }
 
 // ─── Instrument Types ────────────────────────────────────────────────

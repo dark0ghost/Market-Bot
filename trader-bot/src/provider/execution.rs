@@ -29,7 +29,9 @@ pub trait ExecutionProvider {
         _limit_price: Option<f64>,
         _kind: StopOrderKind,
     ) -> Result<OrderResult> {
-        Err(anyhow::anyhow!("stop orders not supported by this provider"))
+        Err(anyhow::anyhow!(
+            "stop orders not supported by this provider"
+        ))
     }
 
     async fn get_orders(&self) -> Result<Vec<OrderResult>>;

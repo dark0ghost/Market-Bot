@@ -138,7 +138,7 @@ impl PositionTracker {
                 .collect();
             if let Some(ref mut rec) = to_close.last_mut() {
                 rec.close(exit_price);
-                let _ = mem.add(rec.clone());
+                mem.add_sync(rec.clone());
             }
         }
     }

@@ -104,11 +104,15 @@ impl DecisionMemory {
         Ok(mem)
     }
 
-    pub async fn add(&mut self, record: DecisionRecord) -> Result<()> {
+    pub fn add_sync(&mut self, record: DecisionRecord) {
         if self.records.len() >= self.max_records {
             self.records.pop_front();
         }
         self.records.push_back(record);
+    }
+
+    pub async fn add(&mut self, record: DecisionRecord) -> Result<()> {
+        self.add_sync(record);
         if let Some(ref path) = self.path {
             self.save(path).await?;
         }
@@ -141,6 +145,10 @@ impl DecisionMemory {
 
     pub fn records(&self) -> &VecDeque<DecisionRecord> {
         &self.records
+    }
+
+    pub fn path(&self) -> Option<&PathBuf> {
+        self.path.as_ref()
     }
 
     pub fn recent(&self, n: usize) -> Vec<&DecisionRecord> {

@@ -262,12 +262,14 @@ impl TechnicalAnalyzer {
 
         let mut bb = match BollingerBands::new(period, self.bollinger_std_dev) {
             Ok(bb) => bb,
-            Err(_) => return BollingerValues {
-                upper: 0.0,
-                middle: 0.0,
-                lower: 0.0,
-                bandwidth: 0.0,
-            },
+            Err(_) => {
+                return BollingerValues {
+                    upper: 0.0,
+                    middle: 0.0,
+                    lower: 0.0,
+                    bandwidth: 0.0,
+                };
+            }
         };
 
         let mut upper = 0.0;

@@ -32,9 +32,12 @@ impl FinBertInference {
 
         let session = Arc::new(OrtSessionPool::new(onnx_str, num_threads)?);
 
-        let tokenizer_str = tokenizer_path
-            .to_str()
-            .ok_or_else(|| anyhow::anyhow!("Tokenizer path contains invalid UTF-8: {:?}", tokenizer_path))?;
+        let tokenizer_str = tokenizer_path.to_str().ok_or_else(|| {
+            anyhow::anyhow!(
+                "Tokenizer path contains invalid UTF-8: {:?}",
+                tokenizer_path
+            )
+        })?;
 
         let tokenizer = Tokenizer::from_file(tokenizer_str)
             .map_err(|e| anyhow::anyhow!("Tokenizer load failed: {e}"))?;
@@ -103,10 +106,10 @@ impl FinBertInference {
         };
 
         let mut cache = self.cache.lock().unwrap();
-        if cache.len() >= MAX_CACHE_SIZE {
-            if let Some(&oldest_key) = cache.keys().next() {
-                cache.remove(&oldest_key);
-            }
+        if cache.len() >= MAX_CACHE_SIZE
+            && let Some(&oldest_key) = cache.keys().next()
+        {
+            cache.remove(&oldest_key);
         }
         cache.insert(hash, result.clone());
 

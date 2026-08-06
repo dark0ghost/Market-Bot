@@ -1,4 +1,4 @@
-use crate::core::{OrderAction, OrderStatus};
+use crate::core::OrderAction;
 use crate::execution::position_manager::{OrderResult, PositionManager};
 use crate::strategy::grid::{GridLevel, GridState, GridStrategy, OrderSide};
 use anyhow::Result;
@@ -184,7 +184,10 @@ impl GridExecutor {
     /// Cancel the live broker order mapped to a grid level.
     async fn cancel_order_by_level(&mut self, level_index: u32) -> Result<()> {
         let Some(order_id) = self.level_order_ids.get(&level_index).cloned() else {
-            warn!("No mapped order_id for level {}, skipping cancel", level_index);
+            warn!(
+                "No mapped order_id for level {}, skipping cancel",
+                level_index
+            );
             return Ok(());
         };
         self.position_manager.cancel_order(&order_id).await?;
@@ -270,6 +273,7 @@ pub struct RebalanceResult {
 mod tests {
     use super::*;
     use crate::config::GridConfig;
+    use crate::core::OrderStatus;
 
     #[test]
     fn test_rebalance_result_debug() {

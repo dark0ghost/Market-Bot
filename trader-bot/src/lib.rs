@@ -10,7 +10,6 @@ pub mod execution;
 pub mod instrument;
 pub mod mcp;
 pub mod provider;
-pub mod scanner;
 pub mod scheduler;
 pub mod storage;
 pub mod strategy;

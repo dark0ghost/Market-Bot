@@ -93,6 +93,7 @@ struct FinamOrderItem {
     symbol: Option<String>,
     side: Option<String>,
     #[serde(rename = "type")]
+    #[allow(dead_code)]
     order_type: Option<String>,
     quantity: Option<FinamDecimal>,
     limit_price: Option<FinamDecimal>,
@@ -148,28 +149,17 @@ struct FinamOrderBookLevel {
     volume: Option<FinamDecimal>,
 }
 
-#[derive(Deserialize)]
-struct FinamAssetsResponse {
-    assets: Option<Vec<FinamAsset>>,
-}
-
-#[derive(Deserialize)]
-struct FinamAsset {
-    symbol: Option<String>,
-    ticker: Option<String>,
-    #[allow(dead_code)]
-    mic: Option<String>,
-    #[allow(dead_code)]
-    name: Option<String>,
-    #[allow(dead_code)]
-    r#type: Option<String>,
-}
-
 // ─── Helpers ─────────────────────────────────────────────────────────
 
 fn parse_decimal(d: &Option<FinamDecimal>) -> Option<f64> {
     let v = d.as_ref()?.value.as_ref()?;
     v.parse::<f64>().ok()
+}
+
+/// Parse a money value straight into `Decimal` (avoids an f64 round-trip).
+fn parse_decimal_money(d: &Option<FinamDecimal>) -> Option<Decimal> {
+    let v = d.as_ref()?.value.as_ref()?;
+    v.parse().ok()
 }
 
 fn parse_money(m: &Option<Vec<FinamMoney>>) -> f64 {
@@ -256,12 +246,13 @@ impl FinamBroker {
         let auth_value = format!("Bearer {}", self.token);
         h.insert(
             reqwest::header::AUTHORIZATION,
-            auth_value
-                .parse()
-                .unwrap_or_else(|e| {
-                    log::error!("Failed to parse authorization header: {:?}, using fallback", e);
-                    reqwest::header::HeaderValue::from_static("Bearer invalid")
-                }),
+            auth_value.parse().unwrap_or_else(|e| {
+                log::error!(
+                    "Failed to parse authorization header: {:?}, using fallback",
+                    e
+                );
+                reqwest::header::HeaderValue::from_static("Bearer invalid")
+            }),
         );
         h
     }
@@ -537,7 +528,7 @@ impl Broker for FinamBroker {
                     action,
                     quantity: parse_decimal(&o.quantity).unwrap_or(0.0) as i32,
                     filled_quantity: 0,
-                    price: parse_decimal(&o.limit_price),
+                    price: parse_decimal_money(&o.limit_price),
                     avg_fill_price: None,
                     status,
                     created_at: Utc::now(),
@@ -575,36 +566,38 @@ impl Broker for FinamBroker {
 
         for p in &positions {
             let qty = parse_decimal(&p.quantity).unwrap_or(0.0) as i32;
-            let avg = parse_decimal(&p.average_price).unwrap_or(0.0);
-            let cur = parse_decimal(&p.current_price).unwrap_or(0.0);
+            let avg = parse_decimal_money(&p.average_price).unwrap_or_default();
+            let cur = parse_decimal_money(&p.current_price).unwrap_or_default();
+            let avg_f = decimal_to_f64(avg);
+            let cur_f = decimal_to_f64(cur);
 
             pos_views.push(PositionView {
                 instrument: symbol_to_figi(p.symbol.as_deref().unwrap_or("")),
                 quantity: qty,
                 average_price: avg,
                 current_price: cur,
-                pnl: (cur - avg) * qty as f64,
-                pnl_pct: if avg > 0.0 {
-                    (cur - avg) / avg * 100.0
+                pnl: f64_to_decimal((cur_f - avg_f) * qty as f64),
+                pnl_pct: f64_to_decimal(if avg_f > 0.0 {
+                    (cur_f - avg_f) / avg_f * 100.0
                 } else {
                     0.0
-                },
-                total_value: cur * qty as f64,
+                }),
+                total_value: f64_to_decimal(cur_f * qty as f64),
             });
         }
 
-        let total_value: f64 = pos_views.iter().map(|p| p.total_value).sum();
-        let total_pnl: f64 = pos_views.iter().map(|p| p.pnl).sum();
+        let total_value = pos_views.iter().map(|p| p.total_value).sum::<Decimal>();
+        let total_pnl = pos_views.iter().map(|p| p.pnl).sum::<Decimal>();
 
         let available = resp
             .portfolio_mc
             .as_ref()
-            .and_then(|mc| parse_decimal(&mc.available_cash))
-            .unwrap_or(cash);
+            .and_then(|mc| parse_decimal_money(&mc.available_cash))
+            .unwrap_or_else(|| f64_to_decimal(cash));
 
         Ok(PortfolioView {
             account_id: self.account_id.clone(),
-            total_balance: cash + total_value,
+            total_balance: f64_to_decimal(cash) + total_value,
             available_balance: available,
             positions: pos_views,
             total_pnl,
@@ -614,7 +607,7 @@ impl Broker for FinamBroker {
 
     async fn balance(&self) -> Result<f64> {
         let portfolio = self.portfolio().await?;
-        Ok(portfolio.available_balance)
+        Ok(decimal_to_f64(portfolio.available_balance))
     }
 
     async fn position(&self, instrument: &str) -> Result<Option<PositionView>> {

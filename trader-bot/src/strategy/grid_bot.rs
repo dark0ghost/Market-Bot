@@ -83,7 +83,10 @@ impl GridBot {
         self.executor = Some(executor);
 
         // Main monitoring loop
-        let calendar = TradingCalendar::default();
+        let calendar = match std::env::var("MOEX_HOLIDAYS_FILE") {
+            Ok(path) => TradingCalendar::from_holiday_file(std::path::Path::new(&path)),
+            Err(_) => TradingCalendar::default(),
+        };
         loop {
             tokio::time::sleep(tokio::time::Duration::from_secs(
                 self.config.check_interval_secs,

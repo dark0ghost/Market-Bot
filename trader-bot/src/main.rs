@@ -1,30 +1,3 @@
-#![allow(async_fn_in_trait)]
-
-mod agent;
-mod analysis;
-mod api;
-mod backtest;
-mod broker;
-mod client;
-mod config;
-mod core;
-mod datasource;
-mod error;
-mod execution;
-mod instrument;
-mod logging;
-mod mcp;
-mod ml_inference;
-mod optimizer;
-mod provider;
-mod scanner;
-mod scheduler;
-mod storage;
-mod strategy;
-mod stream;
-mod telemetry;
-mod utils;
-
 use anyhow::{Result, anyhow};
 use log::Level;
 use std::env;
@@ -32,21 +5,24 @@ use std::sync::Arc;
 use t_invest_sdk::TInvestSdk;
 use tokio::sync::Mutex;
 
-use agent::{DecisionContext, OllamaQuery, TradingAgent};
-use analysis::{
+use trader_bot::agent::{self, DecisionContext, OllamaQuery, TradingAgent};
+use trader_bot::analysis::{
     FinBertSentimentService, FundamentalDataService, NewsAnalyzer, NewsItem, NewsLlmService,
     NewsSentiment, NewsSentimentAnalyzer, RegimeDetector, TechnicalAnalyzer,
 };
-use broker::{FinamBroker, MockBroker, TinkoffBroker};
-use client::MarketDataService;
-use config::{AccountConfig, Credential, SandboxConfig, StrategyType, TradingConfig, WorkingMode};
-use core::*;
-use datasource::{DataSourceRegistry, TinkoffDataSource};
-use execution::PositionTracker;
-use execution::risk_gate;
-
-use crate::mcp::ollama::OllamaProvider;
-use strategy::{
+use trader_bot::api;
+use trader_bot::broker::{FinamBroker, MockBroker, TinkoffBroker};
+use trader_bot::client::{self, MarketDataService};
+use trader_bot::config::{
+    self, AccountConfig, BrokerType, Credential, SandboxConfig, StrategyType, TradingConfig,
+    WorkingMode,
+};
+use trader_bot::core::*;
+use trader_bot::datasource::{DataSourceRegistry, FinamDataSource, TinkoffDataSource};
+use trader_bot::execution::{PositionTracker, risk_gate};
+use trader_bot::logging;
+use trader_bot::mcp::ollama::OllamaProvider;
+use trader_bot::strategy::{
     AiStrategy, GridBot, GridBotConfig, GridStrategy, IntervalStrategy, StrategyRegistry,
     TradingCalendar,
 };
@@ -56,6 +32,7 @@ use strategy::{
 struct AccountBroker {
     broker: Arc<dyn Broker>,
     sdk: Option<TInvestSdk>,
+    datasource: Option<Arc<dyn DataSource>>,
 }
 
 async fn init_broker(
@@ -65,8 +42,8 @@ async fn init_broker(
     sandbox_cfg: Option<&SandboxConfig>,
 ) -> Result<AccountBroker> {
     let aid = account.account_id.clone().unwrap_or_default();
-    match account.broker.as_str() {
-        "tinkoff" => {
+    match account.broker {
+        BrokerType::Tinkoff => {
             let token = if cred.token.is_empty() {
                 env::var("API_TOKEN")
                     .map_err(|_| anyhow!("API_TOKEN not set and no token in config"))?
@@ -87,30 +64,39 @@ async fn init_broker(
             .await?;
             let sdk = tb.sdk();
             let broker = Arc::new(tb) as Arc<dyn Broker>;
+            let datasource =
+                Some(Arc::new(TinkoffDataSource::new(sdk.clone())) as Arc<dyn DataSource>);
             Ok(AccountBroker {
                 broker,
                 sdk: Some(sdk),
+                datasource,
             })
         }
-        "finam" => {
+        BrokerType::Finam => {
             let finam_cred = cred
                 .additional_keys
                 .as_ref()
-                .and_then(|keys| keys.iter().find(|k| k.broker == "finam"))
+                .and_then(|keys| keys.iter().find(|k| k.broker == BrokerType::Finam))
                 .ok_or_else(|| anyhow!("Finam creds not found for account {}", aid))?;
             let broker = Arc::new(FinamBroker::new(&finam_cred.api_key, aid.clone()).await?)
                 as Arc<dyn Broker>;
-            Ok(AccountBroker { broker, sdk: None })
+            let datasource = Some(Arc::new(
+                FinamDataSource::new(&finam_cred.api_key, Some(aid.clone())).await?,
+            ) as Arc<dyn DataSource>);
+            Ok(AccountBroker {
+                broker,
+                sdk: None,
+                datasource,
+            })
         }
-        "mock" => {
+        BrokerType::Mock => {
             let broker = Arc::new(MockBroker::new(aid.clone(), 1_000_000.0)) as Arc<dyn Broker>;
-            Ok(AccountBroker { broker, sdk: None })
+            Ok(AccountBroker {
+                broker,
+                sdk: None,
+                datasource: None,
+            })
         }
-        other => Err(anyhow!(
-            "Unsupported broker '{}' for account {}",
-            other,
-            aid
-        )),
     }
 }
 
@@ -207,12 +193,15 @@ async fn main() -> Result<()> {
     let fundamental_data = FundamentalDataService::new();
     let mut regime_detector = RegimeDetector::new(14, 14);
 
-    let use_finbert = config
-        .accounts
-        .first()
-        .and_then(|a| a.strategy.parameters.ai_config.as_ref())
-        .map(|c| c.use_finbert)
-        .unwrap_or(false);
+    // Use FinBERT if any account requests it (shared sentiment service).
+    let use_finbert = config.accounts.iter().any(|a| {
+        a.strategy
+            .parameters
+            .ai_config
+            .as_ref()
+            .map(|c| c.use_finbert)
+            .unwrap_or(false)
+    });
     let news_analyzer_service: Arc<dyn NewsSentimentAnalyzer> = if use_finbert {
         log::info!("News sentiment: FinBERT");
         match FinBertSentimentService::new("models/finbert") {
@@ -255,8 +244,8 @@ async fn main() -> Result<()> {
     // ── 5. Data sources ───────────────────────────────────────────────
     let mut data_sources = DataSourceRegistry::new();
     for (_, ab) in &account_brokers {
-        if let Some(ref sdk) = ab.sdk {
-            data_sources.register(Arc::new(TinkoffDataSource::new(sdk.clone())));
+        if let Some(ref ds) = ab.datasource {
+            data_sources.register(ds.clone());
         }
     }
     log::info!("Data sources: {:?}", data_sources.list_names());
@@ -315,21 +304,8 @@ async fn main() -> Result<()> {
     for (account, account_broker) in &account_brokers {
         match account.strategy.strategy {
             StrategyType::Grid => run_grid_account(account, account_broker).await,
-            StrategyType::Ai => {
-                run_ai_account(
-                    account,
-                    account_broker,
-                    &technical_analyzer,
-                    &news_analyzer,
-                    news_analyzer_service.as_ref(),
-                    &fundamental_data,
-                    &mut regime_detector,
-                    &ollama,
-                    &model_name,
-                )
-                .await
-            }
-            // Non-AI strategies share the same pipeline (rule-based unless use_llm is set)
+            // Ai and rule-based strategies share the same pipeline
+            // (rule-based unless use_llm is set in the account config).
             _ => {
                 run_ai_account(
                     account,
@@ -415,6 +391,13 @@ async fn run_ai_account(
     let balance = ab.broker.balance().await.unwrap_or(0.0);
     log::info!("[{}] Balance: {:.2}", aid, balance);
 
+    // Trading calendar: exact closure dates can be provided externally via
+    // MOEX_HOLIDAYS_FILE (one YYYY-MM-DD per line), merged with the built-ins.
+    let calendar = match env::var("MOEX_HOLIDAYS_FILE") {
+        Ok(path) => TradingCalendar::from_holiday_file(std::path::Path::new(&path)),
+        Err(_) => TradingCalendar::default(),
+    };
+
     let memory_path = account
         .strategy
         .parameters
@@ -497,8 +480,8 @@ async fn run_ai_account(
         let position = ab.broker.position(&instrument.ticker).await.ok().flatten();
         let pos_for_ctx = position.map(|p| agent::CurrentPosition {
             quantity: p.quantity,
-            average_price: p.average_price,
-            current_value: p.current_price * p.quantity as f64,
+            average_price: decimal_to_f64(p.average_price),
+            current_value: decimal_to_f64(p.current_price) * p.quantity as f64,
         });
 
         let ctx = DecisionContext {
@@ -561,7 +544,7 @@ async fn run_ai_account(
             .unwrap_or(0.6);
         if decision.action != agent::Action::Hold && decision.confidence >= min_confidence {
             // Market-hours gate: never place orders outside the MOEX session.
-            if !TradingCalendar::default().is_open_now() {
+            if !calendar.is_open_now() {
                 log::warn!(
                     "[{}] Order skipped: MOEX is closed (outside trading hours/holiday)",
                     instrument.ticker
@@ -764,7 +747,7 @@ async fn execute_via_broker(
         action,
         order_type: OrderType::Limit,
         quantity: qty,
-        price: Some(price),
+        price: Some(f64_to_decimal(price)),
         account_id: broker.account_id().to_string(),
         client_order_id: None,
     };
@@ -783,47 +766,45 @@ async fn execute_via_broker(
         agent::Action::Sell => OrderAction::Buy,
         agent::Action::Hold => return Ok(()),
     };
-    if let Some(sl) = decision.stop_loss {
-        if let Err(e) = broker
+    if let Some(sl) = decision.stop_loss
+        && let Err(e) = broker
             .place_stop_order(StopOrderRequest {
                 instrument: decision.ticker.clone(),
                 action: close_action.clone(),
                 kind: StopOrderKind::StopLoss,
                 quantity: qty,
-                stop_price: sl,
-                price: Some(sl),
+                stop_price: f64_to_decimal(sl),
+                price: Some(f64_to_decimal(sl)),
                 account_id: broker.account_id().to_string(),
                 client_order_id: None,
             })
             .await
-        {
-            log::warn!(
-                "[{}] Broker stop-loss rejected (in-memory fallback active): {}",
-                decision.ticker,
-                e
-            );
-        }
+    {
+        log::warn!(
+            "[{}] Broker stop-loss rejected (in-memory fallback active): {}",
+            decision.ticker,
+            e
+        );
     }
-    if let Some(tp) = decision.take_profit {
-        if let Err(e) = broker
+    if let Some(tp) = decision.take_profit
+        && let Err(e) = broker
             .place_stop_order(StopOrderRequest {
                 instrument: decision.ticker.clone(),
                 action: close_action,
                 kind: StopOrderKind::TakeProfit,
                 quantity: qty,
-                stop_price: tp,
-                price: Some(tp),
+                stop_price: f64_to_decimal(tp),
+                price: Some(f64_to_decimal(tp)),
                 account_id: broker.account_id().to_string(),
                 client_order_id: None,
             })
             .await
-        {
-            log::warn!(
-                "[{}] Broker take-profit rejected (in-memory fallback active): {}",
-                decision.ticker,
-                e
-            );
-        }
+    {
+        log::warn!(
+            "[{}] Broker take-profit rejected (in-memory fallback active): {}",
+            decision.ticker,
+            e
+        );
     }
     Ok(())
 }

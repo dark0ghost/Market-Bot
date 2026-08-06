@@ -83,14 +83,6 @@ impl PairsTrader {
         if den == 0.0 { 1.0 } else { num / den }
     }
 
-    fn calculate_spread(&self, hedge_ratio: f64) -> f64 {
-        if let (Some(pa), Some(pb)) = (self.prices_a.back(), self.prices_b.back()) {
-            pa - hedge_ratio * pb
-        } else {
-            0.0
-        }
-    }
-
     fn calculate_z_score(&self, spread: &[f64]) -> f64 {
         if spread.len() < 2 {
             return 0.0;

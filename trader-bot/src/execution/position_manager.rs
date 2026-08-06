@@ -107,8 +107,14 @@ impl PositionManager {
         action: OrderAction,
         quantity: i32,
     ) -> Result<OrderResult> {
-        let request =
-            build_post_order_request(figi, action.clone(), quantity, None, OrderType::Market, &self.account_id);
+        let request = build_post_order_request(
+            figi,
+            action.clone(),
+            quantity,
+            None,
+            OrderType::Market,
+            &self.account_id,
+        );
 
         let response = self.sdk.orders().post_order(request).await?;
         let order_response = response.into_inner();
