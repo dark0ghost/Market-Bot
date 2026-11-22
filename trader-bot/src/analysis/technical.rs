@@ -1,9 +1,11 @@
 use anyhow::Result;
 use chrono::{DateTime, Utc};
+use fin_primitives::signals::{BarInput, Signal as _, indicators::Rsi};
+use rust_decimal::{Decimal, prelude::ToPrimitive};
 use t_invest_sdk::api::Quotation;
 use ta::{
     Next,
-    indicators::{BollingerBands, MovingAverageConvergenceDivergence, RelativeStrengthIndex},
+    indicators::{BollingerBands, MovingAverageConvergenceDivergence},
 };
 
 /// Extract price from Quotation
@@ -213,14 +215,15 @@ impl TechnicalAnalyzer {
             return None;
         }
 
-        let mut rsi = RelativeStrengthIndex::new(self.rsi_period).ok()?;
+        let mut rsi = Rsi::new("rsi", self.rsi_period).ok()?;
         let mut result = None;
 
         for price in prices {
-            result = Some(rsi.next(*price));
+            let close = Decimal::try_from(*price).ok()?;
+            result = rsi.update(&BarInput::from_close(close)).ok()?.as_decimal();
         }
 
-        result
+        result.and_then(|d| d.to_f64())
     }
 
     /// Calculate MACD
@@ -530,5 +533,19 @@ mod tests {
         );
 
         assert_eq!(recommendation, Recommendation::StrongBuy);
+    }
+
+    #[test]
+    fn test_rsi_is_wilder_smoothed() {
+        // Changes +1, +1, -1, +1 with period 2. Wilder: seed avg gain 1 / loss 0,
+        // then 0.5 / 0.5, then 0.75 / 0.25 -> RS 3 -> RSI 75.
+        let analyzer = TechnicalAnalyzer {
+            rsi_period: 2,
+            ..TechnicalAnalyzer::new()
+        };
+        let rsi = analyzer
+            .calculate_rsi(&[10.0, 11.0, 12.0, 11.0, 12.0])
+            .unwrap();
+        assert!((rsi - 75.0).abs() < 1e-9, "rsi = {rsi}");
     }
 }
